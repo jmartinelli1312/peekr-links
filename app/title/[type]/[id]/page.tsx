@@ -1,115 +1,103 @@
-import { Metadata } from 'next';
+export const dynamic = 'force-dynamic';
+import type { Metadata } from 'next';
 
-type PageProps = {
-  params: Promise<{
-    type: 'movie' | 'tv';
-    id: string;
-  }>;
+type Params = {
+  type: 'movie' | 'tv';
+  id: string;
 };
+
+type Props = {
+  params: Promise<Params>;
+};
+
+// ===============================
+// TMDB FETCH (API KEY)
+// ===============================
+const TMDB_KEY = process.env.TMDB_API_KEY!;
+const TMDB_BASE = 'https://api.themoviedb.org/3';
 
 async function getTitle(type: string, id: string) {
   const res = await fetch(
-    `https://api.themoviedb.org/3/${type}/${id}?language=en-US`,
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.TMDB_BEARER_TOKEN}`,
-      },
-      cache: 'no-store',
-    }
+    `${TMDB_BASE}/${type}/${id}?api_key=${TMDB_KEY}&language=en-US`,
+    { next: { revalidate: 86400 } }
   );
 
   if (!res.ok) return null;
   return res.json();
 }
 
-// ----------------------------------------------------
-// 🧠 METADATA (WhatsApp / OG / Twitter)
-// ----------------------------------------------------
+// ===============================
+// METADATA (WhatsApp / OG)
+// ===============================
 export async function generateMetadata(
-  { params }: PageProps
+  { params }: Props
 ): Promise<Metadata> {
-  const { type, id } = await params; // ✅ FIX
-  const data = await getTitle(type, id);
+  const { type, id } = await params;
 
+  const data = await getTitle(type, id);
   if (!data) {
     return {
       title: 'Peekr',
-      description: 'Discover movies and series on Peekr',
+      description: 'Discover movies & TV shows on Peekr',
     };
   }
 
   const title = data.title || data.name;
-  const description =
-    data.overview || 'Discover this title on Peekr';
-
   const poster = data.poster_path
-    ? `https://image.tmdb.org/t/p/w500${data.poster_path}`
+    ? `https://image.tmdb.org/t/p/w780${data.poster_path}`
     : undefined;
-
-  const url = `https://peekr-links.vercel.app/title/${type}/${id}`;
 
   return {
     title,
-    description,
+    description: data.overview,
     openGraph: {
       title,
-      description,
-      url,
-      siteName: 'Peekr',
-      images: poster
-        ? [{ url: poster, width: 500, height: 750 }]
-        : [],
+      description: data.overview,
+      images: poster ? [poster] : [],
       type: 'website',
     },
     twitter: {
       card: 'summary_large_image',
       title,
-      description,
+      description: data.overview,
       images: poster ? [poster] : [],
     },
   };
 }
 
-// ----------------------------------------------------
-// 🧱 PAGE
-// ----------------------------------------------------
-export default async function TitlePage({ params }: PageProps) {
-  const { type, id } = await params; // ✅ FIX
-  const data = await getTitle(type, id);
+// ===============================
+// PAGE
+// ===============================
+export default async function TitlePage({ params }: Props) {
+  const { type, id } = await params;
 
+  const data = await getTitle(type, id);
   if (!data) {
-    return <div style={{ padding: 40 }}>Not found</div>;
+    return <div className="p-10 text-white">Not found</div>;
   }
 
+  const title = data.title || data.name;
+  const poster = data.poster_path
+    ? `https://image.tmdb.org/t/p/w500${data.poster_path}`
+    : null;
+
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#000',
-        color: 'white',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 40,
-        textAlign: 'center',
-      }}
-    >
-      <div>
-        {data.poster_path && (
+    <main className="min-h-screen bg-black text-white p-6">
+      <div className="flex gap-6">
+        {poster && (
           <img
-            src={`https://image.tmdb.org/t/p/w500${data.poster_path}`}
-            style={{ width: 260, borderRadius: 12 }}
+            src={poster}
+            alt={title}
+            className="w-64 rounded-xl"
           />
         )}
-
-        <h1 style={{ marginTop: 20 }}>
-          {data.title || data.name}
-        </h1>
-
-        <p style={{ maxWidth: 420, opacity: 0.8 }}>
-          {data.overview}
-        </p>
+        <div>
+          <h1 className="text-3xl font-bold">{title}</h1>
+          <p className="mt-4 text-white/80 max-w-xl">
+            {data.overview}
+          </p>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
