@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "KSQLRUQFXB.com.peekr.app",
+        "paths": [
+          "/title/*"
+        ]
+      }
+    ]
+  }
+}
