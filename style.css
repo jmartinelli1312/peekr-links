@@ -1,0 +1,82 @@
+/* GLOBAL */
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    background: #0c0615;
+    color: #fff;
+}
+
+/* HERO */
+.hero {
+    text-align: center;
+    padding: 80px 20px 60px;
+}
+
+.hero-logo {
+    width: 180px;
+    margin-bottom: 20px;
+}
+
+.hero-title {
+    font-size: 36px;
+    font-weight: 700;
+    margin: 10px 0;
+}
+
+.hero-subtitle {
+    font-size: 18px;
+    opacity: 0.8;
+    max-width: 420px;
+    margin: 10px auto 30px;
+}
+
+.appstore-btn img {
+    width: 180px;
+    margin-top: 10px;
+}
+
+/* ONBOARDING ROW */
+.onboarding-row {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 40px 20px;
+    flex-wrap: wrap;
+}
+
+.onboarding-row .on-img {
+    width: 280px;
+    border-radius: 20px;
+    box-shadow: 0px 0px 35px rgba(255, 0, 128, 0.3);
+}
+
+/* ABOUT */
+.about {
+    text-align: center;
+    padding: 60px 20px 80px;
+    max-width: 650px;
+    margin: auto;
+}
+
+.about h2 {
+    font-size: 28px;
+    margin-bottom: 15px;
+}
+
+.about p {
+    font-size: 17px;
+    line-height: 1.6;
+    opacity: 0.85;
+}
+
+/* FOOTER */
+footer {
+    text-align: center;
+    padding: 40px 20px;
+    opacity: 0.75;
+}
+
+.footer-logo {
+    width: 60px;
+    margin-bottom: 10px;
+}
