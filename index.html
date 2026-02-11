@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Peekr</title>
+
+  <!-- ========================= -->
+  <!-- OPEN GRAPH (WhatsApp) -->
+  <!-- ========================= -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Peekr" />
+  <meta property="og:title" content="Peekr – Discover what your friends are watching" />
+  <meta property="og:description" content="See what people you trust are watching and discover your next favorite movie or show." />
+  <meta property="og:image" content="https://peekr.app/assets/share-default.jpg" />
+  <meta property="og:url" content="https://peekr.app/" />
+
+  <!-- iOS -->
+  <meta name="apple-itunes-app" content="app-id=TU_APP_ID" />
+
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/png" href="assets/logo-icon.png" />
+</head>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const titleId = params.get('title');
+
+  if (titleId) {
+    setTimeout(() => {
+      window.location.href = `peekr://title/${titleId}`;
+    }, 600);
+
+    setTimeout(() => {
+      window.location.href = "https://apps.apple.com/app/idTU_APP_ID";
+    }, 1600);
+  }
+</script>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+    <img src="assets/logo-text.png" class="hero-logo" alt="Peekr Logo" />
+
+    <h1 class="hero-title">Discover what your friends are watching.</h1>
+    <p class="hero-subtitle">Rate shows, join groups, and explore together.</p>
+
+    <a href="#" class="appstore-btn">
+        <img src="assets/appstore.png" alt="Download on the App Store" />
+    </a>
+</section>
+
+<!-- ONBOARDING PREVIEW -->
+<section class="onboarding-row">
+    <img src="assets/onboarding-1.png" class="on-img" />
+    <img src="assets/onboarding-2.png" class="on-img" />
+    <img src="assets/onboarding-3.png" class="on-img" />
+</section>
+
+<!-- ABOUT -->
+<section class="about">
+    <h1>What is Peekr?</h1>
+    <p><h2>
+        Peekr is a social app where your friends become your best source of 
+        recommendations. See what people you trust are watching, rate movies 
+        and shows, join private groups, track your favorites, and discover new 
+        content together. Everything in one simple and beautiful experience.
+    </h2></p>
+</section>
+
+<!-- FOOTER -->
+<footer>
+    <img src="assets/logo-icon.png" class="footer-logo" />
+    <p>© 2025 Peekr. All rights reserved.</p>
+</footer>
+
+</body>
+</html>
