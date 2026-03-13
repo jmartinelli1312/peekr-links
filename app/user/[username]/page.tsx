@@ -1,21 +1,21 @@
 import { supabase } from "@/lib/supabase";
 
 type PageProps = {
-  params: {
+  params: Promise<{
     username: string;
-  };
+  }>;
 };
 
 export default async function UserPage({ params }: PageProps) {
 
- const username = decodeURIComponent(params.username)
+  const { username } = await params;
+  const decoded = decodeURIComponent(username);
 
-const { data: profile } = await supabase
-  .from("profiles")
-  .select("*")
-  .or(`username.ilike.${username},display_name.ilike.${username}`)
-  .maybeSingle();
-
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("username", decoded)
+    .maybeSingle();
 
   if (!profile) {
     return (
