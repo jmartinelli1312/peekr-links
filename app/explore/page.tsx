@@ -2,8 +2,6 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { translations, getLang } from "@/lib/i18n";
-import HorizontalScroller from "@/components/HorizontalScroller";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -14,9 +12,6 @@ type SearchParams = {
   q?: string;
   tab?: string;
 };
-
-const lang = getLang();
-const t = translations[lang as "en" | "es" | "pt"];
 
 async function fetchTMDB(url: string) {
   const res = await fetch(url, { next: { revalidate: 3600 } });
@@ -41,23 +36,31 @@ async function getExploreData() {
 }
 
 async function getPeeklists() {
-  const { data } = await supabase.from("peeklists").select("*").limit(12);
+  const { data } = await supabase
+    .from("peeklists")
+    .select("*")
+    .limit(12);
+
   return data || [];
 }
 
 async function searchTitles(q: string) {
   const data = await fetchTMDB(
-    `${TMDB_BASE}/search/multi?api_key=${TMDB_KEY}&query=${encodeURIComponent(q)}`
+    `${TMDB_BASE}/search/multi?api_key=${TMDB_KEY}&query=${encodeURIComponent(
+      q
+    )}`
   );
 
   return (data?.results || []).filter(
-    (x: any) => x.media_type === "movie" || x.media_type === "tv"
+    (item: any) => item.media_type === "movie" || item.media_type === "tv"
   );
 }
 
 async function searchPeople(q: string) {
   const data = await fetchTMDB(
-    `${TMDB_BASE}/search/person?api_key=${TMDB_KEY}&query=${encodeURIComponent(q)}`
+    `${TMDB_BASE}/search/person?api_key=${TMDB_KEY}&query=${encodeURIComponent(
+      q
+    )}`
   );
 
   return data?.results || [];
@@ -73,22 +76,52 @@ async function searchUsers(q: string) {
   return data || [];
 }
 
-function sectionTitle(title: string) {
+function SectionTitle({ children }: { children: any }) {
   return (
     <h2
       style={{
-        fontSize: "28px",
-        marginBottom: "18px",
+        fontSize: 28,
+        marginBottom: 18,
         color: BRAND,
         fontWeight: 800,
       }}
     >
-      {title}
+      {children}
     </h2>
   );
 }
 
-function HorizontalPosterRow({
+function BubbleTab({
+  label,
+  active,
+  href,
+}: {
+  label: string;
+  active: boolean;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      style={{
+        padding: "10px 14px",
+        borderRadius: 999,
+        textDecoration: "none",
+        fontWeight: 600,
+        fontSize: 14,
+        background: active ? BRAND : "rgba(255,255,255,0.04)",
+        border: `1px solid ${
+          active ? BRAND : "rgba(255,255,255,0.12)"
+        }`,
+        color: "#fff",
+      }}
+    >
+      {label}
+    </Link>
+  );
+}
+
+function PosterRow({
   items,
   type,
 }: {
@@ -96,112 +129,60 @@ function HorizontalPosterRow({
   type: "movie" | "tv";
 }) {
   return (
-    <>
-      {items.slice(0, 20).map((item) => {
-        const poster = item.poster_path
-          ? `${TMDB_IMG}${item.poster_path}`
-          : null;
-
-        return (
-          <Link
-            key={`${type}-${item.id}`}
-            href={`/title/${type}/${item.id}`}
-            style={{
-              textDecoration: "none",
-              color: "#fff",
-              minWidth: "160px",
-              maxWidth: "160px",
-              flex: "0 0 160px",
-            }}
-          >
-            {poster ? (
-              <img
-                src={poster}
-                alt={item.title || item.name}
-                style={{
-                  width: "160px",
-                  height: "240px",
-                  objectFit: "cover",
-                  borderRadius: "14px",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: "160px",
-                  height: "240px",
-                  borderRadius: "14px",
-                  background: "rgba(255,255,255,0.1)",
-                }}
-              />
-            )}
-
-            <div
+    <div style={{ display: "flex", gap: 16, overflowX: "auto" }}>
+      {items.slice(0, 20).map((item) => (
+        <Link
+          key={item.id}
+          href={`/title/${type}/${item.id}`}
+          style={{ textDecoration: "none", color: "#fff" }}
+        >
+          {item.poster_path && (
+            <img
+              src={`${TMDB_IMG}${item.poster_path}`}
               style={{
-                marginTop: "8px",
-                fontSize: "14px",
+                width: 160,
+                height: 240,
+                borderRadius: 12,
+                objectFit: "cover",
               }}
-            >
-              {item.title || item.name}
-            </div>
-          </Link>
-        );
-      })}
-    </>
+            />
+          )}
+        </Link>
+      ))}
+    </div>
   );
 }
 
-function UsersGrid({ items }: { items: any[] }) {
+function TitleGrid({ items }: { items: any[] }) {
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
-        gap: "16px",
+        gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
+        gap: 18,
       }}
     >
-      {items.map((user) => {
-        const avatar = user.avatar_url || null;
+      {items.map((item) => {
+        const type = item.media_type === "tv" ? "tv" : "movie";
 
         return (
           <Link
-            key={user.id}
-            href={`/user/${user.username}`}
-            style={{
-              textDecoration: "none",
-              color: "#fff",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "16px",
-              padding: "14px",
-              display: "flex",
-              gap: "12px",
-            }}
+            key={item.id}
+            href={`/title/${type}/${item.id}`}
+            style={{ textDecoration: "none", color: "#fff" }}
           >
-            {avatar ? (
+            {item.poster_path && (
               <img
-                src={avatar}
+                src={`${TMDB_IMG}${item.poster_path}`}
                 style={{
-                  width: "52px",
-                  height: "52px",
-                  borderRadius: "50%",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: "52px",
-                  height: "52px",
-                  borderRadius: "50%",
-                  background: "rgba(255,255,255,0.1)",
+                  width: "100%",
+                  borderRadius: 12,
                 }}
               />
             )}
 
-            <div>
-              <div>@{user.username}</div>
-              {user.display_name && (
-                <div style={{ opacity: 0.7 }}>{user.display_name}</div>
-              )}
+            <div style={{ marginTop: 8, fontWeight: 600 }}>
+              {item.title || item.name}
             </div>
           </Link>
         );
@@ -216,99 +197,125 @@ function PeopleGrid({ items }: { items: any[] }) {
       style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))",
-        gap: "18px",
+        gap: 18,
       }}
     >
-      {items.map((person) => {
-        const img = person.profile_path
-          ? `https://image.tmdb.org/t/p/w185${person.profile_path}`
-          : null;
+      {items.map((p) => (
+        <Link
+          key={p.id}
+          href={`/actor/${p.id}`}
+          style={{
+            textDecoration: "none",
+            color: "#fff",
+            background: "rgba(255,255,255,0.05)",
+            padding: 12,
+            borderRadius: 14,
+          }}
+        >
+          {p.profile_path && (
+            <img
+              src={`https://image.tmdb.org/t/p/w185${p.profile_path}`}
+              style={{
+                width: "100%",
+                borderRadius: 10,
+              }}
+            />
+          )}
 
-        return (
-          <Link
-            key={person.id}
-            href={`/person/${person.id}`}
-            style={{
-              textDecoration: "none",
-              color: "#fff",
-            }}
-          >
-            {img ? (
-              <img
-                src={img}
-                style={{
-                  width: "100%",
-                  borderRadius: "12px",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: "100%",
-                  aspectRatio: "1",
-                  background: "rgba(255,255,255,0.1)",
-                  borderRadius: "12px",
-                }}
-              />
+          <div style={{ marginTop: 8, fontWeight: 600 }}>
+            {p.name}
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function UsersGrid({ items }: { items: any[] }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
+        gap: 16,
+      }}
+    >
+      {items.map((u) => (
+        <Link
+          key={u.id}
+          href={`/user/${u.username}`}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: 14,
+            background: "rgba(255,255,255,0.05)",
+            borderRadius: 14,
+            textDecoration: "none",
+            color: "#fff",
+          }}
+        >
+          {u.avatar_url && (
+            <img
+              src={u.avatar_url}
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: "50%",
+              }}
+            />
+          )}
+
+          <div>
+            <div style={{ fontWeight: 700 }}>
+              @{u.username}
+            </div>
+
+            {u.display_name && (
+              <div style={{ opacity: 0.7 }}>
+                {u.display_name}
+              </div>
             )}
-
-            <div style={{ marginTop: "10px" }}>{person.name}</div>
-          </Link>
-        );
-      })}
+          </div>
+        </Link>
+      ))}
     </div>
   );
 }
 
 function PeeklistsRow({ items }: { items: any[] }) {
   return (
-    <>
-      {items.map((list) => {
-        const cover = list.cover_url || null;
+    <div style={{ display: "flex", gap: 16, overflowX: "auto" }}>
+      {items.map((pl) => (
+        <Link
+          key={pl.id}
+          href={`/peeklist/${pl.id}`}
+          style={{
+            minWidth: 260,
+            textDecoration: "none",
+            color: "#fff",
+            background: "rgba(255,255,255,0.05)",
+            borderRadius: 16,
+            overflow: "hidden",
+          }}
+        >
+          {pl.cover_url && (
+            <img
+              src={pl.cover_url}
+              style={{
+                width: "100%",
+                height: 150,
+                objectFit: "cover",
+              }}
+            />
+          )}
 
-        return (
-          <Link
-            key={list.id}
-            href={`/peeklist/${list.id}`}
-            style={{
-              minWidth: "260px",
-              maxWidth: "260px",
-              flex: "0 0 260px",
-              textDecoration: "none",
-              color: "#fff",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "18px",
-              overflow: "hidden",
-            }}
-          >
-            {cover ? (
-              <img
-                src={cover}
-                style={{
-                  width: "100%",
-                  height: "150px",
-                  objectFit: "cover",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  height: "150px",
-                  background:
-                    "linear-gradient(135deg,#FA0082,rgba(255,255,255,0.1))",
-                }}
-              />
-            )}
-
-            <div style={{ padding: "14px" }}>
-              <div style={{ fontWeight: 700 }}>
-                {list.title || "Peeklist"}
-              </div>
-            </div>
-          </Link>
-        );
-      })}
-    </>
+          <div style={{ padding: 14, fontWeight: 600 }}>
+            {pl.title || "Peeklist"}
+          </div>
+        </Link>
+      ))}
+    </div>
   );
 }
 
@@ -336,68 +343,127 @@ export default async function ExplorePage({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "56px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 56 }}>
       <section>
-        <h1 style={{ fontSize: "42px", fontWeight: 900 }}>{t.explore}</h1>
+        <h1 style={{ fontSize: 42, fontWeight: 900 }}>Explore</h1>
 
-        <form action="/explore" method="GET" style={{ marginTop: "20px" }}>
+        <form
+          action="/explore"
+          method="GET"
+          style={{
+            marginTop: 20,
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+          }}
+        >
           <input
             name="q"
             defaultValue={query}
-            placeholder={t.search_placeholder}
+            placeholder="Search movies, series, cast, crew or users"
             style={{
-              width: "400px",
-              padding: "14px",
-              borderRadius: "12px",
+              flex: 1,
+              padding: "14px 16px",
+              borderRadius: 14,
+              border: "1px solid rgba(255,255,255,0.15)",
+              background: "rgba(255,255,255,0.06)",
+              color: "#fff",
             }}
           />
 
-          <input type="hidden" name="tab" value={tab} />
+          {query && (
+            <Link
+              href="/explore"
+              style={{
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.1)",
+                textDecoration: "none",
+                color: "#fff",
+              }}
+            >
+              Clear
+            </Link>
+          )}
+
+          <button
+            style={{
+              background: BRAND,
+              border: "none",
+              padding: "14px 18px",
+              borderRadius: 12,
+              color: "#fff",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Search
+          </button>
         </form>
+
+        {query && (
+          <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
+            <BubbleTab
+              label="Titles"
+              active={tab === "titles"}
+              href={`/explore?q=${query}&tab=titles`}
+            />
+
+            <BubbleTab
+              label="Cast & Crew"
+              active={tab === "people"}
+              href={`/explore?q=${query}&tab=people`}
+            />
+
+            <BubbleTab
+              label="Users"
+              active={tab === "users"}
+              href={`/explore?q=${query}&tab=users`}
+            />
+          </div>
+        )}
       </section>
 
       {query && (
         <section>
-          {tab === "titles" && <HorizontalPosterRow items={titleResults} type="movie" />}
+          <SectionTitle>
+            Search results for "{query}"
+          </SectionTitle>
+
+          {tab === "titles" && <TitleGrid items={titleResults} />}
           {tab === "people" && <PeopleGrid items={peopleResults} />}
           {tab === "users" && <UsersGrid items={userResults} />}
         </section>
       )}
 
-      <section>
-        {sectionTitle(t.peeklists)}
-        <HorizontalScroller>
-          <PeeklistsRow items={peeklists} />
-        </HorizontalScroller>
-      </section>
+      {!query && (
+        <>
+          <section>
+            <SectionTitle>Peeklists</SectionTitle>
+            <PeeklistsRow items={peeklists} />
+          </section>
 
-      <section>
-        {sectionTitle(t.trending_movies)}
-        <HorizontalScroller>
-          <HorizontalPosterRow items={trendingMovies} type="movie" />
-        </HorizontalScroller>
-      </section>
+          <section>
+            <SectionTitle>Trending Movies</SectionTitle>
+            <PosterRow items={trendingMovies} type="movie" />
+          </section>
 
-      <section>
-        {sectionTitle(t.trending_tv)}
-        <HorizontalScroller>
-          <HorizontalPosterRow items={trendingTV} type="tv" />
-        </HorizontalScroller>
-      </section>
+          <section>
+            <SectionTitle>Trending TV</SectionTitle>
+            <PosterRow items={trendingTV} type="tv" />
+          </section>
 
-      <section>
-        {sectionTitle(t.top_movies)}
-        <HorizontalScroller>
-          <HorizontalPosterRow items={topMovies} type="movie" />
-        </HorizontalScroller>
-      </section>
+          <section>
+            <SectionTitle>Top Rated Movies</SectionTitle>
+            <PosterRow items={topMovies} type="movie" />
+          </section>
 
-      <section>
-        {sectionTitle(t.top_tv)}
-        <HorizontalScroller>
-          <HorizontalPosterRow items={topTV} type="tv" />
-        </HorizontalScroller>
-      </section>
+          <section>
+            <SectionTitle>Top Rated TV</SectionTitle>
+            <PosterRow items={topTV} type="tv" />
+          </section>
+        </>
+      )}
     </div>
   );
 }
