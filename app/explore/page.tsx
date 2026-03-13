@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const IMG = "https://image.tmdb.org/t/p/w342";
+const BRAND = "#FA0082";
 
 type SearchParams = {
   q?: string;
@@ -99,7 +100,8 @@ function PosterRow({ items, type }: { items: any[]; type: "movie" | "tv" }) {
                 width: "160px",
                 aspectRatio: "2 / 3",
                 objectFit: "cover",
-                borderRadius: "12px",
+                borderRadius: "14px",
+                display: "block",
               }}
             />
           )}
@@ -110,6 +112,28 @@ function PosterRow({ items, type }: { items: any[]; type: "movie" | "tv" }) {
         </Link>
       ))}
     </div>
+  );
+}
+
+function Bubble({ label, active, href }: any) {
+  return (
+    <Link
+      href={href}
+      style={{
+        padding: "10px 14px",
+        borderRadius: 999,
+        textDecoration: "none",
+        fontWeight: 600,
+        fontSize: 14,
+        background: active ? BRAND : "rgba(255,255,255,0.04)",
+        border: `1px solid ${
+          active ? BRAND : "rgba(255,255,255,0.12)"
+        }`,
+        color: "#fff",
+      }}
+    >
+      {label}
+    </Link>
   );
 }
 
@@ -221,28 +245,124 @@ export default async function ExplorePage({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 48 }}>
-      <h1>Explore</h1>
+      
+      {/* SEARCH BAR */}
+      <section>
+        <h1 style={{ fontSize: 42, fontWeight: 900 }}>Explore</h1>
 
-      {!query && (
-        <>
-          <h2>Peeklists</h2>
-          <PeeklistsRow items={peeklists} />
+        <form
+          action="/explore"
+          method="GET"
+          style={{
+            marginTop: 20,
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+          }}
+        >
+          <input
+            type="text"
+            name="q"
+            defaultValue={query}
+            placeholder="Search movies, series, cast, crew or users"
+            style={{
+              flex: 1,
+              padding: "14px 16px",
+              borderRadius: 14,
+              border: "1px solid rgba(255,255,255,0.15)",
+              background: "rgba(255,255,255,0.06)",
+              color: "#fff",
+            }}
+          />
 
-          <h2>Trending Movies</h2>
-          <PosterRow items={trendingMovies} type="movie" />
+          {query && (
+            <Link
+              href="/explore"
+              style={{
+                padding: "12px",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.1)",
+                textDecoration: "none",
+                color: "#fff",
+              }}
+            >
+              Clear
+            </Link>
+          )}
 
-          <h2>Trending TV</h2>
-          <PosterRow items={trendingTV} type="tv" />
+          <button
+            type="submit"
+            style={{
+              background: BRAND,
+              border: "none",
+              padding: "14px 18px",
+              borderRadius: 12,
+              color: "#fff",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Search
+          </button>
+        </form>
 
-          <h2>Top Rated Movies</h2>
-          <PosterRow items={topMovies} type="movie" />
+        {query && (
+          <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
+            <Bubble
+              label="Titles"
+              active={tab === "titles"}
+              href={`/explore?q=${query}&tab=titles`}
+            />
+            <Bubble
+              label="Cast & Crew"
+              active={tab === "people"}
+              href={`/explore?q=${query}&tab=people`}
+            />
+            <Bubble
+              label="Users"
+              active={tab === "users"}
+              href={`/explore?q=${query}&tab=users`}
+            />
+          </div>
+        )}
+      </section>
 
-          <h2>Top Rated TV</h2>
-          <PosterRow items={topTV} type="tv" />
-        </>
+      {/* SEARCH RESULTS */}
+      {query && (
+        <section>
+          {tab === "users" && <UsersGrid items={userResults} />}
+        </section>
       )}
 
-      {query && tab === "users" && <UsersGrid items={userResults} />}
+      {/* DISCOVERY */}
+      {!query && (
+        <>
+          <section>
+            <h2>Peeklists</h2>
+            <PeeklistsRow items={peeklists} />
+          </section>
+
+          <section>
+            <h2>Trending Movies</h2>
+            <PosterRow items={trendingMovies} type="movie" />
+          </section>
+
+          <section>
+            <h2>Trending TV</h2>
+            <PosterRow items={trendingTV} type="tv" />
+          </section>
+
+          <section>
+            <h2>Top Rated Movies</h2>
+            <PosterRow items={topMovies} type="movie" />
+          </section>
+
+          <section>
+            <h2>Top Rated TV</h2>
+            <PosterRow items={topTV} type="tv" />
+          </section>
+        </>
+      )}
     </div>
   );
 }
