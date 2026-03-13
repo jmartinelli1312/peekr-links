@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import type { Metadata } from 'next';
 import { supabase } from '@/lib/supabase';
-import { useEffect } from 'react';
+import AppRedirect from './AppRedirect';
 
 // ===============================
 // TYPES
