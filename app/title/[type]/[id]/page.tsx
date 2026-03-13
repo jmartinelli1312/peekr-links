@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer as supabase } from "@/lib/supabase";
 
 type Params = {
   type: "movie" | "tv";
