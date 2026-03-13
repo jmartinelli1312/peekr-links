@@ -14,7 +14,7 @@ export default async function UserPage({ params }: PageProps) {
     .from("profiles")
     .select("*")
     .eq("username", username)
-    .single();
+    .maybeSingle();
 
   if (!profile) {
     return (
