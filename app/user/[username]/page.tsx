@@ -8,13 +8,15 @@ type PageProps = {
 
 export default async function UserPage({ params }: PageProps) {
 
-  const username = params.username;
+  const username = decodeURIComponent(params.username);
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("*")
-    .eq("username", username)
+    .ilike("username", username)
     .maybeSingle();
+
+  console.log(profile, error)
 
   if (!profile) {
     return (
