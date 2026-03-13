@@ -1,31 +1,85 @@
 import { supabase } from "@/lib/supabase";
 
-export default async function PeeklistPage({ params }) {
+type PageProps = {
+  params: {
+    id: string;
+  };
+};
 
-const id = params.id
+export default async function PeeklistPage({ params }: PageProps) {
 
-const { data } = await supabase
-.from("peeklists")
-.select("*")
-.eq("id", id)
-.single()
+  const id = params.id;
 
-if (!data) {
-return <div>Peeklist not found</div>
-}
+  const { data: peeklist } = await supabase
+    .from("peeklists")
+    .select("*")
+    .eq("id", id)
+    .single();
 
-return (
+  if (!peeklist) {
+    return (
+      <div style={{ padding: 40 }}>
+        Peeklist not found
+      </div>
+    );
+  }
 
-<div style={{padding:40}}>
+  const { data: titles } = await supabase
+    .from("peeklist_titles")
+    .select("*")
+    .eq("peeklist_id", id);
 
-<h1>{data.title}</h1>
+  return (
+    <div style={{ padding: 40 }}>
 
-{data.description && (
-<p>{data.description}</p>
-)}
+      <h1>{peeklist.title}</h1>
 
-</div>
+      {peeklist.description && (
+        <p style={{ marginTop: 10 }}>
+          {peeklist.description}
+        </p>
+      )}
 
-)
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
+          gap: 20,
+          marginTop: 30
+        }}
+      >
 
+        {titles?.map((t: any) => {
+
+          const media = t.media_type === "tv" ? "tv" : "movie";
+
+          return (
+            <a
+              key={t.tmdb_id}
+              href={`/title/${media}/${t.tmdb_id}`}
+              style={{ textDecoration: "none", color: "white" }}
+            >
+
+              {t.poster_path && (
+                <img
+                  src={`https://image.tmdb.org/t/p/w342${t.poster_path}`}
+                  style={{
+                    width: "100%",
+                    borderRadius: 12
+                  }}
+                />
+              )}
+
+              <div style={{ marginTop: 8 }}>
+                {t.title}
+              </div>
+
+            </a>
+          );
+        })}
+
+      </div>
+
+    </div>
+  );
 }
