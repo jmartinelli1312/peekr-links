@@ -10,7 +10,7 @@ export default async function UserPage({ params }: PageProps) {
 
   const username = decodeURIComponent(params.username);
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from("profiles")
     .select("*")
     .ilike("username", username)
