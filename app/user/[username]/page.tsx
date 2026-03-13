@@ -27,8 +27,7 @@ export default async function UserPage({ params }: PageProps) {
   const { data: watched } = await supabase
     .from("user_title_activities")
     .select("tmdb_id,title,poster_path,media_type,rating")
-    .eq("user_id", profile.id)
-    .order("created_at", { ascending: false });
+    .eq("user_id", profile.id);
 
   const { data: peeklists } = await supabase
     .from("peeklists")
