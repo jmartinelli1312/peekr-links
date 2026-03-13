@@ -13,29 +13,70 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-black text-white">
+      <body style={{ background: "#000000", color: "#ffffff", margin: 0 }}>
 
         {/* NAVBAR */}
-        <header className="w-full border-b border-white/10">
-          <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
-
+        <header
+          style={{
+            width: "100%",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            background: "#000000",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: "1200px",
+              margin: "0 auto",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "20px",
+            }}
+          >
             {/* LOGO */}
-            <Link href="/" className="text-2xl font-bold tracking-tight">
+            <Link
+              href="/"
+              style={{
+                fontSize: "24px",
+                fontWeight: "700",
+                color: "#ff2bd6",
+                textDecoration: "none",
+              }}
+            >
               Peekr
             </Link>
 
-            {/* NAV LINKS */}
-            <nav className="flex gap-6 text-sm text-white/80">
-              <Link href="/explore">Explore</Link>
-              <Link href="/trending">Trending</Link>
-              <Link href="/top">Top</Link>
-            </nav>
+            {/* NAV */}
+            <nav
+              style={{
+                display: "flex",
+                gap: "24px",
+                fontSize: "14px",
+              }}
+            >
+              <Link href="/explore" style={{ color: "#ffffff", textDecoration: "none" }}>
+                Explore
+              </Link>
 
+              <Link href="/trending" style={{ color: "#ffffff", textDecoration: "none" }}>
+                Trending
+              </Link>
+
+              <Link href="/top" style={{ color: "#ffffff", textDecoration: "none" }}>
+                Top
+              </Link>
+            </nav>
           </div>
         </header>
 
-        {/* PAGE CONTENT */}
-        <main className="max-w-6xl mx-auto px-6 py-10">
+        {/* PAGE */}
+        <main
+          style={{
+            maxWidth: "1200px",
+            margin: "0 auto",
+            padding: "40px 20px",
+          }}
+        >
           {children}
         </main>
 
