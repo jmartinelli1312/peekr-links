@@ -1,27 +1,51 @@
 const TMDB = "https://api.themoviedb.org/3";
 
-export default async function ActorPage({ params }) {
+type PageProps = {
+  params: {
+    id: string;
+  };
+};
 
-const id = params.id
+export default async function ActorPage({ params }: PageProps) {
 
-const res = await fetch(
-`${TMDB}/person/${id}?api_key=${process.env.TMDB_API_KEY}`
-)
+  const id = params.id;
 
-const actor = await res.json()
+  const res = await fetch(
+    `${TMDB}/person/${id}?api_key=${process.env.TMDB_API_KEY}`
+  );
 
-return (
+  const actor = await res.json();
 
-<div style={{padding:40}}>
+  if (!actor) {
+    return (
+      <div style={{ padding: 40 }}>
+        Actor not found
+      </div>
+    );
+  }
 
-<h1>{actor.name}</h1>
+  return (
+    <div style={{ padding: 40 }}>
 
-{actor.biography && (
-<p>{actor.biography}</p>
-)}
+      <h1>{actor.name}</h1>
 
-</div>
+      {actor.profile_path && (
+        <img
+          src={`https://image.tmdb.org/t/p/w500${actor.profile_path}`}
+          style={{
+            width: 200,
+            borderRadius: 12,
+            marginTop: 20
+          }}
+        />
+      )}
 
-)
+      {actor.biography && (
+        <p style={{ marginTop: 20, maxWidth: 700 }}>
+          {actor.biography}
+        </p>
+      )}
 
+    </div>
+  );
 }
