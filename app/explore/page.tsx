@@ -5,8 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = "https://api.themoviedb.org/3";
-const TMDB_IMG = "https://image.tmdb.org/t/p/w342";
-const BRAND = "#FA0082";
+const IMG = "https://image.tmdb.org/t/p/w342";
 
 type SearchParams = {
   q?: string;
@@ -38,7 +37,7 @@ async function getExploreData() {
 async function getPeeklists() {
   const { data } = await supabase
     .from("peeklists")
-    .select("*")
+    .select("id,title,cover_url")
     .limit(12);
 
   return data || [];
@@ -46,21 +45,17 @@ async function getPeeklists() {
 
 async function searchTitles(q: string) {
   const data = await fetchTMDB(
-    `${TMDB_BASE}/search/multi?api_key=${TMDB_KEY}&query=${encodeURIComponent(
-      q
-    )}`
+    `${TMDB_BASE}/search/multi?api_key=${TMDB_KEY}&query=${encodeURIComponent(q)}`
   );
 
   return (data?.results || []).filter(
-    (item: any) => item.media_type === "movie" || item.media_type === "tv"
+    (i: any) => i.media_type === "movie" || i.media_type === "tv"
   );
 }
 
 async function searchPeople(q: string) {
   const data = await fetchTMDB(
-    `${TMDB_BASE}/search/person?api_key=${TMDB_KEY}&query=${encodeURIComponent(
-      q
-    )}`
+    `${TMDB_BASE}/search/person?api_key=${TMDB_KEY}&query=${encodeURIComponent(q)}`
   );
 
   return data?.results || [];
@@ -70,160 +65,47 @@ async function searchUsers(q: string) {
   const { data } = await supabase
     .from("profiles")
     .select("*")
-    .ilike("username", `%${q}%`)
+    .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
     .limit(12);
 
   return data || [];
 }
 
-function SectionTitle({ children }: { children: any }) {
+function PosterRow({ items, type }: { items: any[]; type: "movie" | "tv" }) {
   return (
-    <h2
+    <div
       style={{
-        fontSize: 28,
-        marginBottom: 18,
-        color: BRAND,
-        fontWeight: 800,
+        display: "flex",
+        gap: 16,
+        overflowX: "auto",
+        paddingBottom: 10,
       }}
     >
-      {children}
-    </h2>
-  );
-}
-
-function BubbleTab({
-  label,
-  active,
-  href,
-}: {
-  label: string;
-  active: boolean;
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      style={{
-        padding: "10px 14px",
-        borderRadius: 999,
-        textDecoration: "none",
-        fontWeight: 600,
-        fontSize: 14,
-        background: active ? BRAND : "rgba(255,255,255,0.04)",
-        border: `1px solid ${
-          active ? BRAND : "rgba(255,255,255,0.12)"
-        }`,
-        color: "#fff",
-      }}
-    >
-      {label}
-    </Link>
-  );
-}
-
-function PosterRow({
-  items,
-  type,
-}: {
-  items: any[];
-  type: "movie" | "tv";
-}) {
-  return (
-    <div style={{ display: "flex", gap: 16, overflowX: "auto" }}>
       {items.slice(0, 20).map((item) => (
         <Link
           key={item.id}
           href={`/title/${type}/${item.id}`}
-          style={{ textDecoration: "none", color: "#fff" }}
-        >
-          {item.poster_path && (
-            <img
-              src={`${TMDB_IMG}${item.poster_path}`}
-              style={{
-                width: 160,
-                height: 240,
-                borderRadius: 12,
-                objectFit: "cover",
-              }}
-            />
-          )}
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-function TitleGrid({ items }: { items: any[] }) {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
-        gap: 18,
-      }}
-    >
-      {items.map((item) => {
-        const type = item.media_type === "tv" ? "tv" : "movie";
-
-        return (
-          <Link
-            key={item.id}
-            href={`/title/${type}/${item.id}`}
-            style={{ textDecoration: "none", color: "#fff" }}
-          >
-            {item.poster_path && (
-              <img
-                src={`${TMDB_IMG}${item.poster_path}`}
-                style={{
-                  width: "100%",
-                  borderRadius: 12,
-                }}
-              />
-            )}
-
-            <div style={{ marginTop: 8, fontWeight: 600 }}>
-              {item.title || item.name}
-            </div>
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
-function PeopleGrid({ items }: { items: any[] }) {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))",
-        gap: 18,
-      }}
-    >
-      {items.map((p) => (
-        <Link
-          key={p.id}
-          href={`/actor/${p.id}`}
           style={{
             textDecoration: "none",
             color: "#fff",
-            background: "rgba(255,255,255,0.05)",
-            padding: 12,
-            borderRadius: 14,
+            minWidth: 160,
+            flex: "0 0 160px",
           }}
         >
-          {p.profile_path && (
+          {item.poster_path && (
             <img
-              src={`https://image.tmdb.org/t/p/w185${p.profile_path}`}
+              src={`${IMG}${item.poster_path}`}
               style={{
-                width: "100%",
-                borderRadius: 10,
+                width: "160px",
+                aspectRatio: "2 / 3",
+                objectFit: "cover",
+                borderRadius: "12px",
               }}
             />
           )}
 
-          <div style={{ marginTop: 8, fontWeight: 600 }}>
-            {p.name}
+          <div style={{ marginTop: 6, fontSize: 14 }}>
+            {item.title || item.name}
           </div>
         </Link>
       ))}
@@ -246,11 +128,10 @@ function UsersGrid({ items }: { items: any[] }) {
           href={`/user/${u.username}`}
           style={{
             display: "flex",
-            alignItems: "center",
             gap: 12,
-            padding: 14,
-            background: "rgba(255,255,255,0.05)",
-            borderRadius: 14,
+            padding: 12,
+            background: "#111",
+            borderRadius: 12,
             textDecoration: "none",
             color: "#fff",
           }}
@@ -259,8 +140,8 @@ function UsersGrid({ items }: { items: any[] }) {
             <img
               src={u.avatar_url}
               style={{
-                width: 48,
-                height: 48,
+                width: 46,
+                height: 46,
                 borderRadius: "50%",
               }}
             />
@@ -268,14 +149,12 @@ function UsersGrid({ items }: { items: any[] }) {
 
           <div>
             <div style={{ fontWeight: 700 }}>
-              @{u.username}
+              {u.display_name || u.username}
             </div>
 
-            {u.display_name && (
-              <div style={{ opacity: 0.7 }}>
-                {u.display_name}
-              </div>
-            )}
+            <div style={{ opacity: 0.6 }}>
+              @{u.username}
+            </div>
           </div>
         </Link>
       ))}
@@ -294,8 +173,8 @@ function PeeklistsRow({ items }: { items: any[] }) {
             minWidth: 260,
             textDecoration: "none",
             color: "#fff",
-            background: "rgba(255,255,255,0.05)",
-            borderRadius: 16,
+            background: "#111",
+            borderRadius: 14,
             overflow: "hidden",
           }}
         >
@@ -310,9 +189,7 @@ function PeeklistsRow({ items }: { items: any[] }) {
             />
           )}
 
-          <div style={{ padding: 14, fontWeight: 600 }}>
-            {pl.title || "Peeklist"}
-          </div>
+          <div style={{ padding: 12 }}>{pl.title}</div>
         </Link>
       ))}
     </div>
@@ -343,127 +220,29 @@ export default async function ExplorePage({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 56 }}>
-      <section>
-        <h1 style={{ fontSize: 42, fontWeight: 900 }}>Explore</h1>
-
-        <form
-          action="/explore"
-          method="GET"
-          style={{
-            marginTop: 20,
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-          }}
-        >
-          <input
-            name="q"
-            defaultValue={query}
-            placeholder="Search movies, series, cast, crew or users"
-            style={{
-              flex: 1,
-              padding: "14px 16px",
-              borderRadius: 14,
-              border: "1px solid rgba(255,255,255,0.15)",
-              background: "rgba(255,255,255,0.06)",
-              color: "#fff",
-            }}
-          />
-
-          {query && (
-            <Link
-              href="/explore"
-              style={{
-                padding: "10px 12px",
-                borderRadius: 10,
-                background: "rgba(255,255,255,0.1)",
-                textDecoration: "none",
-                color: "#fff",
-              }}
-            >
-              Clear
-            </Link>
-          )}
-
-          <button
-            style={{
-              background: BRAND,
-              border: "none",
-              padding: "14px 18px",
-              borderRadius: 12,
-              color: "#fff",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            Search
-          </button>
-        </form>
-
-        {query && (
-          <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
-            <BubbleTab
-              label="Titles"
-              active={tab === "titles"}
-              href={`/explore?q=${query}&tab=titles`}
-            />
-
-            <BubbleTab
-              label="Cast & Crew"
-              active={tab === "people"}
-              href={`/explore?q=${query}&tab=people`}
-            />
-
-            <BubbleTab
-              label="Users"
-              active={tab === "users"}
-              href={`/explore?q=${query}&tab=users`}
-            />
-          </div>
-        )}
-      </section>
-
-      {query && (
-        <section>
-          <SectionTitle>
-            Search results for "{query}"
-          </SectionTitle>
-
-          {tab === "titles" && <TitleGrid items={titleResults} />}
-          {tab === "people" && <PeopleGrid items={peopleResults} />}
-          {tab === "users" && <UsersGrid items={userResults} />}
-        </section>
-      )}
+    <div style={{ display: "flex", flexDirection: "column", gap: 48 }}>
+      <h1>Explore</h1>
 
       {!query && (
         <>
-          <section>
-            <SectionTitle>Peeklists</SectionTitle>
-            <PeeklistsRow items={peeklists} />
-          </section>
+          <h2>Peeklists</h2>
+          <PeeklistsRow items={peeklists} />
 
-          <section>
-            <SectionTitle>Trending Movies</SectionTitle>
-            <PosterRow items={trendingMovies} type="movie" />
-          </section>
+          <h2>Trending Movies</h2>
+          <PosterRow items={trendingMovies} type="movie" />
 
-          <section>
-            <SectionTitle>Trending TV</SectionTitle>
-            <PosterRow items={trendingTV} type="tv" />
-          </section>
+          <h2>Trending TV</h2>
+          <PosterRow items={trendingTV} type="tv" />
 
-          <section>
-            <SectionTitle>Top Rated Movies</SectionTitle>
-            <PosterRow items={topMovies} type="movie" />
-          </section>
+          <h2>Top Rated Movies</h2>
+          <PosterRow items={topMovies} type="movie" />
 
-          <section>
-            <SectionTitle>Top Rated TV</SectionTitle>
-            <PosterRow items={topTV} type="tv" />
-          </section>
+          <h2>Top Rated TV</h2>
+          <PosterRow items={topTV} type="tv" />
         </>
       )}
+
+      {query && tab === "users" && <UsersGrid items={userResults} />}
     </div>
   );
 }
