@@ -23,9 +23,11 @@ export default async function TitlePage({
   params: { type: string; id: string }
 }) {
 
-  const data = await getTitle(params.tmdb_id)
+const id = params.id
 
-  if (!data) return notFound()
+const data = await getTitle(id)
+
+if (!data) return notFound()
 
   const { data: ratings } = await supabase
     .from("user_title_activities")
