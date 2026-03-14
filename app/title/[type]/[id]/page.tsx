@@ -1,6 +1,6 @@
 // app/title/[tmdb_id]/page.tsx
 
-import { createClient } from "@/lib/supabase/server"
+import { supabase } from "@/lib/supabase"
 import Image from "next/image"
 import { notFound } from "next/navigation"
 
@@ -17,18 +17,20 @@ async function getTitle(tmdbId: string) {
   return res.json()
 }
 
-export default async function TitlePage({ params }: { params: { tmdb_id: string } }) {
+export default async function TitlePage({
+  params,
+}: {
+  params: { type: string; id: string }
+}) {
 
   const data = await getTitle(params.tmdb_id)
 
   if (!data) return notFound()
 
-  const supabase = createClient()
-
   const { data: ratings } = await supabase
     .from("user_title_activities")
     .select("rating")
-    .eq("tmdb_id", params.tmdb_id)
+    .eq("tmdb_id", id)
 
   const avg =
     ratings && ratings.length
