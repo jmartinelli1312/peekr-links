@@ -21,9 +21,10 @@ async function getTitle(type: string, id: string) {
 export default async function TitlePage({
   params,
 }: {
-  params: { type: string; id: string };
+  params: Promise<{ type: string; id: string }>;
 }) {
-  const { type, id } = params;
+
+  const { type, id } = await params
 
   const data = await getTitle(type, id);
 
