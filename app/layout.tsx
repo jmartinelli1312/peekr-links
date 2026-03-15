@@ -7,21 +7,20 @@ export const metadata = {
   description: "The social network for movies and series",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const langCookie = cookieStore.get("lang")?.value
 
-  const browserLang =
-    typeof navigator !== "undefined"
-      ? navigator.language.slice(0, 2)
-      : "en"
+  let lang = "en"
 
-  const lang = langCookie || browserLang || "en"
+  if (langCookie) {
+    lang = langCookie
+  }
 
   return (
     <html lang={lang}>
@@ -34,8 +33,6 @@ export default function RootLayout({
             "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif",
         }}
       >
-
-        {/* HEADER /}
 
         <header
           style={{
@@ -79,10 +76,7 @@ export default function RootLayout({
 
           </div>
 
-
           <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-
-            {/ LANGUAGE SWITCH /}
 
             <a href="/lang/en">🇺🇸</a>
             <a href="/lang/es">🇪🇸</a>
@@ -110,9 +104,6 @@ export default function RootLayout({
 
         </header>
 
-
-        {/ PAGE /}
-
         <main
           style={{
             maxWidth: 1200,
@@ -122,9 +113,6 @@ export default function RootLayout({
         >
           {children}
         </main>
-
-
-        {/ FOOTER */}
 
         <footer
           style={{
@@ -163,26 +151,15 @@ export default function RootLayout({
               flexWrap: "wrap",
             }}
           >
-            <a
-              href="https://instagram.com/peekr.app"
-              target="_blank"
-              style={footerLink}
-            >
+            <a href="https://instagram.com/peekr.app" target="_blank" style={footerLink}>
               Instagram
             </a>
 
-            <a
-              href="https://x.com/peekr_oficial"
-              target="_blank"
-              style={footerLink}
-            >
+            <a href="https://x.com/peekr_oficial" target="_blank" style={footerLink}>
               X
             </a>
 
-            <a
-              href="mailto:info@peekr.app"
-              style={footerLink}
-            >
+            <a href="mailto:info@peekr.app" style={footerLink}>
               info@peekr.app
             </a>
           </div>
@@ -192,4 +169,17 @@ export default function RootLayout({
       </body>
     </html>
   )
+}
+
+const nav = {
+  color: "white",
+  textDecoration: "none",
+  fontSize: 15,
+  opacity: 0.9,
+}
+
+const footerLink = {
+  color: "white",
+  textDecoration: "none",
+  opacity: 0.7,
 }
