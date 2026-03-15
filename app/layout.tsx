@@ -7,7 +7,7 @@ export const metadata = {
   description: "The social network for movies and series",
 }
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
@@ -28,7 +28,7 @@ export default async function RootLayout({
         }}
       >
 
-        {/* HEADER /}
+        {/* HEADER */}
 
         <header
           style={{
@@ -44,9 +44,7 @@ export default async function RootLayout({
           }}
         >
 
-          {/ LEFT NAV /}
-
-          <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+          <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
 
             <Link
               href="/"
@@ -60,33 +58,27 @@ export default async function RootLayout({
               Peekr
             </Link>
 
-            <Link href="/explore" style={nav}>
+            <Link href="/explore" style={{ color: "white", textDecoration: "none" }}>
               Explore
             </Link>
 
-            <Link href="/lists" style={nav}>
+            <Link href="/lists" style={{ color: "white", textDecoration: "none" }}>
               Lists
             </Link>
 
-            <Link href="/activity" style={nav}>
+            <Link href="/activity" style={{ color: "white", textDecoration: "none" }}>
               Activity
             </Link>
 
           </div>
 
-          {/ RIGHT NAV /}
+          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <a href="/lang/en">🇺🇸</a>
+            <a href="/lang/es">🇪🇸</a>
+            <a href="/lang/pt">🇧🇷</a>
 
-            {/ LANGUAGE /}
-
-            <div style={{ display: "flex", gap: 8 }}>
-              <a href="/lang/en">🇺🇸</a>
-              <a href="/lang/es">🇪🇸</a>
-              <a href="/lang/pt">🇧🇷</a>
-            </div>
-
-            <Link href="/login" style={nav}>
+            <Link href="/login" style={{ color: "white", textDecoration: "none" }}>
               Sign in
             </Link>
 
@@ -96,9 +88,9 @@ export default async function RootLayout({
                 background: "#FA0082",
                 padding: "8px 14px",
                 borderRadius: 8,
-                fontWeight: 600,
                 color: "white",
                 textDecoration: "none",
+                fontWeight: 600,
               }}
             >
               Create account
@@ -107,8 +99,6 @@ export default async function RootLayout({
           </div>
 
         </header>
-
-        {/ PAGE /}
 
         <main
           style={{
@@ -120,44 +110,19 @@ export default async function RootLayout({
           {children}
         </main>
 
-        {/ FOOTER */}
-
         <footer
           style={{
             marginTop: 80,
             borderTop: "1px solid rgba(255,255,255,0.08)",
             padding: "40px 20px",
             textAlign: "center",
-            opacity: 0.6,
+            opacity: 0.7,
             fontSize: 14,
           }}
         >
-
-          <div style={{ marginBottom: 12 }}>
-            Peekr © {new Date().getFullYear()}
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "center", gap: 20 }}>
-            <Link href="/about" style={footerLink}>About</Link>
-            <Link href="/privacy" style={footerLink}>Privacy</Link>
-            <Link href="/terms" style={footerLink}>Terms</Link>
-          </div>
-
+          Peekr © {new Date().getFullYear()}
         </footer>
 
       </body>
     </html>
   )
-}
-
-const nav = {
-  color: "white",
-  textDecoration: "none",
-  fontSize: 15,
-  opacity: 0.9,
-}
-
-const footerLink = {
-  color: "white",
-  textDecoration: "none",
-  opacity: 0.7,
