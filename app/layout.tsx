@@ -7,13 +7,55 @@ export const metadata = {
   description: "The social network for movies and series",
 }
 
+type Lang = "en" | "es" | "pt"
+
+function normalizeLang(value?: string | null): Lang {
+  const raw = (value || "en").toLowerCase()
+  if (raw.startsWith("es")) return "es"
+  if (raw.startsWith("pt")) return "pt"
+  return "en"
+}
+
 export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const cookieStore = await cookies()
-  const lang = cookieStore.get("lang")?.value || "en"
+  const lang = normalizeLang(cookieStore.get("lang")?.value)
+
+  const t = {
+    en: {
+      explore: "Explore",
+      lists: "Lists",
+      activity: "Activity",
+      signIn: "Sign in",
+      createAccount: "Create account",
+      about: "About",
+      privacy: "Privacy",
+      terms: "Terms",
+    },
+    es: {
+      explore: "Explorar",
+      lists: "Listas",
+      activity: "Actividad",
+      signIn: "Iniciar sesión",
+      createAccount: "Crear cuenta",
+      about: "Acerca de",
+      privacy: "Privacidad",
+      terms: "Términos",
+    },
+    pt: {
+      explore: "Explorar",
+      lists: "Listas",
+      activity: "Atividade",
+      signIn: "Entrar",
+      createAccount: "Criar conta",
+      about: "Sobre",
+      privacy: "Privacidade",
+      terms: "Termos",
+    },
+  }[lang]
 
   return (
     <html lang={lang}>
@@ -241,7 +283,7 @@ export default async function RootLayout({
 
           .peekr-footer-link {
             color: white;
-            text-decoration: none;
+            textDecoration: none;
             opacity: 0.7;
           }
 
@@ -276,13 +318,13 @@ export default async function RootLayout({
 
             <nav className="peekr-nav-desktop">
               <Link href="/explore" className="peekr-link">
-                Explore
+                {t.explore}
               </Link>
               <Link href="/lists" className="peekr-link">
-                Lists
+                {t.lists}
               </Link>
               <Link href="/activity" className="peekr-link">
-                Activity
+                {t.activity}
               </Link>
             </nav>
 
@@ -297,11 +339,11 @@ export default async function RootLayout({
               </details>
 
               <Link href="/login" className="peekr-link">
-                Sign in
+                {t.signIn}
               </Link>
 
               <Link href="/signup" className="peekr-signup">
-                Create account
+                {t.createAccount}
               </Link>
             </div>
 
@@ -324,22 +366,22 @@ export default async function RootLayout({
 
                 <div className="peekr-mobile-panel">
                   <Link href="/explore" className="peekr-mobile-item">
-                    Explore
+                    {t.explore}
                   </Link>
                   <Link href="/lists" className="peekr-mobile-item">
-                    Lists
+                    {t.lists}
                   </Link>
                   <Link href="/activity" className="peekr-mobile-item">
-                    Activity
+                    {t.activity}
                   </Link>
 
                   <div className="peekr-mobile-divider" />
 
                   <Link href="/login" className="peekr-mobile-item">
-                    Sign in
+                    {t.signIn}
                   </Link>
                   <Link href="/signup" className="peekr-mobile-item">
-                    Create account
+                    {t.createAccount}
                   </Link>
                 </div>
               </details>
@@ -356,9 +398,9 @@ export default async function RootLayout({
             </div>
 
             <div className="peekr-footer-links">
-              <Link href="/about" className="peekr-footer-link">About</Link>
-              <Link href="/privacy" className="peekr-footer-link">Privacy</Link>
-              <Link href="/terms" className="peekr-footer-link">Terms</Link>
+              <Link href="/about" className="peekr-footer-link">{t.about}</Link>
+              <Link href="/privacy" className="peekr-footer-link">{t.privacy}</Link>
+              <Link href="/terms" className="peekr-footer-link">{t.terms}</Link>
             </div>
 
             <div className="peekr-footer-social">
