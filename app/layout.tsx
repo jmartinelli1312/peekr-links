@@ -78,9 +78,37 @@ export default async function RootLayout({
 
           <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
 
-            <a href="/lang/en">🇺🇸</a>
-            <a href="/lang/es">🇪🇸</a>
-            <a href="/lang/pt">🇧🇷</a>
+          
+<div style={{ position: "relative" }}>
+  <details style={{ cursor: "pointer" }}>
+    <summary
+      style={{
+        listStyle: "none",
+        fontSize: 18,
+        cursor: "pointer",
+      }}
+    >
+      🌍
+    </summary>
+
+    <div
+      style={{
+        position: "absolute",
+        right: 0,
+        top: 30,
+        background: "#111",
+        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: 8,
+        padding: "6px 0",
+        minWidth: 140,
+      }}
+    >
+      <a href="/lang/en" style={langItem}>🇺🇸 English</a>
+      <a href="/lang/es" style={langItem}>🇪🇸 Español</a>
+      <a href="/lang/pt" style={langItem}>🇧🇷 Português</a>
+    </div>
+  </details>
+<
 
             <Link href="/login" style={nav}>
               Sign in
@@ -182,4 +210,12 @@ const footerLink = {
   color: "white",
   textDecoration: "none",
   opacity: 0.7,
+}
+
+const langItem = {
+  display: "block",
+  padding: "8px 12px",
+  textDecoration: "none",
+  color: "white",
+  fontSize: 14,
 }
