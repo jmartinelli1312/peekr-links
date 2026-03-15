@@ -123,42 +123,17 @@ function dedupeActivities(items: PeekrActivity[]) {
 
 async function getTrendingOnPeekr() {
   try {
-    const [watchedRes, ratedRes] = await Promise.all([
-      supabase
-        .from("user_title_activities")
-        .select("tmdb_id,title,poster_path,media_type,rating,watched_at")
-        .not("tmdb_id", "is", null)
-        .not("poster_path", "is", null)
-        .order("watched_at", { ascending: false })
-        .limit(30),
+    const { data, error } = await supabase.rpc("get_home_trending_on_peekr", {
+      limit_count: 12,
+    });
 
-      supabase
-        .from("user_title_activities")
-        .select("tmdb_id,title,poster_path,media_type,rating,watched_at")
-        .not("tmdb_id", "is", null)
-        .not("poster_path", "is", null)
-        .not("rating", "is", null)
-        .order("watched_at", { ascending: false })
-        .limit(30),
-    ]);
+    if (error) {
+      return [];
+    }
 
-    const recentlyWatched = dedupeActivities(
-      (watchedRes.data as PeekrActivity[] | null) ?? []
-    ).slice(0, 12);
-
-    const recentlyRated = dedupeActivities(
-      (ratedRes.data as PeekrActivity[] | null) ?? []
-    ).slice(0, 12);
-
-    return {
-      recentlyWatched,
-      recentlyRated,
-    };
+    return (data as PeekrActivity[] | null) ?? [];
   } catch {
-    return {
-      recentlyWatched: [] as PeekrActivity[],
-      recentlyRated: [] as PeekrActivity[],
-    };
+    return [];
   }
 }
 
@@ -408,9 +383,8 @@ export default async function HomePage() {
     },
   }[lang];
 
-  const [{ topMovies, topTV, popularPeople }, { recentlyWatched, recentlyRated }] =
-    await Promise.all([getTmdbHomeData(lang), getTrendingOnPeekr()]);
-
+ const [{ topMovies, topTV, popularPeople }, trendingOnPeekr] =
+  await Promise.all([getTmdbHomeData(lang), getTrendingOnPeekr()]);
   return (
     <>
       <style>{`
@@ -696,39 +670,10 @@ export default async function HomePage() {
           <PeopleRow items={popularPeople} />
         </section>
 
-        <section>
-          <SectionHeader title={t.peekrTitle} text={t.peekrText} />
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            <div>
-              <div
-                style={{
-                  marginBottom: 12,
-                  fontSize: 18,
-                  fontWeight: 800,
-                  color: "rgba(255,255,255,0.92)",
-                }}
-              >
-                {t.watchedTitle}
-              </div>
-              <PeekrRow items={recentlyWatched} showRating={false} />
-            </div>
-
-            <div>
-              <div
-                style={{
-                  marginBottom: 12,
-                  fontSize: 18,
-                  fontWeight: 800,
-                  color: "rgba(255,255,255,0.92)",
-                }}
-              >
-                {t.ratedTitle}
-              </div>
-              <PeekrRow items={recentlyRated} showRating />
-            </div>
-          </div>
-        </section>
+       <section>
+        <SectionHeader title={t.peekrTitle} text={t.peekrText} />
+        <PeekrRow items={trendingOnPeekr} showRating />
+      </section>
 
         <section className="why-box">
           <SectionHeader title={t.whyTitle} />
