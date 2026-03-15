@@ -59,11 +59,11 @@ const { count: comments } = await supabase
   .eq("tmdb_id", id)
   .eq("media_type", type)
 
-  const avgRating =
-  ratings && peekrRatings.length > 0
+const avgRating =
+  peekrRatings && peekrRatings.length > 0
     ? (
         peekrRatings.reduce((a: number, b: any) => a + b.rating, 0) /
-        ratings.length
+        peekrRatings.length
       ).toFixed(1)
     : null
 
