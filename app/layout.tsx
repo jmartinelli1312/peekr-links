@@ -1,136 +1,53 @@
-import "./globals.css";
-import Link from "next/link";
+import "./globals.css"
 import { cookies } from "next/headers"
 
 export const metadata = {
   title: "Peekr",
-  description: "Watch. Rate. Share.",
-};
+  description: "Movies • Series • Watchlists",
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
 
- const cookieStore = await cookies()
- const lang = cookieStore.get("lang")?.value || "en"
-  
+  const cookieStore = await cookies()
+  const lang = cookieStore.get("lang")?.value || "en"
+
   return (
     <html lang={lang}>
       <body
         style={{
+          background: "#0B0B0F",
+          color: "white",
           margin: 0,
-          background: "#000",
-          color: "#fff",
           fontFamily:
             "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif",
         }}
-        <div
-  style={{
-    position: "fixed",
-    top: 15,
-    right: 20,
-    zIndex: 9999,
-    display: "flex",
-    gap: 8
-  }}
->
-
-<a href="/lang/en">🇺🇸 EN</a>
-<a href="/lang/es">🇪🇸 ES</a>
-<a href="/lang/pt">🇧🇷 PT</a>
-
-</div>
       >
-        {/* NAVBAR */}
-        <header
+
+        {/* LANGUAGE SWITCH */}
+
+        <div
           style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 50,
-            background: "rgba(0,0,0,0.85)",
-            backdropFilter: "blur(10px)",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            position: "fixed",
+            top: 15,
+            right: 20,
+            zIndex: 9999,
+            display: "flex",
+            gap: 10,
+            fontSize: 14,
           }}
         >
-          <div
-            style={{
-              maxWidth: "1200px",
-              margin: "0 auto",
-              padding: "18px 24px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            {/* LOGO */}
-            <Link
-              href="/"
-              style={{
-                fontSize: "26px",
-                fontWeight: 800,
-                letterSpacing: "-0.02em",
-                color: "#FA0082",
-                textDecoration: "none",
-              }}
-            >
-              Peekr
-            </Link>
+          <a href="/lang/en">🇺🇸 EN</a>
+          <a href="/lang/es">🇪🇸 ES</a>
+          <a href="/lang/pt">🇧🇷 PT</a>
+        </div>
 
-            {/* NAV LINKS */}
-            <nav
-              style={{
-                display: "flex",
-                gap: "28px",
-                fontSize: "15px",
-                fontWeight: 500,
-              }}
-            >
-              <Link
-                href="/explore"
-                style={{
-                  color: "#fff",
-                  textDecoration: "none",
-                }}
-              >
-                Explore
-              </Link>
+        {children}
 
-              <Link
-                href="/trending"
-                style={{
-                  color: "#fff",
-                  textDecoration: "none",
-                }}
-              >
-                Trending
-              </Link>
-
-              <Link
-                href="/top"
-                style={{
-                  color: "#fff",
-                  textDecoration: "none",
-                }}
-              >
-                Top
-              </Link>
-            </nav>
-          </div>
-        </header>
-
-        {/* PAGE CONTENT */}
-        <main
-          style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
-            padding: "60px 24px",
-          }}
-        >
-          {children}
-        </main>
       </body>
     </html>
-  );
+  )
 }
