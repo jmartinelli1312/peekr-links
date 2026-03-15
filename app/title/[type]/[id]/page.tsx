@@ -3,15 +3,16 @@ export const dynamic = "force-dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { headers } from "next/headers"
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB = "https://api.themoviedb.org/3";
 const IMG = "https://image.tmdb.org/t/p/original";
 const POSTER = "https://image.tmdb.org/t/p/w342";
 
-async function getTitle(type: string, id: string) {
+async function getTitle(type: string, id: string, lang: string) {
   const res = await fetch(
-    `${TMDB}/${type}/${id}?api_key=${TMDB_KEY}&language=es-ES&append_to_response=credits,videos,watch/providers`,
+    `${TMDB}/${type}/${id}?api_key=${TMDB_KEY}&language=${lang}&append_to_response=credits,videos,watch/providers`,
     { next: { revalidate: 3600 } }
   );
 
@@ -26,8 +27,14 @@ export default async function TitlePage({
 }) {
 
   const { type, id } = await params
+  const lang =
+  headers().get("accept-language")?.includes("es")
+    ? "es-ES"
+    : headers().get("accept-language")?.includes("pt")
+    ? "pt-BR"
+    : "en-US"
 
-  const data = await getTitle(type, id);
+  const data = await getTitle(type, id, lang);
 
   if (!data) {
     return (
