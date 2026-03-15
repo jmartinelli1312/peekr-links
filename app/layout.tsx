@@ -59,7 +59,7 @@ export default async function RootLayout({
                 textDecoration: "none",
               }}
             >
-              PEEKR
+              Peekr
             </Link>
 
             {/* EXPLORE */}
