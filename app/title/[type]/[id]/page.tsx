@@ -1,15 +1,16 @@
 // app/title/[tmdb_id]/page.tsx
 
+export const dynamic = "force-dynamic";
 import { supabase } from "@/lib/supabase"
 import Image from "next/image"
 import { notFound } from "next/navigation"
 
-const TMDB_KEY = "3fe8e88bbcb0d91a3b4f9ab4d01f418a"
+const TMDB_KEY = process.env.TMDB_API_KEY
 
 async function getTitle(type: string, id: string) {
   const res = await fetch(
     `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&append_to_response=credits,watch/providers`,
-    { cache: "no-store" }
+    { next: { revalidate: 3600 } }
   )
 
   if (!res.ok) return null
