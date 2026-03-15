@@ -138,6 +138,7 @@ const watchersSafe = watchers ?? []
     .eq("tmdb_id", id)
     .limit(10)
 
+  const commentsSafe = peekrComments ?? []
 
   return (
     <div style={{ background:"#0B0B0F",minHeight:"100vh",color:"white"}}>
@@ -425,11 +426,11 @@ const watchersSafe = watchers ?? []
 
         {/* COMMENTS */}
 
-        {peekrComments?.length>0 && (
+        {commentsSafe.length>0 && (
           <div style={{marginTop:40}}>
             <h2>Comments</h2>
 
-            {peekrComments.map((c:any)=>(
+            {commentsSafe.map((c:any)=>(
               <div
                 key={c.id}
                 style={{
