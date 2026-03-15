@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { supabase } from "@/lib/supabase";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -26,6 +27,40 @@ type TmdbPerson = {
   profile_path?: string | null;
 };
 
+type PeekrActivity = {
+  tmdb_id: number | null;
+  title: string | null;
+  poster_path: string | null;
+  media_type: string | null;
+  rating: number | null;
+  watched_at: string | null;
+};
+
+export async function generateMetadata() {
+  return {
+    title: "Peekr | The social network for movies and series",
+    description:
+      "Discover movies, TV series, actors and real social activity around what people are watching on Peekr.",
+    openGraph: {
+      title: "Peekr | The social network for movies and series",
+      description:
+        "Track what you watch, rate titles, create Peeklists and discover what people are watching in real time.",
+      type: "website",
+      url: "https://www.peekr.app",
+      siteName: "Peekr",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Peekr | The social network for movies and series",
+      description:
+        "Track what you watch, rate titles, create Peeklists and discover what people are watching in real time.",
+    },
+    alternates: {
+      canonical: "https://www.peekr.app",
+    },
+  };
+}
+
 function normalizeLang(value?: string | null): Lang {
   const raw = (value || "en").toLowerCase();
   if (raw.startsWith("es")) return "es";
@@ -49,7 +84,7 @@ async function fetchTMDB<T>(url: string): Promise<T | null> {
   }
 }
 
-async function getHomeData(lang: Lang) {
+async function getTmdbHomeData(lang: Lang) {
   const apiLang = tmdbLanguage(lang);
 
   const [topMovies, topTV, popularPeople] = await Promise.all([
@@ -71,9 +106,93 @@ async function getHomeData(lang: Lang) {
   };
 }
 
+function dedupeActivities(items: PeekrActivity[]) {
+  const seen = new Set<string>();
+  const out: PeekrActivity[] = [];
+
+  for (const item of items) {
+    if (!item.tmdb_id || !item.media_type) continue;
+    const key = `${item.media_type}-${item.tmdb_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+
+  return out;
+}
+
+async function getTrendingOnPeekr() {
+  try {
+    const [watchedRes, ratedRes] = await Promise.all([
+      supabase
+        .from("user_title_activities")
+        .select("tmdb_id,title,poster_path,media_type,rating,watched_at")
+        .not("tmdb_id", "is", null)
+        .not("poster_path", "is", null)
+        .order("watched_at", { ascending: false })
+        .limit(30),
+
+      supabase
+        .from("user_title_activities")
+        .select("tmdb_id,title,poster_path,media_type,rating,watched_at")
+        .not("tmdb_id", "is", null)
+        .not("poster_path", "is", null)
+        .not("rating", "is", null)
+        .order("watched_at", { ascending: false })
+        .limit(30),
+    ]);
+
+    const recentlyWatched = dedupeActivities(
+      (watchedRes.data as PeekrActivity[] | null) ?? []
+    ).slice(0, 12);
+
+    const recentlyRated = dedupeActivities(
+      (ratedRes.data as PeekrActivity[] | null) ?? []
+    ).slice(0, 12);
+
+    return {
+      recentlyWatched,
+      recentlyRated,
+    };
+  } catch {
+    return {
+      recentlyWatched: [] as PeekrActivity[],
+      recentlyRated: [] as PeekrActivity[],
+    };
+  }
+}
+
 function getYear(item: TmdbTitle) {
   const raw = item.release_date || item.first_air_date || "";
   return raw ? raw.slice(0, 4) : "";
+}
+
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+function titleHref(item: {
+  tmdb_id?: number | null;
+  id?: number | null;
+  media_type?: string | null;
+  title?: string | null;
+  name?: string | null;
+}) {
+  const id = item.tmdb_id ?? item.id;
+  const type = item.media_type === "tv" ? "tv" : "movie";
+  const rawTitle = item.title || item.name || "title";
+  const slug = slugify(rawTitle);
+  return `/title/${type}/${id}-${slug}`;
+}
+
+function actorHref(person: TmdbPerson) {
+  return `/actor/${person.id}-${slugify(person.name)}`;
 }
 
 function SectionHeader({
@@ -87,22 +206,6 @@ function SectionHeader({
     <div className="section-header">
       <h2>{title}</h2>
       {text ? <p>{text}</p> : null}
-    </div>
-  );
-}
-
-function ScreenshotCard({
-  src,
-  alt,
-  priority = false,
-}: {
-  src: string;
-  alt: string;
-  priority?: boolean;
-}) {
-  return (
-    <div className="shot-card">
-      <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} />
     </div>
   );
 }
@@ -123,7 +226,12 @@ function TitleRow({
         return (
           <Link
             key={`${type}-${item.id}`}
-            href={`/title/${type}/${item.id}`}
+            href={titleHref({
+              id: item.id,
+              media_type: type,
+              title: item.title,
+              name: item.name,
+            })}
             className="poster-card"
           >
             {poster ? (
@@ -152,11 +260,7 @@ function PeopleRow({ items }: { items: TmdbPerson[] }) {
           : null;
 
         return (
-          <Link
-            key={person.id}
-            href={`/actor/${person.id}`}
-            className="person-card"
-          >
+          <Link key={person.id} href={actorHref(person)} className="person-card">
             {photo ? (
               <img src={photo} alt={person.name} className="person-image" />
             ) : (
@@ -164,6 +268,45 @@ function PeopleRow({ items }: { items: TmdbPerson[] }) {
             )}
 
             <div className="person-name">{person.name}</div>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+function PeekrRow({
+  items,
+  showRating,
+}: {
+  items: PeekrActivity[];
+  showRating: boolean;
+}) {
+  return (
+    <div className="scroll-row">
+      {items.map((item, index) => {
+        const title = item.title || "Untitled";
+        const poster = item.poster_path ? `${POSTER}${item.poster_path}` : null;
+        const href = titleHref(item);
+
+        return (
+          <Link
+            key={`${item.media_type}-${item.tmdb_id}-${index}`}
+            href={href}
+            className="poster-card"
+          >
+            {poster ? (
+              <img src={poster} alt={title} className="poster-image" />
+            ) : (
+              <div className="poster-fallback" />
+            )}
+
+            <div className="poster-meta">
+              <div className="poster-title">{title}</div>
+              <div className="poster-year">
+                {showRating && item.rating != null ? `⭐ ${item.rating}/10` : ""}
+              </div>
+            </div>
           </Link>
         );
       })}
@@ -179,114 +322,94 @@ export default async function HomePage() {
     en: {
       heroTitle: "The social network for movies and series.",
       heroText:
-        "Track what you watch, rate titles, create Peeklists, discover actors, and follow what people around you are watching in real time.",
+        "Track what you watch, rate titles, create Peeklists and discover what people are watching in real time.",
       createAccount: "Create account",
       downloadApp: "Download app",
-      discoverTitle: "Discover top-rated movies and TV series",
-      discoverText:
-        "Explore cinema, television and people with a product built for discovery and taste.",
+      discoverMovies: "Discover top-rated movies",
+      discoverMoviesText:
+        "A cleaner way to explore the greatest films ever made.",
+      discoverTV: "Discover top-rated TV series",
+      discoverTVText:
+        "Series worth bingeing, discussing and sharing with your friends.",
       peopleTitle: "Popular people",
       peopleText:
         "Go beyond titles and discover the actors and creators shaping what everyone is watching now.",
-      profileTitle: "Build your identity as a viewer",
-      profileText:
-        "Your profile is more than a diary. It is your public taste map: watched titles, followers, following, watchlist and Peeklists.",
-      socialTitle: "A social feed built for film and series culture",
-      socialText:
-        "See what your friends watched, rated, saved and discussed. Peekr turns passive tracking into active social discovery.",
+      peekrTitle: "Trending on Peekr",
+      peekrText:
+        "Live activity from the community: the latest watched and rated titles on Peekr.",
+      watchedTitle: "Recently watched",
+      ratedTitle: "Recently rated",
       whyTitle: "Why Peekr feels different",
       why1: "Movies and TV series in one place",
       why2: "Real social activity, not just logging",
-      why3: "Peeklists designed to share taste",
-      why4: "Discovery of people, titles and awards",
-      why5: "Mobile-first and web-ready",
+      why3: "Peeklists built to share taste",
+      why4: "Discover actors, titles and awards",
       ctaTitle: "Start building your taste graph.",
       ctaText:
-        "Create your account, track what you watch, follow friends and discover your next obsession.",
+        "Create your account, track what you watch and discover your next obsession.",
     },
     es: {
       heroTitle: "La red social para películas y series.",
       heroText:
-        "Lleva registro de lo que ves, califica títulos, crea Peeklists, descubre actores y sigue en tiempo real lo que otras personas están viendo.",
+        "Lleva registro de lo que ves, califica títulos, crea Peeklists y descubre lo que la gente está viendo en tiempo real.",
       createAccount: "Crear cuenta",
       downloadApp: "Bajar app",
-      discoverTitle: "Descubre películas y series top rated",
-      discoverText:
-        "Explora cine, televisión y personas con un producto creado para descubrimiento y gusto.",
+      discoverMovies: "Descubre películas top rated",
+      discoverMoviesText:
+        "Una forma más limpia de explorar las mejores películas de todos los tiempos.",
+      discoverTV: "Descubre series top rated",
+      discoverTVText:
+        "Series que valen la pena maratonear, comentar y compartir con tus amigos.",
       peopleTitle: "Personas populares",
       peopleText:
         "Ve más allá de los títulos y descubre actores y creadores que están definiendo lo que todos están viendo.",
-      profileTitle: "Construye tu identidad como viewer",
-      profileText:
-        "Tu perfil es más que un diario. Es tu mapa público de gustos: vistos, seguidores, siguiendo, watchlist y Peeklists.",
-      socialTitle: "Un feed social hecho para la cultura del cine y las series",
-      socialText:
-        "Mira qué vieron, calificaron, guardaron y comentaron tus amigos. Peekr convierte el tracking pasivo en descubrimiento social activo.",
+      peekrTitle: "Trending on Peekr",
+      peekrText:
+        "Actividad en vivo de la comunidad: los últimos títulos vistos y calificados en Peekr.",
+      watchedTitle: "Últimos vistos",
+      ratedTitle: "Últimos calificados",
       whyTitle: "Por qué Peekr se siente diferente",
       why1: "Películas y series en un mismo lugar",
       why2: "Actividad social real, no solo logging",
       why3: "Peeklists hechas para compartir gusto",
-      why4: "Descubrimiento de personas, títulos y premios",
-      why5: "Diseñado mobile-first y fuerte en web",
+      why4: "Descubre actores, títulos y premios",
       ctaTitle: "Empieza a construir tu mapa de gustos.",
       ctaText:
-        "Crea tu cuenta, registra lo que ves, sigue a tus amigos y descubre tu próxima obsesión.",
+        "Crea tu cuenta, registra lo que ves y descubre tu próxima obsesión.",
     },
     pt: {
       heroTitle: "A rede social para filmes e séries.",
       heroText:
-        "Registre o que você assiste, avalie títulos, crie Peeklists, descubra atores e acompanhe em tempo real o que as pessoas estão vendo.",
+        "Registre o que você assiste, avalie títulos, crie Peeklists e descubra o que as pessoas estão vendo em tempo real.",
       createAccount: "Criar conta",
       downloadApp: "Baixar app",
-      discoverTitle: "Descubra filmes e séries top rated",
-      discoverText:
-        "Explore cinema, televisão e pessoas com um produto criado para descoberta e gosto.",
+      discoverMovies: "Descubra filmes top rated",
+      discoverMoviesText:
+        "Uma forma mais limpa de explorar os melhores filmes de todos os tempos.",
+      discoverTV: "Descubra séries top rated",
+      discoverTVText:
+        "Séries que valem a maratona, o comentário e o compartilhamento.",
       peopleTitle: "Pessoas populares",
       peopleText:
         "Vá além dos títulos e descubra atores e criadores que estão moldando o que todo mundo está assistindo agora.",
-      profileTitle: "Construa sua identidade como viewer",
-      profileText:
-        "Seu perfil é mais que um diário. É o seu mapa público de gosto: vistos, seguidores, seguindo, watchlist e Peeklists.",
-      socialTitle: "Um feed social feito para a cultura de filmes e séries",
-      socialText:
-        "Veja o que seus amigos assistiram, avaliaram, salvaram e comentaram. Peekr transforma tracking passivo em descoberta social ativa.",
+      peekrTitle: "Trending on Peekr",
+      peekrText:
+        "Atividade ao vivo da comunidade: os últimos títulos assistidos e avaliados no Peekr.",
+      watchedTitle: "Assistidos recentemente",
+      ratedTitle: "Avaliados recentemente",
       whyTitle: "Por que Peekr é diferente",
       why1: "Filmes e séries no mesmo lugar",
       why2: "Atividade social real, não só logging",
       why3: "Peeklists feitas para compartilhar gosto",
-      why4: "Descoberta de pessoas, títulos e premiações",
-      why5: "Criado mobile-first e forte no web",
+      why4: "Descubra atores, títulos e premiações",
       ctaTitle: "Comece a construir seu mapa de gosto.",
       ctaText:
-        "Crie sua conta, registre o que assiste, siga seus amigos e descubra sua próxima obsessão.",
+        "Crie sua conta, registre o que assiste e descubra sua próxima obsessão.",
     },
   }[lang];
 
-  const { topMovies, topTV, popularPeople } = await getHomeData(lang);
-
-  const screenshots = {
-    en: {
-      hero: "/home/feed-en.jpg",
-      explore: "/home/explore-es.jpg",
-      profile: "/home/profile-en.jpg",
-      actor: "/home/actor-es.jpg",
-      social: "/home/feed-en.jpg",
-    },
-    es: {
-      hero: "/home/explore-es.jpg",
-      explore: "/home/explore-es.jpg",
-      profile: "/home/profile-es.jpg",
-      actor: "/home/actor-es.jpg",
-      social: "/home/feed-es.jpg",
-    },
-    pt: {
-      hero: "/home/feed-pt.jpg",
-      explore: "/home/explore-es.jpg",
-      profile: "/home/profile-es.jpg",
-      actor: "/home/actor-pt.jpg",
-      social: "/home/feed-pt.jpg",
-    },
-  }[lang];
+  const [{ topMovies, topTV, popularPeople }, { recentlyWatched, recentlyRated }] =
+    await Promise.all([getTmdbHomeData(lang), getTrendingOnPeekr()]);
 
   return (
     <>
@@ -294,35 +417,14 @@ export default async function HomePage() {
         .home-page {
           display: flex;
           flex-direction: column;
-          gap: 72px;
+          gap: 56px;
         }
 
-        .hero-grid,
-        .two-col {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 28px;
-          align-items: center;
+        .hero {
+          padding-top: 4px;
         }
 
-        .hero-copy h1 {
-          margin: 0;
-          font-size: 44px;
-          line-height: 0.98;
-          letter-spacing: -0.05em;
-          font-weight: 900;
-          color: white;
-        }
-
-        .hero-copy p {
-          margin: 18px 0 0 0;
-          font-size: 16px;
-          line-height: 1.7;
-          color: rgba(255,255,255,0.74);
-          max-width: 680px;
-        }
-
-        .badge {
+        .hero-badge {
           display: inline-flex;
           align-items: center;
           padding: 8px 12px;
@@ -332,6 +434,24 @@ export default async function HomePage() {
           font-weight: 800;
           font-size: 13px;
           margin-bottom: 18px;
+        }
+
+        .hero h1 {
+          margin: 0;
+          font-size: clamp(44px, 10vw, 72px);
+          line-height: 0.98;
+          letter-spacing: -0.05em;
+          font-weight: 900;
+          color: white;
+          max-width: 840px;
+        }
+
+        .hero p {
+          margin: 18px 0 0 0;
+          max-width: 760px;
+          color: rgba(255,255,255,0.74);
+          font-size: 17px;
+          line-height: 1.75;
         }
 
         .hero-actions,
@@ -365,30 +485,14 @@ export default async function HomePage() {
           color: white;
         }
 
-        .shot-card {
-          width: 100%;
-          border-radius: 26px;
-          overflow: hidden;
-          border: 1px solid rgba(255,255,255,0.08);
-          background: #111;
-          box-shadow: 0 18px 40px rgba(0,0,0,0.28);
-        }
-
-        .shot-card img {
-          width: 100%;
-          height: auto;
-          display: block;
-          object-fit: cover;
-        }
-
         .section-header {
           margin-bottom: 18px;
         }
 
         .section-header h2 {
           margin: 0;
-          font-size: 30px;
-          line-height: 1.04;
+          font-size: clamp(30px, 7vw, 38px);
+          line-height: 1.02;
           color: white;
           font-weight: 900;
           letter-spacing: -0.03em;
@@ -398,8 +502,8 @@ export default async function HomePage() {
           margin: 10px 0 0 0;
           color: rgba(255,255,255,0.70);
           font-size: 15px;
-          line-height: 1.65;
-          max-width: 820px;
+          line-height: 1.7;
+          max-width: 840px;
         }
 
         .scroll-row {
@@ -408,6 +512,7 @@ export default async function HomePage() {
           overflow-x: auto;
           padding-bottom: 8px;
           -webkit-overflow-scrolling: touch;
+          scroll-snap-type: x proximity;
         }
 
         .poster-card,
@@ -415,6 +520,7 @@ export default async function HomePage() {
           text-decoration: none;
           color: white;
           flex: 0 0 auto;
+          scroll-snap-align: start;
         }
 
         .poster-card {
@@ -448,6 +554,7 @@ export default async function HomePage() {
           margin-top: 4px;
           font-size: 12px;
           color: rgba(255,255,255,0.55);
+          min-height: 16px;
         }
 
         .person-card {
@@ -501,12 +608,12 @@ export default async function HomePage() {
 
         .cta-final {
           text-align: center;
-          padding: 6px 0 8px 0;
+          padding: 8px 0 8px 0;
         }
 
         .cta-final h2 {
           margin: 0;
-          font-size: 38px;
+          font-size: clamp(38px, 8vw, 52px);
           line-height: 1.02;
           color: white;
           font-weight: 900;
@@ -522,21 +629,8 @@ export default async function HomePage() {
         }
 
         @media (min-width: 900px) {
-          .hero-grid {
-            grid-template-columns: 1.02fr 0.98fr;
-          }
-
-          .two-col {
-            grid-template-columns: 1fr 1fr;
-            align-items: start;
-          }
-
-          .hero-copy h1 {
-            font-size: 62px;
-          }
-
-          .section-header h2 {
-            font-size: 34px;
+          .home-page {
+            gap: 72px;
           }
 
           .poster-card {
@@ -560,79 +654,78 @@ export default async function HomePage() {
           }
 
           .why-grid {
-            grid-template-columns: repeat(5, minmax(0, 1fr));
-          }
-
-          .cta-final h2 {
-            font-size: 46px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
           }
         }
       `}</style>
 
       <div className="home-page">
-        <section className="hero-grid">
-          <div className="hero-copy">
-            <div className="badge">Peekr</div>
+        <section className="hero">
+          <div className="hero-badge">Peekr</div>
 
-            <h1>{t.heroTitle}</h1>
+          <h1>{t.heroTitle}</h1>
 
-            <p>{t.heroText}</p>
+          <p>{t.heroText}</p>
 
-            <div className="hero-actions">
-              <Link href="/signup" className="btn-primary">
-                {t.createAccount}
-              </Link>
+          <div className="hero-actions">
+            <Link href="/signup" className="btn-primary">
+              {t.createAccount}
+            </Link>
 
-              <a
-                href="mailto:info@peekr.app?subject=Peekr%20App"
-                className="btn-secondary"
-              >
-                {t.downloadApp}
-              </a>
-            </div>
+            <a
+              href="mailto:info@peekr.app?subject=Peekr%20App"
+              className="btn-secondary"
+            >
+              {t.downloadApp}
+            </a>
           </div>
-
-          <ScreenshotCard src={screenshots.hero} alt="Peekr hero" priority />
         </section>
 
         <section>
-          <SectionHeader title={t.discoverTitle} text={t.discoverText} />
-          <ScreenshotCard src={screenshots.explore} alt="Peekr explore" />
-          <div style={{ marginTop: 24 }}>{TitleRow({ items: topMovies, type: "movie" })}</div>
-          <div style={{ marginTop: 20 }}>{TitleRow({ items: topTV, type: "tv" })}</div>
+          <SectionHeader title={t.discoverMovies} text={t.discoverMoviesText} />
+          <TitleRow items={topMovies} type="movie" />
+        </section>
+
+        <section>
+          <SectionHeader title={t.discoverTV} text={t.discoverTVText} />
+          <TitleRow items={topTV} type="tv" />
         </section>
 
         <section>
           <SectionHeader title={t.peopleTitle} text={t.peopleText} />
-          {PeopleRow({ items: popularPeople })}
+          <PeopleRow items={popularPeople} />
         </section>
 
-        <section className="two-col">
-          <ScreenshotCard src={screenshots.profile} alt="Peekr profile" />
-          <div>
-            <SectionHeader title={t.profileTitle} text={t.profileText} />
-            <div className="why-grid">
-              {[t.why1, t.why2, t.why3].map((item) => (
-                <div key={item} className="why-card">
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        <section>
+          <SectionHeader title={t.peekrTitle} text={t.peekrText} />
 
-        <section className="two-col">
-          <div>
-            <ScreenshotCard src={screenshots.actor} alt="Peekr actor page" />
-            <div style={{ marginTop: 18 }}>
-              <SectionHeader title={t.peopleTitle} text={t.peopleText} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            <div>
+              <div
+                style={{
+                  marginBottom: 12,
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: "rgba(255,255,255,0.92)",
+                }}
+              >
+                {t.watchedTitle}
+              </div>
+              <PeekrRow items={recentlyWatched} showRating={false} />
             </div>
-          </div>
 
-          <div>
-            <ScreenshotCard src={screenshots.social} alt="Peekr social feed" />
-            <div style={{ marginTop: 18 }}>
-              <SectionHeader title={t.socialTitle} text={t.socialText} />
+            <div>
+              <div
+                style={{
+                  marginBottom: 12,
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: "rgba(255,255,255,0.92)",
+                }}
+              >
+                {t.ratedTitle}
+              </div>
+              <PeekrRow items={recentlyRated} showRating />
             </div>
           </div>
         </section>
@@ -640,7 +733,7 @@ export default async function HomePage() {
         <section className="why-box">
           <SectionHeader title={t.whyTitle} />
           <div className="why-grid">
-            {[t.why1, t.why2, t.why3, t.why4, t.why5].map((item) => (
+            {[t.why1, t.why2, t.why3, t.why4].map((item) => (
               <div key={item} className="why-card">
                 {item}
               </div>
