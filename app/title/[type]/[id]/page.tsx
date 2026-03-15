@@ -155,19 +155,50 @@ export default async function TitlePage({
               }}
             >
               {cast.map((c: any) => (
-                <div key={c.id} style={{ textAlign: "center" }}>
-                  {c.profile_path && (
-                    <Image
-                      src={`https://image.tmdb.org/t/p/w185${c.profile_path}`}
-                      alt={c.name}
-                      width={120}
-                      height={160}
-                      style={{ borderRadius: 8 }}
-                    />
-                  )}
-                  <div style={{ marginTop: 6, fontSize: 13 }}>{c.name}</div>
-                </div>
-              ))}
+  <Link
+    key={c.id}
+    href={`/actor/${c.id}`}
+    style={{
+      textAlign: "center",
+      textDecoration: "none",
+      color: "white",
+    }}
+  >
+    <div>
+
+      {c.profile_path ? (
+        <Image
+          src={`https://image.tmdb.org/t/p/w185${c.profile_path}`}
+          alt={c.name}
+          width={120}
+          height={160}
+          style={{
+            borderRadius: 8,
+            objectFit: "cover",
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            width: 120,
+            height: 160,
+            background: "#1c1c24",
+            borderRadius: 8,
+          }}
+        />
+      )}
+
+      <div style={{ marginTop: 8, fontSize: 13, fontWeight: 500 }}>
+        {c.name}
+      </div>
+
+      <div style={{ fontSize: 12, opacity: 0.6 }}>
+        {c.character}
+      </div>
+
+    </div>
+  </Link>
+))}
             </div>
           </div>
         )}
