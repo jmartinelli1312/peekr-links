@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { headers } from "next/headers"
+import { headers } from "next/headers";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB = "https://api.themoviedb.org/3";
@@ -27,14 +27,45 @@ export default async function TitlePage({
 }) {
 
   const { type, id } = await params
-  const lang =
-  headers().get("accept-language")?.includes("es")
+  const h = await headers()
+
+const lang =
+  h.get("accept-language")?.includes("es")
     ? "es-ES"
-    : headers().get("accept-language")?.includes("pt")
+    : h.get("accept-language")?.includes("pt")
     ? "pt-BR"
     : "en-US"
 
   const data = await getTitle(type, id, lang);
+  // -----------------------------
+// PEEKR SOCIAL DATA
+// -----------------------------
+
+const { data: ratings } = await supabase
+  .from("ratings")
+  .select("rating")
+  .eq("tmdb_id", id)
+  .eq("media_type", type)
+
+const { count: watched } = await supabase
+  .from("watched")
+  .select("*", { count: "exact", head: true })
+  .eq("tmdb_id", id)
+  .eq("media_type", type)
+
+const { count: comments } = await supabase
+  .from("comments")
+  .select("*", { count: "exact", head: true })
+  .eq("tmdb_id", id)
+  .eq("media_type", type)
+
+  const avgRating =
+  ratings && ratings.length > 0
+    ? (
+        ratings.reduce((a: number, b: any) => a + b.rating, 0) /
+        ratings.length
+      ).toFixed(1)
+    : null
 
   if (!data) {
     return (
@@ -44,6 +75,7 @@ export default async function TitlePage({
       </div>
     );
   }
+  
 
   const title = data.title || data.name;
   const year = (data.release_date || data.first_air_date || "").slice(0, 4);
@@ -150,6 +182,29 @@ export default async function TitlePage({
             <h1 style={{fontSize:36}}>
               {title} {year && <span style={{opacity:.6}}>({year})</span>}
             </h1>
+            {/* PEEKR SOCIAL STATS */}
+
+<div
+  style={{
+    display: "flex",
+    gap: 24,
+    marginTop: 14,
+    fontSize: 15,
+    opacity: 0.9,
+  }}
+>
+  <div>
+    ⭐ {avgRating ?? "-"}
+  </div>
+
+  <div>
+    👁 {watched ?? 0} watched
+  </div>
+
+  <div>
+    💬 {comments ?? 0} comments
+  </div>
+</div>
 
             {director && (
               <div style={{marginTop:6}}>
