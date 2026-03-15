@@ -6,9 +6,9 @@ import { notFound } from "next/navigation"
 
 const TMDB_KEY = process.env.TMDB_API_KEY
 
-async function getTitle(tmdbId: string) {
+async function getTitle(type: string, id: string) {
   const res = await fetch(
-    `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${TMDB_KEY}&append_to_response=credits,watch/providers`,
+    `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&append_to_response=credits,watch/providers`,
     { cache: "no-store" }
   )
 
@@ -25,7 +25,7 @@ export default async function TitlePage({
 
 const id = params.id
 
-const data = await getTitle(id)
+const data = await getTitle(params.type, params.id)
 
 if (!data) return notFound()
 
