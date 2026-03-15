@@ -14,7 +14,14 @@ export default function RootLayout({
 }) {
 
   const cookieStore = cookies()
-  const lang = cookieStore.get("lang")?.value || "en"
+  const langCookie = cookieStore.get("lang")?.value
+
+  const browserLang =
+    typeof navigator !== "undefined"
+      ? navigator.language.slice(0, 2)
+      : "en"
+
+  const lang = langCookie || browserLang || "en"
 
   return (
     <html lang={lang}>
@@ -28,7 +35,7 @@ export default function RootLayout({
         }}
       >
 
-        {/* HEADER */}
+        {/* HEADER /}
 
         <header
           style={{
@@ -44,7 +51,7 @@ export default function RootLayout({
           }}
         >
 
-          <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
 
             <Link
               href="/"
@@ -58,27 +65,30 @@ export default function RootLayout({
               Peekr
             </Link>
 
-            <Link href="/explore" style={{ color: "white", textDecoration: "none" }}>
+            <Link href="/explore" style={nav}>
               Explore
             </Link>
 
-            <Link href="/lists" style={{ color: "white", textDecoration: "none" }}>
+            <Link href="/lists" style={nav}>
               Lists
             </Link>
 
-            <Link href="/activity" style={{ color: "white", textDecoration: "none" }}>
+            <Link href="/activity" style={nav}>
               Activity
             </Link>
 
           </div>
 
+
           <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+
+            {/ LANGUAGE SWITCH /}
 
             <a href="/lang/en">🇺🇸</a>
             <a href="/lang/es">🇪🇸</a>
             <a href="/lang/pt">🇧🇷</a>
 
-            <Link href="/login" style={{ color: "white", textDecoration: "none" }}>
+            <Link href="/login" style={nav}>
               Sign in
             </Link>
 
@@ -88,9 +98,9 @@ export default function RootLayout({
                 background: "#FA0082",
                 padding: "8px 14px",
                 borderRadius: 8,
+                fontWeight: 600,
                 color: "white",
                 textDecoration: "none",
-                fontWeight: 600,
               }}
             >
               Create account
@@ -99,6 +109,9 @@ export default function RootLayout({
           </div>
 
         </header>
+
+
+        {/ PAGE /}
 
         <main
           style={{
@@ -110,19 +123,73 @@ export default function RootLayout({
           {children}
         </main>
 
+
+        {/ FOOTER */}
+
         <footer
           style={{
             marginTop: 80,
             borderTop: "1px solid rgba(255,255,255,0.08)",
             padding: "40px 20px",
             textAlign: "center",
-            opacity: 0.7,
             fontSize: 14,
+            opacity: 0.7,
           }}
         >
-          Peekr © {new Date().getFullYear()}
+
+          <div style={{ marginBottom: 18 }}>
+            Peekr © {new Date().getFullYear()}
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 20,
+              flexWrap: "wrap",
+              marginBottom: 18,
+            }}
+          >
+            <Link href="/about" style={footerLink}>About</Link>
+            <Link href="/privacy" style={footerLink}>Privacy</Link>
+            <Link href="/terms" style={footerLink}>Terms</Link>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            <a
+              href="https://instagram.com/peekr.app"
+              target="_blank"
+              style={footerLink}
+            >
+              Instagram
+            </a>
+
+            <a
+              href="https://x.com/peekr_oficial"
+              target="_blank"
+              style={footerLink}
+            >
+              X
+            </a>
+
+            <a
+              href="mailto:info@peekr.app"
+              style={footerLink}
+            >
+              info@peekr.app
+            </a>
+          </div>
+
         </footer>
 
       </body>
     </html>
   )
+}
