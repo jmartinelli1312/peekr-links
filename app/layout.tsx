@@ -12,7 +12,6 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-
   const cookieStore = await cookies()
   const lang = cookieStore.get("lang")?.value || "en"
 
@@ -27,155 +26,366 @@ export default async function RootLayout({
             "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif",
         }}
       >
+        <style>{`
+          .peekr-header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: #0B0B0F;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+          }
 
-        <header
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "14px 28px",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
-            position: "sticky",
-            top: 0,
-            background: "#0B0B0F",
-            zIndex: 1000,
-          }}
-        >
+          .peekr-header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+          }
 
-          <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
+          .peekr-logo {
+            font-size: 22px;
+            font-weight: 800;
+            color: #FA0082;
+            text-decoration: none;
+            flex-shrink: 0;
+          }
 
-            <Link
-              href="/"
-              style={{
-                fontSize: 22,
-                fontWeight: 800,
-                color: "#FA0082",
-                textDecoration: "none",
-              }}
-            >
+          .peekr-nav-desktop {
+            display: none;
+            align-items: center;
+            gap: 28px;
+          }
+
+          .peekr-actions-desktop {
+            display: none;
+            align-items: center;
+            gap: 16px;
+          }
+
+          .peekr-link {
+            color: white;
+            text-decoration: none;
+            font-size: 15px;
+            opacity: 0.9;
+          }
+
+          .peekr-signup {
+            background: #FA0082;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-weight: 700;
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .peekr-lang {
+            position: relative;
+          }
+
+          .peekr-lang summary,
+          .peekr-menu summary {
+            list-style: none;
+            cursor: pointer;
+          }
+
+          .peekr-lang summary::-webkit-details-marker,
+          .peekr-menu summary::-webkit-details-marker {
+            display: none;
+          }
+
+          .peekr-lang-menu {
+            position: absolute;
+            right: 0;
+            top: 34px;
+            min-width: 150px;
+            background: #111;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+          }
+
+          .peekr-lang-item {
+            display: block;
+            padding: 10px 12px;
+            text-decoration: none;
+            color: white;
+            font-size: 14px;
+          }
+
+          .peekr-lang-item:hover {
+            background: rgba(255,255,255,0.06);
+          }
+
+          .peekr-mobile-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-left: auto;
+          }
+
+          .peekr-menu {
+            position: relative;
+          }
+
+          .peekr-menu-button {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.04);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .peekr-menu-icon {
+            width: 18px;
+            height: 12px;
+            position: relative;
+            display: block;
+          }
+
+          .peekr-menu-icon::before,
+          .peekr-menu-icon::after,
+          .peekr-menu-icon span {
+            content: "";
+            position: absolute;
+            left: 0;
+            width: 18px;
+            height: 2px;
+            background: white;
+            border-radius: 999px;
+          }
+
+          .peekr-menu-icon::before {
+            top: 0;
+          }
+
+          .peekr-menu-icon span {
+            top: 5px;
+          }
+
+          .peekr-menu-icon::after {
+            top: 10px;
+          }
+
+          .peekr-mobile-panel {
+            position: absolute;
+            right: 0;
+            top: 50px;
+            width: min(280px, calc(100vw - 32px));
+            background: #111;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            padding: 10px;
+            box-shadow: 0 18px 44px rgba(0,0,0,0.38);
+          }
+
+          .peekr-mobile-item {
+            display: block;
+            padding: 12px 10px;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 15px;
+          }
+
+          .peekr-mobile-item:hover {
+            background: rgba(255,255,255,0.06);
+          }
+
+          .peekr-mobile-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.08);
+            margin: 8px 0;
+          }
+
+          .peekr-main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px 20px;
+          }
+
+          .peekr-footer {
+            margin-top: 80px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding: 40px 20px;
+            text-align: center;
+            font-size: 14px;
+            opacity: 0.7;
+          }
+
+          .peekr-footer-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+          }
+
+          .peekr-footer-links,
+          .peekr-footer-social {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+          }
+
+          .peekr-footer-links {
+            margin: 0 0 18px 0;
+          }
+
+          .peekr-footer-link {
+            color: white;
+            text-decoration: none;
+            opacity: 0.7;
+          }
+
+          @media (min-width: 900px) {
+            .peekr-header-inner {
+              padding: 14px 28px;
+            }
+
+            .peekr-nav-desktop {
+              display: flex;
+            }
+
+            .peekr-actions-desktop {
+              display: flex;
+            }
+
+            .peekr-mobile-right {
+              display: none;
+            }
+
+            .peekr-main {
+              padding: 32px 20px;
+            }
+          }
+        `}</style>
+
+        <header className="peekr-header">
+          <div className="peekr-header-inner">
+            <Link href="/" className="peekr-logo">
               Peekr
             </Link>
 
-            <Link href="/explore" style={nav}>Explore</Link>
-            <Link href="/lists" style={nav}>Lists</Link>
-            <Link href="/activity" style={nav}>Activity</Link>
+            <nav className="peekr-nav-desktop">
+              <Link href="/explore" className="peekr-link">
+                Explore
+              </Link>
+              <Link href="/lists" className="peekr-link">
+                Lists
+              </Link>
+              <Link href="/activity" className="peekr-link">
+                Activity
+              </Link>
+            </nav>
 
+            <div className="peekr-actions-desktop">
+              <details className="peekr-lang">
+                <summary style={{ cursor: "pointer", fontSize: 18 }}>🌍</summary>
+                <div className="peekr-lang-menu">
+                  <a href="/lang/en" className="peekr-lang-item">🇺🇸 English</a>
+                  <a href="/lang/es" className="peekr-lang-item">🇪🇸 Español</a>
+                  <a href="/lang/pt" className="peekr-lang-item">🇧🇷 Português</a>
+                </div>
+              </details>
+
+              <Link href="/login" className="peekr-link">
+                Sign in
+              </Link>
+
+              <Link href="/signup" className="peekr-signup">
+                Create account
+              </Link>
+            </div>
+
+            <div className="peekr-mobile-right">
+              <details className="peekr-lang">
+                <summary style={{ cursor: "pointer", fontSize: 18 }}>🌍</summary>
+                <div className="peekr-lang-menu">
+                  <a href="/lang/en" className="peekr-lang-item">🇺🇸 English</a>
+                  <a href="/lang/es" className="peekr-lang-item">🇪🇸 Español</a>
+                  <a href="/lang/pt" className="peekr-lang-item">🇧🇷 Português</a>
+                </div>
+              </details>
+
+              <details className="peekr-menu">
+                <summary className="peekr-menu-button">
+                  <span className="peekr-menu-icon">
+                    <span />
+                  </span>
+                </summary>
+
+                <div className="peekr-mobile-panel">
+                  <Link href="/explore" className="peekr-mobile-item">
+                    Explore
+                  </Link>
+                  <Link href="/lists" className="peekr-mobile-item">
+                    Lists
+                  </Link>
+                  <Link href="/activity" className="peekr-mobile-item">
+                    Activity
+                  </Link>
+
+                  <div className="peekr-mobile-divider" />
+
+                  <Link href="/login" className="peekr-mobile-item">
+                    Sign in
+                  </Link>
+                  <Link href="/signup" className="peekr-mobile-item">
+                    Create account
+                  </Link>
+                </div>
+              </details>
+            </div>
           </div>
-
-          <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
-
-            <details style={{ position: "relative" }}>
-              <summary style={{ cursor: "pointer", fontSize: 18 }}>
-                🌍
-              </summary>
-
-              <div
-                style={{
-                  position: "absolute",
-                  right: 0,
-                  top: 30,
-                  background: "#111",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 8,
-                  padding: "6px 0",
-                  minWidth: 150,
-                }}
-              >
-                <a href="/lang/en" style={langItem}>🇺🇸 English</a>
-                <a href="/lang/es" style={langItem}>🇪🇸 Español</a>
-                <a href="/lang/pt" style={langItem}>🇧🇷 Português</a>
-              </div>
-            </details>
-
-            <Link href="/login" style={nav}>Sign in</Link>
-
-            <Link
-              href="/signup"
-              style={{
-                background: "#FA0082",
-                padding: "8px 14px",
-                borderRadius: 8,
-                fontWeight: 600,
-                color: "white",
-                textDecoration: "none",
-              }}
-            >
-              Create account
-            </Link>
-
-          </div>
-
         </header>
 
-        <main
-          style={{
-            maxWidth: 1200,
-            margin: "0 auto",
-            padding: "32px 20px",
-          }}
-        >
-          {children}
-        </main>
+        <main className="peekr-main">{children}</main>
 
-        <footer
-          style={{
-            marginTop: 80,
-            borderTop: "1px solid rgba(255,255,255,0.08)",
-            padding: "40px 20px",
-            textAlign: "center",
-            fontSize: 14,
-            opacity: 0.7,
-          }}
-        >
+        <footer className="peekr-footer">
+          <div className="peekr-footer-inner">
+            <div style={{ marginBottom: 18 }}>
+              Peekr © {new Date().getFullYear()}
+            </div>
 
-          <div style={{ marginBottom: 18 }}>
-            Peekr © {new Date().getFullYear()}
+            <div className="peekr-footer-links">
+              <Link href="/about" className="peekr-footer-link">About</Link>
+              <Link href="/privacy" className="peekr-footer-link">Privacy</Link>
+              <Link href="/terms" className="peekr-footer-link">Terms</Link>
+            </div>
+
+            <div className="peekr-footer-social">
+              <a
+                href="https://instagram.com/peekr.app"
+                target="_blank"
+                className="peekr-footer-link"
+              >
+                Instagram
+              </a>
+              <a
+                href="https://x.com/peekr_oficial"
+                target="_blank"
+                className="peekr-footer-link"
+              >
+                X
+              </a>
+              <a
+                href="mailto:info@peekr.app"
+                className="peekr-footer-link"
+              >
+                info@peekr.app
+              </a>
+            </div>
           </div>
-
-          <div style={{ display: "flex", justifyContent: "center", gap: 20, marginBottom: 18 }}>
-            <Link href="/about" style={footerLink}>About</Link>
-            <Link href="/privacy" style={footerLink}>Privacy</Link>
-            <Link href="/terms" style={footerLink}>Terms</Link>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>
-            <a href="https://instagram.com/peekr.app" target="_blank" style={footerLink}>
-              Instagram
-            </a>
-
-            <a href="https://x.com/peekr_oficial" target="_blank" style={footerLink}>
-              X
-            </a>
-
-            <a href="mailto:info@peekr.app" style={footerLink}>
-              info@peekr.app
-            </a>
-          </div>
-
         </footer>
-
       </body>
     </html>
   )
-}
-
-const nav = {
-  color: "white",
-  textDecoration: "none",
-  fontSize: 15,
-  opacity: 0.9,
-}
-
-const footerLink = {
-  color: "white",
-  textDecoration: "none",
-  opacity: 0.7,
-}
-
-const langItem = {
-  display: "block",
-  padding: "8px 12px",
-  textDecoration: "none",
-  color: "white",
-  fontSize: 14,
 }
