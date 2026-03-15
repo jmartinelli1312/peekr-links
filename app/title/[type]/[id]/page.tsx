@@ -112,16 +112,18 @@ const avgRating =
       : null
 
   const { data: watchers } = await supabase
-    .from("user_title_activities")
-    .select(`
-      user_id,
-      profiles (
-        username,
-        avatar_url
-      )
-    `)
-    .eq("tmdb_id", id)
-    .limit(12)
+  .from("user_title_activities")
+  .select(`
+    user_id,
+    profiles (
+      username,
+      avatar_url
+    )
+  `)
+  .eq("tmdb_id", id)
+  .limit(12)
+
+const watchersSafe = watchers ?? []
 
   const { data: peekrComments } = await supabase
     .from("title_comments")
@@ -312,12 +314,12 @@ const avgRating =
 
         {/* USERS WHO WATCHED */}
 
-        {watchers?.length>0 && (
+       {watchersSafe.length > 0 && (
           <div style={{marginTop:40}}>
             <h2>Users who watched</h2>
 
             <div style={{display:"flex",gap:10,marginTop:12}}>
-              {watchers.map((w:any)=>(
+              {watchersSafe.map((w:any)=>(
                 <Link key={w.user_id} href={`/user/${w.profiles.username}`}>
                   <Image
                     src={w.profiles.avatar_url}
