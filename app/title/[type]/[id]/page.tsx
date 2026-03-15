@@ -1,266 +1,176 @@
-// app/title/[tmdb_id]/page.tsx
-
 export const dynamic = "force-dynamic";
-import { supabase } from "@/lib/supabase"
-import Image from "next/image"
-import { notFound } from "next/navigation"
 
-const TMDB_KEY = process.env.TMDB_API_KEY
+import Image from "next/image";
+import Link from "next/link";
+
+const TMDB_KEY = process.env.TMDB_API_KEY!;
+const TMDB = "https://api.themoviedb.org/3";
+const IMG = "https://image.tmdb.org/t/p/original";
+const POSTER = "https://image.tmdb.org/t/p/w342";
 
 async function getTitle(type: string, id: string) {
   const res = await fetch(
-    `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_KEY}&append_to_response=credits,watch/providers`,
+    `${TMDB}/${type}/${id}?api_key=${TMDB_KEY}&append_to_response=credits,videos`,
     { next: { revalidate: 3600 } }
-  )
+  );
 
-  if (!res.ok) return null
-
-  return res.json()
+  if (!res.ok) return null;
+  return res.json();
 }
 
 export default async function TitlePage({
   params,
 }: {
-  params: { type: string; id: string }
+  params: { type: string; id: string };
 }) {
+  const { type, id } = params;
 
-const id = params.id
+  const data = await getTitle(type, id);
 
-const data = await getTitle(params.type, params.id)
+  if (!data) {
+    return (
+      <div style={{ padding: 40, color: "white" }}>
+        Error loading TMDB data<br />
+        type: {type} id: {id}
+      </div>
+    );
+  }
 
-if (!data) return notFound()
+  const title = data.title || data.name;
+  const year = (data.release_date || data.first_air_date || "").slice(0, 4);
+  const backdrop = data.backdrop_path;
+  const poster = data.poster_path;
 
-  const { data: ratings } = await supabase
-    .from("user_title_activities")
-    .select("rating")
-    .eq("tmdb_id", id)
+  const cast = data.credits?.cast?.slice(0, 12) || [];
 
-  const avg =
-    ratings && ratings.length
-      ? (
-          ratings.reduce((a, b) => a + (b.rating || 0), 0) / ratings.length
-        ).toFixed(1)
-      : null
+  const trailer =
+    data.videos?.results?.find((v: any) => v.type === "Trailer") || null;
 
   return (
-    <div className="bg-[#0B0B0F] min-h-screen text-white">
+    <div style={{ background: "#0B0B0F", minHeight: "100vh", color: "white" }}>
+      
+      {/* HERO BACKDROP */}
 
-      {/* HERO */}
-      <div className="relative h-[420px] w-full">
-
-        {data.backdrop_path && (
+      {backdrop && (
+        <div
+          style={{
+            position: "relative",
+            height: 420,
+            overflow: "hidden",
+          }}
+        >
           <Image
-            src={`https://image.tmdb.org/t/p/original${data.backdrop_path}`}
-            alt="backdrop"
+            src={`${IMG}${backdrop}`}
+            alt={title}
             fill
-            className="object-cover opacity-40"
+            style={{ objectFit: "cover", opacity: 0.35 }}
           />
-        )}
+        </div>
+      )}
 
-        <div className="absolute bottom-0 left-0 p-8 flex gap-8">
+      <div style={{ maxWidth: 1100, margin: "auto", padding: 30 }}>
 
-          {/* POSTER */}
+        {/* HEADER */}
 
-          {data.poster_path && (
+        <div style={{ display: "flex", gap: 30 }}>
+
+          {poster && (
             <Image
-              src={`https://image.tmdb.org/t/p/w500${data.poster_path}`}
-              alt="poster"
-              width={200}
-              height={300}
-              className="rounded-xl shadow-xl"
+              src={`${POSTER}${poster}`}
+              alt={title}
+              width={220}
+              height={330}
+              style={{ borderRadius: 10 }}
             />
           )}
 
-          {/* INFO */}
+          <div>
 
-          <div className="max-w-xl">
-
-            <h1 className="text-4xl font-bold">
-              {data.title} ({data.release_date?.slice(0,4)})
+            <h1 style={{ fontSize: 36, fontWeight: 700 }}>
+              {title} {year && <span style={{ opacity: 0.6 }}>({year})</span>}
             </h1>
 
-            {avg && (
-              <div className="mt-2 text-pink-400 text-lg">
-                ⭐ {avg}
-              </div>
-            )}
+            <div style={{ marginTop: 10, opacity: 0.7 }}>
+              {data.runtime && <>⏱ {data.runtime} min</>}
+            </div>
 
-            <div className="flex gap-2 mt-3 flex-wrap">
-
-              {data.genres?.map((g:any)=>(
+            <div style={{ marginTop: 10 }}>
+              {data.genres?.map((g: any) => (
                 <span
                   key={g.id}
-                  className="bg-[#15151C] px-3 py-1 rounded-full text-sm"
+                  style={{
+                    marginRight: 10,
+                    padding: "4px 10px",
+                    background: "#1c1c24",
+                    borderRadius: 20,
+                    fontSize: 12,
+                  }}
                 >
                   {g.name}
                 </span>
               ))}
-
             </div>
 
-            <p className="mt-4 text-gray-300">
-              {data.overview}
-            </p>
-
-            {/* ACTIONS */}
-
-            <div className="flex gap-3 mt-5">
-
-              <button className="bg-pink-500 px-4 py-2 rounded-lg">
-                ⭐ Rate
-              </button>
-
-              <button className="bg-[#222] px-4 py-2 rounded-lg">
-                👁 Watched
-              </button>
-
-              <button className="bg-[#222] px-4 py-2 rounded-lg">
-                🔖 Save
-              </button>
-
-              <button className="bg-[#222] px-4 py-2 rounded-lg">
-                🎬 Trailer
-              </button>
-
-            </div>
+            {trailer && (
+              <div style={{ marginTop: 20 }}>
+                <Link
+                  href={`https://youtube.com/watch?v=${trailer.key}`}
+                  target="_blank"
+                  style={{
+                    background: "#FA0082",
+                    padding: "10px 18px",
+                    borderRadius: 8,
+                  }}
+                >
+                  ▶ Watch Trailer
+                </Link>
+              </div>
+            )}
 
           </div>
-
         </div>
 
-      </div>
+        {/* OVERVIEW */}
 
-      {/* TABS */}
-
-      <div className="border-b border-[#222] px-8 mt-8">
-
-        <div className="flex gap-6 text-gray-400">
-
-          <button className="text-white pb-3 border-b-2 border-pink-500">
-            Overview
-          </button>
-
-          <button>Cast</button>
-
-          <button>Crew</button>
-
-          <button>Details</button>
-
-          <button>Genres</button>
-
-          <button>Platforms</button>
-
-          <button>Lists</button>
-
-        </div>
-
-      </div>
-
-      {/* OVERVIEW CONTENT */}
-
-      <div className="p-8">
+        {data.overview && (
+          <div style={{ marginTop: 40 }}>
+            <h2 style={{ fontSize: 22 }}>Overview</h2>
+            <p style={{ marginTop: 10, opacity: 0.8 }}>{data.overview}</p>
+          </div>
+        )}
 
         {/* CAST */}
 
-        <h2 className="text-xl font-semibold mb-4">
-          Cast
-        </h2>
+        {cast.length > 0 && (
+          <div style={{ marginTop: 40 }}>
+            <h2 style={{ fontSize: 22 }}>Cast</h2>
 
-        <div className="flex gap-4 overflow-x-auto pb-4">
-
-          {data.credits?.cast?.slice(0,10).map((actor:any)=>(
             <div
-              key={actor.id}
-              className="w-[120px] flex-shrink-0"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill,120px)",
+                gap: 20,
+                marginTop: 20,
+              }}
             >
-
-              {actor.profile_path && (
-                <Image
-                  src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`}
-                  alt={actor.name}
-                  width={120}
-                  height={180}
-                  className="rounded-lg"
-                />
-              )}
-
-              <div className="mt-2 text-sm">
-                {actor.name}
-              </div>
-
-              <div className="text-xs text-gray-400">
-                {actor.character}
-              </div>
-
-            </div>
-          ))}
-
-        </div>
-
-        {/* CREW */}
-
-        <h2 className="text-xl font-semibold mt-8 mb-4">
-          Crew
-        </h2>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-
-          {data.credits?.crew
-            ?.filter((c:any)=>["Director","Writer"].includes(c.job))
-            .slice(0,8)
-            .map((c:any)=>(
-              <div key={c.id}>
-                <div className="font-medium">
-                  {c.name}
+              {cast.map((c: any) => (
+                <div key={c.id} style={{ textAlign: "center" }}>
+                  {c.profile_path && (
+                    <Image
+                      src={`https://image.tmdb.org/t/p/w185${c.profile_path}`}
+                      alt={c.name}
+                      width={120}
+                      height={160}
+                      style={{ borderRadius: 8 }}
+                    />
+                  )}
+                  <div style={{ marginTop: 6, fontSize: 13 }}>{c.name}</div>
                 </div>
-                <div className="text-sm text-gray-400">
-                  {c.job}
-                </div>
-              </div>
-            ))}
-
-        </div>
-
-        {/* DETAILS */}
-
-        <h2 className="text-xl font-semibold mt-10 mb-4">
-          Details
-        </h2>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-gray-300">
-
-          <div>
-            <div className="text-gray-500 text-sm">
-              Release date
+              ))}
             </div>
-            {data.release_date}
           </div>
-
-          <div>
-            <div className="text-gray-500 text-sm">
-              Runtime
-            </div>
-            {data.runtime} min
-          </div>
-
-          <div>
-            <div className="text-gray-500 text-sm">
-              Language
-            </div>
-            {data.original_language}
-          </div>
-
-          <div>
-            <div className="text-gray-500 text-sm">
-              Status
-            </div>
-            {data.status}
-          </div>
-
-        </div>
-
+        )}
       </div>
-
     </div>
-  )
+  );
 }
