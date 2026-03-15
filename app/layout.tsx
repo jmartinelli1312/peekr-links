@@ -13,7 +13,7 @@ export default async function RootLayout({
   children: React.ReactNode
 }) {
 
-  const cookieStore = await cookies()
+  const cookieStore = cookies()
   const lang = cookieStore.get("lang")?.value || "en"
 
   return (
@@ -28,33 +28,39 @@ export default async function RootLayout({
         }}
       >
 
-        {/* HEADER */}
+        {/* HEADER /}
 
         <header
           style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 999,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "16px 32px",
-            borderBottom: "1px solid #1c1c24",
+            padding: "14px 24px",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            position: "sticky",
+            top: 0,
             background: "#0B0B0F",
+            zIndex: 1000,
           }}
         >
 
-          {/* LEFT */}
+          {/ LEFT /}
 
-          <div style={{ display: "flex", alignItems: "center", gap: 30 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 28,
+            }}
+          >
 
-            {/* LOGO */}
+            {/ LOGO /}
 
             <Link
               href="/"
               style={{
                 fontWeight: 800,
-                fontSize: 22,
+                fontSize: 20,
                 color: "#FA0082",
                 textDecoration: "none",
               }}
@@ -62,7 +68,7 @@ export default async function RootLayout({
               Peekr
             </Link>
 
-            {/* EXPLORE */}
+            {/ NAV /}
 
             <Link
               href="/explore"
@@ -76,51 +82,73 @@ export default async function RootLayout({
               Explore
             </Link>
 
+            <Link
+              href="/lists"
+              style={{
+                color: "white",
+                textDecoration: "none",
+                fontSize: 15,
+                opacity: 0.9,
+              }}
+            >
+              Lists
+            </Link>
+
+            <Link
+              href="/activity"
+              style={{
+                color: "white",
+                textDecoration: "none",
+                fontSize: 15,
+                opacity: 0.9,
+              }}
+            >
+              Activity
+            </Link>
+
           </div>
 
-          {/* RIGHT */}
+          {/ RIGHT /}
 
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 20,
+              gap: 18,
               fontSize: 14,
             }}
           >
 
-            {/* LANGUAGE */}
+            {/ LANGUAGE /}
 
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{display:"flex",gap:8}}>
               <a href="/lang/en">🇺🇸</a>
               <a href="/lang/es">🇪🇸</a>
               <a href="/lang/pt">🇧🇷</a>
             </div>
 
-            {/* SIGN IN */}
+            {/ AUTH /}
 
             <Link
               href="/login"
               style={{
-                textDecoration: "none",
                 color: "white",
-                opacity: 0.8,
+                textDecoration: "none",
+                opacity: 0.9,
               }}
             >
               Sign in
             </Link>
-
-            {/* CREATE ACCOUNT */}
 
             <Link
               href="/signup"
               style={{
                 background: "#FA0082",
                 padding: "8px 14px",
-                borderRadius: 6,
-                textDecoration: "none",
+                borderRadius: 8,
                 color: "white",
                 fontWeight: 600,
+                textDecoration: "none",
               }}
             >
               Create account
@@ -130,13 +158,13 @@ export default async function RootLayout({
 
         </header>
 
-        {/* PAGE */}
+        {/ PAGE */}
 
         <main
           style={{
             maxWidth: 1200,
             margin: "0 auto",
-            padding: "40px 20px",
+            padding: "32px 20px",
           }}
         >
           {children}
@@ -145,4 +173,3 @@ export default async function RootLayout({
       </body>
     </html>
   )
-}
