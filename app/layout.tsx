@@ -14,13 +14,7 @@ export default async function RootLayout({
 }) {
 
   const cookieStore = await cookies()
-  const langCookie = cookieStore.get("lang")?.value
-
-  let lang = "en"
-
-  if (langCookie) {
-    lang = langCookie
-  }
+  const lang = cookieStore.get("lang")?.value || "en"
 
   return (
     <html lang={lang}>
@@ -62,57 +56,38 @@ export default async function RootLayout({
               Peekr
             </Link>
 
-            <Link href="/explore" style={nav}>
-              Explore
-            </Link>
-
-            <Link href="/lists" style={nav}>
-              Lists
-            </Link>
-
-            <Link href="/activity" style={nav}>
-              Activity
-            </Link>
+            <Link href="/explore" style={nav}>Explore</Link>
+            <Link href="/lists" style={nav}>Lists</Link>
+            <Link href="/activity" style={nav}>Activity</Link>
 
           </div>
 
-          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
 
-          
-<div style={{ position: "relative" }}>
-  <details style={{ cursor: "pointer" }}>
-    <summary
-      style={{
-        listStyle: "none",
-        fontSize: 18,
-        cursor: "pointer",
-      }}
-    >
-      🌍
-    </summary>
+            <details style={{ position: "relative" }}>
+              <summary style={{ cursor: "pointer", fontSize: 18 }}>
+                🌍
+              </summary>
 
-    <div
-      style={{
-        position: "absolute",
-        right: 0,
-        top: 30,
-        background: "#111",
-        border: "1px solid rgba(255,255,255,0.1)",
-        borderRadius: 8,
-        padding: "6px 0",
-        minWidth: 140,
-      }}
-    >
-      <a href="/lang/en" style={langItem}>🇺🇸 English</a>
-      <a href="/lang/es" style={langItem}>🇪🇸 Español</a>
-      <a href="/lang/pt" style={langItem}>🇧🇷 Português</a>
-    </div>
-  </details>
-<
+              <div
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  top: 30,
+                  background: "#111",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 8,
+                  padding: "6px 0",
+                  minWidth: 150,
+                }}
+              >
+                <a href="/lang/en" style={langItem}>🇺🇸 English</a>
+                <a href="/lang/es" style={langItem}>🇪🇸 Español</a>
+                <a href="/lang/pt" style={langItem}>🇧🇷 Português</a>
+              </div>
+            </details>
 
-            <Link href="/login" style={nav}>
-              Sign in
-            </Link>
+            <Link href="/login" style={nav}>Sign in</Link>
 
             <Link
               href="/signup"
@@ -157,28 +132,13 @@ export default async function RootLayout({
             Peekr © {new Date().getFullYear()}
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 20,
-              flexWrap: "wrap",
-              marginBottom: 18,
-            }}
-          >
+          <div style={{ display: "flex", justifyContent: "center", gap: 20, marginBottom: 18 }}>
             <Link href="/about" style={footerLink}>About</Link>
             <Link href="/privacy" style={footerLink}>Privacy</Link>
             <Link href="/terms" style={footerLink}>Terms</Link>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 16,
-              flexWrap: "wrap",
-            }}
-          >
+          <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>
             <a href="https://instagram.com/peekr.app" target="_blank" style={footerLink}>
               Instagram
             </a>
