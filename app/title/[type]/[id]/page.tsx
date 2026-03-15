@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase"
 import Image from "next/image"
 import { notFound } from "next/navigation"
 
-const TMDB_KEY = process.env.TMDB_API_KEY
+const TMDB_KEY = "3fe8e88bbcb0d91a3b4f9ab4d01f418a"
 
 async function getTitle(type: string, id: string) {
   const res = await fetch(
