@@ -1,4 +1,3 @@
-
 import "./globals.css"
 import Link from "next/link"
 import { cookies } from "next/headers"
@@ -21,10 +20,11 @@ export default async function RootLayout({
     <html lang={lang}>
       <body
         style={{
-          margin:0,
-          background:"#0B0B0F",
-          color:"white",
-          fontFamily:"-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif"
+          margin: 0,
+          background: "#0B0B0F",
+          color: "white",
+          fontFamily:
+            "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif",
         }}
       >
 
@@ -32,29 +32,29 @@ export default async function RootLayout({
 
         <header
           style={{
-            display:"flex",
-            justifyContent:"space-between",
-            alignItems:"center",
-            padding:"14px 28px",
-            borderBottom:"1px solid rgba(255,255,255,0.08)",
-            position:"sticky",
-            top:0,
-            background:"#0B0B0F",
-            zIndex:1000
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "14px 28px",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            position: "sticky",
+            top: 0,
+            background: "#0B0B0F",
+            zIndex: 1000,
           }}
         >
 
           {/ LEFT NAV /}
 
-          <div style={{display:"flex",alignItems:"center",gap:28}}>
+          <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
 
             <Link
               href="/"
               style={{
-                fontSize:22,
-                fontWeight:800,
-                color:"#FA0082",
-                textDecoration:"none"
+                fontSize: 22,
+                fontWeight: 800,
+                color: "#FA0082",
+                textDecoration: "none",
               }}
             >
               Peekr
@@ -74,12 +74,13 @@ export default async function RootLayout({
 
           </div>
 
-
           {/ RIGHT NAV /}
 
-          <div style={{display:"flex",alignItems:"center",gap:20}}>
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
 
-            <div style={{display:"flex",gap:8}}>
+            {/ LANGUAGE /}
+
+            <div style={{ display: "flex", gap: 8 }}>
               <a href="/lang/en">🇺🇸</a>
               <a href="/lang/es">🇪🇸</a>
               <a href="/lang/pt">🇧🇷</a>
@@ -92,12 +93,12 @@ export default async function RootLayout({
             <Link
               href="/signup"
               style={{
-                background:"#FA0082",
-                padding:"8px 14px",
-                borderRadius:8,
-                fontWeight:600,
-                color:"white",
-                textDecoration:"none"
+                background: "#FA0082",
+                padding: "8px 14px",
+                borderRadius: 8,
+                fontWeight: 600,
+                color: "white",
+                textDecoration: "none",
               }}
             >
               Create account
@@ -107,38 +108,36 @@ export default async function RootLayout({
 
         </header>
 
-
         {/ PAGE /}
 
         <main
           style={{
-            maxWidth:1200,
-            margin:"0 auto",
-            padding:"32px 20px"
+            maxWidth: 1200,
+            margin: "0 auto",
+            padding: "32px 20px",
           }}
         >
           {children}
         </main>
 
-
         {/ FOOTER */}
 
         <footer
           style={{
-            marginTop:80,
-            borderTop:"1px solid rgba(255,255,255,0.08)",
-            padding:"40px 20px",
-            textAlign:"center",
-            opacity:0.6,
-            fontSize:14
+            marginTop: 80,
+            borderTop: "1px solid rgba(255,255,255,0.08)",
+            padding: "40px 20px",
+            textAlign: "center",
+            opacity: 0.6,
+            fontSize: 14,
           }}
         >
 
-          <div style={{marginBottom:12}}>
+          <div style={{ marginBottom: 12 }}>
             Peekr © {new Date().getFullYear()}
           </div>
 
-          <div style={{display:"flex",justifyContent:"center",gap:20}}>
+          <div style={{ display: "flex", justifyContent: "center", gap: 20 }}>
             <Link href="/about" style={footerLink}>About</Link>
             <Link href="/privacy" style={footerLink}>Privacy</Link>
             <Link href="/terms" style={footerLink}>Terms</Link>
@@ -151,15 +150,14 @@ export default async function RootLayout({
   )
 }
 
-
 const nav = {
-  color:"white",
-  textDecoration:"none",
-  fontSize:15,
-  opacity:0.9
+  color: "white",
+  textDecoration: "none",
+  fontSize: 15,
+  opacity: 0.9,
 }
 
 const footerLink = {
-  color:"white",
-  textDecoration:"none",
-  opacity
+  color: "white",
+  textDecoration: "none",
+  opacity: 0.7,
