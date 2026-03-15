@@ -41,7 +41,7 @@ const lang =
 // PEEKR SOCIAL DATA
 // -----------------------------
 
-const { data: ratings } = await supabase
+const { data: peekrRatings } = await supabase
   .from("ratings")
   .select("rating")
   .eq("tmdb_id", id)
@@ -60,9 +60,9 @@ const { count: comments } = await supabase
   .eq("media_type", type)
 
   const avgRating =
-  ratings && ratings.length > 0
+  ratings && peekrRatings.length > 0
     ? (
-        ratings.reduce((a: number, b: any) => a + b.rating, 0) /
+        peekrRatings.reduce((a: number, b: any) => a + b.rating, 0) /
         ratings.length
       ).toFixed(1)
     : null
@@ -123,7 +123,7 @@ const { count: comments } = await supabase
     .eq("tmdb_id", id)
     .limit(12)
 
-  const { data: comments } = await supabase
+  const { data: peekrComments } = await supabase
     .from("title_comments")
     .select(`
       id,
@@ -423,11 +423,11 @@ const { count: comments } = await supabase
 
         {/* COMMENTS */}
 
-        {comments?.length>0 && (
+        {peekrComments?.length>0 && (
           <div style={{marginTop:40}}>
             <h2>Comments</h2>
 
-            {comments.map((c:any)=>(
+            {peekrComments.map((c:any)=>(
               <div
                 key={c.id}
                 style={{
