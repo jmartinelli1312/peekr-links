@@ -6,22 +6,8 @@ import { cookies } from "next/headers";
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const POSTER = "https://image.tmdb.org/t/p/w342";
+const PERSON = "https://image.tmdb.org/t/p/w185";
 const BRAND = "#FA0082";
-
-/*
-  REQUIRED SCREENSHOTS IN /public/home/
-
-  /public/home/feed-en.jpg
-  /public/home/profile-en.jpg
-  /public/home/explore-es.jpg
-  /public/home/profile-es.jpg
-  /public/home/actor-es.jpg
-  /public/home/feed-es.jpg
-  /public/home/actor-pt.jpg
-  /public/home/feed-pt.jpg
-
-  If you want, later we can rename and standardize these.
-*/
 
 type Lang = "en" | "es" | "pt";
 
@@ -90,48 +76,46 @@ function getYear(item: TmdbTitle) {
   return raw ? raw.slice(0, 4) : "";
 }
 
-function sectionTitle(title: string, subtitle?: string) {
+function SectionHeader({
+  title,
+  text,
+}: {
+  title: string;
+  text?: string;
+}) {
   return (
-    <div style={{ marginBottom: 18 }}>
-      <h2
-        style={{
-          margin: 0,
-          fontSize: 34,
-          lineHeight: 1.05,
-          color: "white",
-          fontWeight: 900,
-          letterSpacing: "-0.03em",
-        }}
-      >
-        {title}
-      </h2>
-      {subtitle ? (
-        <p
-          style={{
-            margin: "10px 0 0 0",
-            color: "rgba(255,255,255,0.70)",
-            fontSize: 16,
-            lineHeight: 1.6,
-            maxWidth: 820,
-          }}
-        >
-          {subtitle}
-        </p>
-      ) : null}
+    <div className="section-header">
+      <h2>{title}</h2>
+      {text ? <p>{text}</p> : null}
     </div>
   );
 }
 
-function titleRow(items: TmdbTitle[], type: "movie" | "tv") {
+function ScreenshotCard({
+  src,
+  alt,
+  priority = false,
+}: {
+  src: string;
+  alt: string;
+  priority?: boolean;
+}) {
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 16,
-        overflowX: "auto",
-        paddingBottom: 8,
-      }}
-    >
+    <div className="shot-card">
+      <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} />
+    </div>
+  );
+}
+
+function TitleRow({
+  items,
+  type,
+}: {
+  items: TmdbTitle[];
+  type: "movie" | "tv";
+}) {
+  return (
+    <div className="scroll-row">
       {items.slice(0, 12).map((item) => {
         const title = item.title || item.name || "Untitled";
         const poster = item.poster_path ? `${POSTER}${item.poster_path}` : null;
@@ -140,58 +124,17 @@ function titleRow(items: TmdbTitle[], type: "movie" | "tv") {
           <Link
             key={`${type}-${item.id}`}
             href={`/title/${type}/${item.id}`}
-            style={{
-              textDecoration: "none",
-              color: "white",
-              width: 165,
-              minWidth: 165,
-              flex: "0 0 165px",
-            }}
+            className="poster-card"
           >
             {poster ? (
-              <img
-                src={poster}
-                alt={title}
-                style={{
-                  width: 165,
-                  height: 248,
-                  objectFit: "cover",
-                  borderRadius: 18,
-                  display: "block",
-                  boxShadow: "0 14px 36px rgba(0,0,0,0.35)",
-                }}
-              />
+              <img src={poster} alt={title} className="poster-image" />
             ) : (
-              <div
-                style={{
-                  width: 165,
-                  height: 248,
-                  borderRadius: 18,
-                  background: "rgba(255,255,255,0.08)",
-                }}
-              />
+              <div className="poster-fallback" />
             )}
 
-            <div
-              style={{
-                marginTop: 10,
-                fontSize: 14,
-                fontWeight: 700,
-                lineHeight: 1.35,
-                color: "rgba(255,255,255,0.95)",
-              }}
-            >
-              {title}
-            </div>
-
-            <div
-              style={{
-                marginTop: 4,
-                fontSize: 12,
-                color: "rgba(255,255,255,0.55)",
-              }}
-            >
-              {getYear(item)}
+            <div className="poster-meta">
+              <div className="poster-title">{title}</div>
+              <div className="poster-year">{getYear(item)}</div>
             </div>
           </Link>
         );
@@ -200,96 +143,30 @@ function titleRow(items: TmdbTitle[], type: "movie" | "tv") {
   );
 }
 
-function peopleRow(items: TmdbPerson[]) {
+function PeopleRow({ items }: { items: TmdbPerson[] }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 16,
-        overflowX: "auto",
-        paddingBottom: 8,
-      }}
-    >
+    <div className="scroll-row">
       {items.slice(0, 12).map((person) => {
         const photo = person.profile_path
-          ? `https://image.tmdb.org/t/p/w185${person.profile_path}`
+          ? `${PERSON}${person.profile_path}`
           : null;
 
         return (
           <Link
             key={person.id}
             href={`/actor/${person.id}`}
-            style={{
-              textDecoration: "none",
-              color: "white",
-              width: 150,
-              minWidth: 150,
-              flex: "0 0 150px",
-            }}
+            className="person-card"
           >
             {photo ? (
-              <img
-                src={photo}
-                alt={person.name}
-                style={{
-                  width: 150,
-                  height: 190,
-                  objectFit: "cover",
-                  borderRadius: 18,
-                  display: "block",
-                  boxShadow: "0 12px 30px rgba(0,0,0,0.28)",
-                }}
-              />
+              <img src={photo} alt={person.name} className="person-image" />
             ) : (
-              <div
-                style={{
-                  width: 150,
-                  height: 190,
-                  borderRadius: 18,
-                  background: "rgba(255,255,255,0.08)",
-                }}
-              />
+              <div className="person-fallback" />
             )}
 
-            <div
-              style={{
-                marginTop: 10,
-                fontSize: 14,
-                fontWeight: 700,
-                lineHeight: 1.35,
-                color: "rgba(255,255,255,0.95)",
-              }}
-            >
-              {person.name}
-            </div>
+            <div className="person-name">{person.name}</div>
           </Link>
         );
       })}
-    </div>
-  );
-}
-
-function screenshotCard(src: string, alt: string) {
-  return (
-    <div
-      style={{
-        borderRadius: 26,
-        overflow: "hidden",
-        border: "1px solid rgba(255,255,255,0.08)",
-        background: "#111",
-        boxShadow: "0 18px 40px rgba(0,0,0,0.28)",
-      }}
-    >
-      <img
-        src={src}
-        alt={alt}
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "block",
-          objectFit: "cover",
-        }}
-      />
     </div>
   );
 }
@@ -302,27 +179,27 @@ export default async function HomePage() {
     en: {
       heroTitle: "The social network for movies and series.",
       heroText:
-        "Track what you watch, rate titles, create Peeklists, discover actors, explore awards, and follow what people around you are watching in real time.",
+        "Track what you watch, rate titles, create Peeklists, discover actors, and follow what people around you are watching in real time.",
       createAccount: "Create account",
       downloadApp: "Download app",
       discoverTitle: "Discover top-rated movies and TV series",
       discoverText:
-        "A discovery layer that combines cinema, television, people, awards and social taste in one place.",
+        "Explore cinema, television and people with a product built for discovery and taste.",
       peopleTitle: "Popular people",
       peopleText:
-        "Go beyond titles. Discover actors, creators and faces shaping what everyone is watching now.",
+        "Go beyond titles and discover the actors and creators shaping what everyone is watching now.",
       profileTitle: "Build your identity as a viewer",
       profileText:
         "Your profile is more than a diary. It is your public taste map: watched titles, followers, following, watchlist and Peeklists.",
       socialTitle: "A social feed built for film and series culture",
       socialText:
-        "See what your friends watched, rated, saved and discussed. Peekr turns passive tracking into an active social experience.",
+        "See what your friends watched, rated, saved and discussed. Peekr turns passive tracking into active social discovery.",
       whyTitle: "Why Peekr feels different",
       why1: "Movies and TV series in one place",
       why2: "Real social activity, not just logging",
-      why3: "Peeklists made to share taste",
-      why4: "People, titles and awards discovery",
-      why5: "Designed mobile-first, but powerful on web",
+      why3: "Peeklists designed to share taste",
+      why4: "Discovery of people, titles and awards",
+      why5: "Mobile-first and web-ready",
       ctaTitle: "Start building your taste graph.",
       ctaText:
         "Create your account, track what you watch, follow friends and discover your next obsession.",
@@ -330,27 +207,27 @@ export default async function HomePage() {
     es: {
       heroTitle: "La red social para películas y series.",
       heroText:
-        "Lleva registro de lo que ves, califica títulos, crea Peeklists, descubre actores, explora premios y sigue en tiempo real lo que otras personas están viendo.",
+        "Lleva registro de lo que ves, califica títulos, crea Peeklists, descubre actores y sigue en tiempo real lo que otras personas están viendo.",
       createAccount: "Crear cuenta",
       downloadApp: "Bajar app",
       discoverTitle: "Descubre películas y series top rated",
       discoverText:
-        "Una capa de descubrimiento que une cine, televisión, personas, premios y gusto social en un solo lugar.",
+        "Explora cine, televisión y personas con un producto creado para descubrimiento y gusto.",
       peopleTitle: "Personas populares",
       peopleText:
-        "Ve más allá de los títulos. Descubre actores, creadores y rostros que están definiendo lo que todos están viendo.",
+        "Ve más allá de los títulos y descubre actores y creadores que están definiendo lo que todos están viendo.",
       profileTitle: "Construye tu identidad como viewer",
       profileText:
         "Tu perfil es más que un diario. Es tu mapa público de gustos: vistos, seguidores, siguiendo, watchlist y Peeklists.",
       socialTitle: "Un feed social hecho para la cultura del cine y las series",
       socialText:
-        "Mira qué vieron, calificaron, guardaron y comentaron tus amigos. Peekr convierte el tracking pasivo en una experiencia social activa.",
+        "Mira qué vieron, calificaron, guardaron y comentaron tus amigos. Peekr convierte el tracking pasivo en descubrimiento social activo.",
       whyTitle: "Por qué Peekr se siente diferente",
       why1: "Películas y series en un mismo lugar",
       why2: "Actividad social real, no solo logging",
       why3: "Peeklists hechas para compartir gusto",
       why4: "Descubrimiento de personas, títulos y premios",
-      why5: "Diseñado mobile-first, pero fuerte en web",
+      why5: "Diseñado mobile-first y fuerte en web",
       ctaTitle: "Empieza a construir tu mapa de gustos.",
       ctaText:
         "Crea tu cuenta, registra lo que ves, sigue a tus amigos y descubre tu próxima obsesión.",
@@ -358,27 +235,27 @@ export default async function HomePage() {
     pt: {
       heroTitle: "A rede social para filmes e séries.",
       heroText:
-        "Registre o que você assiste, avalie títulos, crie Peeklists, descubra atores, explore premiações e acompanhe em tempo real o que as pessoas estão vendo.",
+        "Registre o que você assiste, avalie títulos, crie Peeklists, descubra atores e acompanhe em tempo real o que as pessoas estão vendo.",
       createAccount: "Criar conta",
       downloadApp: "Baixar app",
       discoverTitle: "Descubra filmes e séries top rated",
       discoverText:
-        "Uma camada de descoberta que reúne cinema, televisão, pessoas, premiações e gosto social em um só lugar.",
+        "Explore cinema, televisão e pessoas com um produto criado para descoberta e gosto.",
       peopleTitle: "Pessoas populares",
       peopleText:
-        "Vá além dos títulos. Descubra atores, criadores e rostos que estão moldando o que todo mundo está assistindo agora.",
+        "Vá além dos títulos e descubra atores e criadores que estão moldando o que todo mundo está assistindo agora.",
       profileTitle: "Construa sua identidade como viewer",
       profileText:
         "Seu perfil é mais que um diário. É o seu mapa público de gosto: vistos, seguidores, seguindo, watchlist e Peeklists.",
       socialTitle: "Um feed social feito para a cultura de filmes e séries",
       socialText:
-        "Veja o que seus amigos assistiram, avaliaram, salvaram e comentaram. Peekr transforma tracking passivo em experiência social ativa.",
+        "Veja o que seus amigos assistiram, avaliaram, salvaram e comentaram. Peekr transforma tracking passivo em descoberta social ativa.",
       whyTitle: "Por que Peekr é diferente",
       why1: "Filmes e séries no mesmo lugar",
       why2: "Atividade social real, não só logging",
       why3: "Peeklists feitas para compartilhar gosto",
       why4: "Descoberta de pessoas, títulos e premiações",
-      why5: "Criado mobile-first, mas forte no web",
+      why5: "Criado mobile-first e forte no web",
       ctaTitle: "Comece a construir seu mapa de gosto.",
       ctaText:
         "Crie sua conta, registre o que assiste, siga seus amigos e descubra sua próxima obsessão.",
@@ -390,334 +267,405 @@ export default async function HomePage() {
   const screenshots = {
     en: {
       hero: "/home/feed-en.jpg",
+      explore: "/home/explore-es.jpg",
       profile: "/home/profile-en.jpg",
       actor: "/home/actor-es.jpg",
       social: "/home/feed-en.jpg",
-      explore: "/home/explore-es.jpg",
     },
     es: {
       hero: "/home/explore-es.jpg",
+      explore: "/home/explore-es.jpg",
       profile: "/home/profile-es.jpg",
       actor: "/home/actor-es.jpg",
       social: "/home/feed-es.jpg",
-      explore: "/home/explore-es.jpg",
     },
     pt: {
       hero: "/home/feed-pt.jpg",
+      explore: "/home/explore-es.jpg",
       profile: "/home/profile-es.jpg",
       actor: "/home/actor-pt.jpg",
       social: "/home/feed-pt.jpg",
-      explore: "/home/explore-es.jpg",
     },
   }[lang];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 72 }}>
-      {/* HERO */}
-      <section
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.05fr 0.95fr",
-          gap: 28,
-          alignItems: "center",
-        }}
-      >
-        <div>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              padding: "8px 12px",
-              borderRadius: 999,
-              background: "rgba(250,0,130,0.12)",
-              color: BRAND,
-              fontWeight: 800,
-              fontSize: 13,
-              marginBottom: 18,
-            }}
-          >
-            Peekr
+    <>
+      <style>{`
+        .home-page {
+          display: flex;
+          flex-direction: column;
+          gap: 72px;
+        }
+
+        .hero-grid,
+        .two-col {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 28px;
+          align-items: center;
+        }
+
+        .hero-copy h1 {
+          margin: 0;
+          font-size: 44px;
+          line-height: 0.98;
+          letter-spacing: -0.05em;
+          font-weight: 900;
+          color: white;
+        }
+
+        .hero-copy p {
+          margin: 18px 0 0 0;
+          font-size: 16px;
+          line-height: 1.7;
+          color: rgba(255,255,255,0.74);
+          max-width: 680px;
+        }
+
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 8px 12px;
+          border-radius: 999px;
+          background: rgba(250,0,130,0.12);
+          color: ${BRAND};
+          font-weight: 800;
+          font-size: 13px;
+          margin-bottom: 18px;
+        }
+
+        .hero-actions,
+        .cta-actions {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-top: 24px;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+          text-decoration: none;
+          border-radius: 16px;
+          padding: 14px 18px;
+          font-weight: 800;
+          font-size: 15px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .btn-primary {
+          background: ${BRAND};
+          color: white;
+        }
+
+        .btn-secondary {
+          background: rgba(255,255,255,0.07);
+          border: 1px solid rgba(255,255,255,0.10);
+          color: white;
+        }
+
+        .shot-card {
+          width: 100%;
+          border-radius: 26px;
+          overflow: hidden;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: #111;
+          box-shadow: 0 18px 40px rgba(0,0,0,0.28);
+        }
+
+        .shot-card img {
+          width: 100%;
+          height: auto;
+          display: block;
+          object-fit: cover;
+        }
+
+        .section-header {
+          margin-bottom: 18px;
+        }
+
+        .section-header h2 {
+          margin: 0;
+          font-size: 30px;
+          line-height: 1.04;
+          color: white;
+          font-weight: 900;
+          letter-spacing: -0.03em;
+        }
+
+        .section-header p {
+          margin: 10px 0 0 0;
+          color: rgba(255,255,255,0.70);
+          font-size: 15px;
+          line-height: 1.65;
+          max-width: 820px;
+        }
+
+        .scroll-row {
+          display: flex;
+          gap: 14px;
+          overflow-x: auto;
+          padding-bottom: 8px;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .poster-card,
+        .person-card {
+          text-decoration: none;
+          color: white;
+          flex: 0 0 auto;
+        }
+
+        .poster-card {
+          width: 136px;
+          min-width: 136px;
+        }
+
+        .poster-image,
+        .poster-fallback {
+          width: 136px;
+          aspect-ratio: 2 / 3;
+          border-radius: 16px;
+          object-fit: cover;
+          display: block;
+          background: rgba(255,255,255,0.08);
+          box-shadow: 0 14px 36px rgba(0,0,0,0.35);
+        }
+
+        .poster-meta {
+          margin-top: 10px;
+        }
+
+        .poster-title {
+          font-size: 13px;
+          font-weight: 700;
+          line-height: 1.35;
+          color: rgba(255,255,255,0.95);
+        }
+
+        .poster-year {
+          margin-top: 4px;
+          font-size: 12px;
+          color: rgba(255,255,255,0.55);
+        }
+
+        .person-card {
+          width: 132px;
+          min-width: 132px;
+        }
+
+        .person-image,
+        .person-fallback {
+          width: 132px;
+          aspect-ratio: 3 / 4;
+          border-radius: 16px;
+          object-fit: cover;
+          display: block;
+          background: rgba(255,255,255,0.08);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.28);
+        }
+
+        .person-name {
+          margin-top: 10px;
+          font-size: 13px;
+          font-weight: 700;
+          line-height: 1.35;
+          color: rgba(255,255,255,0.95);
+        }
+
+        .why-box {
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.03);
+          border-radius: 28px;
+          padding: 22px;
+        }
+
+        .why-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 14px;
+          margin-top: 8px;
+        }
+
+        .why-card {
+          border-radius: 18px;
+          padding: 16px;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+          color: rgba(255,255,255,0.88);
+          font-weight: 700;
+          line-height: 1.5;
+          font-size: 15px;
+        }
+
+        .cta-final {
+          text-align: center;
+          padding: 6px 0 8px 0;
+        }
+
+        .cta-final h2 {
+          margin: 0;
+          font-size: 38px;
+          line-height: 1.02;
+          color: white;
+          font-weight: 900;
+          letter-spacing: -0.04em;
+        }
+
+        .cta-final p {
+          margin: 16px auto 0 auto;
+          max-width: 760px;
+          color: rgba(255,255,255,0.72);
+          font-size: 16px;
+          line-height: 1.7;
+        }
+
+        @media (min-width: 900px) {
+          .hero-grid {
+            grid-template-columns: 1.02fr 0.98fr;
+          }
+
+          .two-col {
+            grid-template-columns: 1fr 1fr;
+            align-items: start;
+          }
+
+          .hero-copy h1 {
+            font-size: 62px;
+          }
+
+          .section-header h2 {
+            font-size: 34px;
+          }
+
+          .poster-card {
+            width: 165px;
+            min-width: 165px;
+          }
+
+          .poster-image,
+          .poster-fallback {
+            width: 165px;
+          }
+
+          .person-card {
+            width: 150px;
+            min-width: 150px;
+          }
+
+          .person-image,
+          .person-fallback {
+            width: 150px;
+          }
+
+          .why-grid {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+          }
+
+          .cta-final h2 {
+            font-size: 46px;
+          }
+        }
+      `}</style>
+
+      <div className="home-page">
+        <section className="hero-grid">
+          <div className="hero-copy">
+            <div className="badge">Peekr</div>
+
+            <h1>{t.heroTitle}</h1>
+
+            <p>{t.heroText}</p>
+
+            <div className="hero-actions">
+              <Link href="/signup" className="btn-primary">
+                {t.createAccount}
+              </Link>
+
+              <a
+                href="mailto:info@peekr.app?subject=Peekr%20App"
+                className="btn-secondary"
+              >
+                {t.downloadApp}
+              </a>
+            </div>
           </div>
 
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 62,
-              lineHeight: 0.98,
-              letterSpacing: "-0.05em",
-              fontWeight: 900,
-              color: "white",
-              maxWidth: 760,
-            }}
-          >
-            {t.heroTitle}
-          </h1>
+          <ScreenshotCard src={screenshots.hero} alt="Peekr hero" priority />
+        </section>
 
-          <p
-            style={{
-              marginTop: 20,
-              fontSize: 18,
-              lineHeight: 1.7,
-              color: "rgba(255,255,255,0.74)",
-              maxWidth: 700,
-            }}
-          >
-            {t.heroText}
-          </p>
+        <section>
+          <SectionHeader title={t.discoverTitle} text={t.discoverText} />
+          <ScreenshotCard src={screenshots.explore} alt="Peekr explore" />
+          <div style={{ marginTop: 24 }}>{TitleRow({ items: topMovies, type: "movie" })}</div>
+          <div style={{ marginTop: 20 }}>{TitleRow({ items: topTV, type: "tv" })}</div>
+        </section>
 
-          <div
-            style={{
-              display: "flex",
-              gap: 14,
-              flexWrap: "wrap",
-              marginTop: 26,
-            }}
-          >
-            <Link
-              href="/signup"
-              style={{
-                background: BRAND,
-                color: "white",
-                textDecoration: "none",
-                padding: "15px 20px",
-                borderRadius: 16,
-                fontWeight: 800,
-                fontSize: 15,
-              }}
-            >
+        <section>
+          <SectionHeader title={t.peopleTitle} text={t.peopleText} />
+          {PeopleRow({ items: popularPeople })}
+        </section>
+
+        <section className="two-col">
+          <ScreenshotCard src={screenshots.profile} alt="Peekr profile" />
+          <div>
+            <SectionHeader title={t.profileTitle} text={t.profileText} />
+            <div className="why-grid">
+              {[t.why1, t.why2, t.why3].map((item) => (
+                <div key={item} className="why-card">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="two-col">
+          <div>
+            <ScreenshotCard src={screenshots.actor} alt="Peekr actor page" />
+            <div style={{ marginTop: 18 }}>
+              <SectionHeader title={t.peopleTitle} text={t.peopleText} />
+            </div>
+          </div>
+
+          <div>
+            <ScreenshotCard src={screenshots.social} alt="Peekr social feed" />
+            <div style={{ marginTop: 18 }}>
+              <SectionHeader title={t.socialTitle} text={t.socialText} />
+            </div>
+          </div>
+        </section>
+
+        <section className="why-box">
+          <SectionHeader title={t.whyTitle} />
+          <div className="why-grid">
+            {[t.why1, t.why2, t.why3, t.why4, t.why5].map((item) => (
+              <div key={item} className="why-card">
+                {item}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="cta-final">
+          <h2>{t.ctaTitle}</h2>
+          <p>{t.ctaText}</p>
+
+          <div className="cta-actions">
+            <Link href="/signup" className="btn-primary">
               {t.createAccount}
             </Link>
 
             <a
               href="mailto:info@peekr.app?subject=Peekr%20App"
-              style={{
-                background: "rgba(255,255,255,0.07)",
-                border: "1px solid rgba(255,255,255,0.10)",
-                color: "white",
-                textDecoration: "none",
-                padding: "15px 20px",
-                borderRadius: 16,
-                fontWeight: 800,
-                fontSize: 15,
-              }}
+              className="btn-secondary"
             >
               {t.downloadApp}
             </a>
           </div>
-        </div>
-
-        <div>{screenshotCard(screenshots.hero, "Peekr hero")}</div>
-      </section>
-
-      {/* DISCOVER */}
-      <section>
-        {sectionTitle(t.discoverTitle, t.discoverText)}
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr",
-            gap: 28,
-          }}
-        >
-          {screenshotCard(screenshots.explore, "Peekr explore")}
-          <div>{titleRow(topMovies, "movie")}</div>
-          <div>{titleRow(topTV, "tv")}</div>
-        </div>
-      </section>
-
-      {/* POPULAR PEOPLE */}
-      <section>
-        {sectionTitle(t.peopleTitle, t.peopleText)}
-        <div>{peopleRow(popularPeople)}</div>
-      </section>
-
-      {/* PROFILE */}
-      <section
-        style={{
-          display: "grid",
-          gridTemplateColumns: "0.95fr 1.05fr",
-          gap: 28,
-          alignItems: "center",
-        }}
-      >
-        <div>{screenshotCard(screenshots.profile, "Peekr profile")}</div>
-
-        <div>
-          {sectionTitle(t.profileTitle, t.profileText)}
-
-          <div
-            style={{
-              display: "grid",
-              gap: 14,
-              marginTop: 18,
-            }}
-          >
-            {[t.why1, t.why2, t.why3].map((item) => (
-              <div
-                key={item}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  color: "rgba(255,255,255,0.88)",
-                  fontSize: 16,
-                }}
-              >
-                <span
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: 999,
-                    background: BRAND,
-                    display: "inline-block",
-                    flexShrink: 0,
-                  }}
-                />
-                <span>{item}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ACTOR + SOCIAL */}
-      <section
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 28,
-          alignItems: "start",
-        }}
-      >
-        <div>
-          {screenshotCard(screenshots.actor, "Peekr actor page")}
-          <div style={{ marginTop: 18 }}>
-            {sectionTitle(t.peopleTitle, t.peopleText)}
-          </div>
-        </div>
-
-        <div>
-          {screenshotCard(screenshots.social, "Peekr social feed")}
-          <div style={{ marginTop: 18 }}>
-            {sectionTitle(t.socialTitle, t.socialText)}
-          </div>
-        </div>
-      </section>
-
-      {/* WHY PEEKR */}
-      <section
-        style={{
-          border: "1px solid rgba(255,255,255,0.08)",
-          background: "rgba(255,255,255,0.03)",
-          borderRadius: 28,
-          padding: 28,
-        }}
-      >
-        {sectionTitle(t.whyTitle)}
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-            gap: 16,
-            marginTop: 10,
-          }}
-        >
-          {[t.why1, t.why2, t.why3, t.why4, t.why5].map((item) => (
-            <div
-              key={item}
-              style={{
-                borderRadius: 18,
-                padding: 18,
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                minHeight: 110,
-                color: "rgba(255,255,255,0.88)",
-                fontWeight: 700,
-                lineHeight: 1.5,
-                fontSize: 15,
-              }}
-            >
-              {item}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* FINAL CTA */}
-      <section
-        style={{
-          textAlign: "center",
-          padding: "18px 0 8px 0",
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 46,
-            lineHeight: 1.02,
-            color: "white",
-            fontWeight: 900,
-            letterSpacing: "-0.04em",
-          }}
-        >
-          {t.ctaTitle}
-        </h2>
-
-        <p
-          style={{
-            margin: "18px auto 0 auto",
-            maxWidth: 760,
-            color: "rgba(255,255,255,0.72)",
-            fontSize: 18,
-            lineHeight: 1.7,
-          }}
-        >
-          {t.ctaText}
-        </p>
-
-        <div
-          style={{
-            display: "flex",
-            gap: 14,
-            justifyContent: "center",
-            flexWrap: "wrap",
-            marginTop: 28,
-          }}
-        >
-          <Link
-            href="/signup"
-            style={{
-              background: BRAND,
-              color: "white",
-              textDecoration: "none",
-              padding: "15px 20px",
-              borderRadius: 16,
-              fontWeight: 800,
-              fontSize: 15,
-            }}
-          >
-            {t.createAccount}
-          </Link>
-
-          <a
-            href="mailto:info@peekr.app?subject=Peekr%20App"
-            style={{
-              background: "rgba(255,255,255,0.07)",
-              border: "1px solid rgba(255,255,255,0.10)",
-              color: "white",
-              textDecoration: "none",
-              padding: "15px 20px",
-              borderRadius: 16,
-              fontWeight: 800,
-              fontSize: 15,
-            }}
-          >
-            {t.downloadApp}
-          </a>
-        </div>
-      </section>
-    </div>
+        </section>
+      </div>
+    </>
   );
 }
