@@ -389,25 +389,25 @@ export default async function HomePage() {
 
   const screenshots = {
     en: {
-      hero: "/home/feed-en.png",
-      profile: "/home/profile-en.png",
-      actor: "/home/actor-es.png",
-      social: "/home/feed-en.png",
-      explore: "/home/explore-es.png",
+      hero: "/home/feed-en.jpg",
+      profile: "/home/profile-en.jpg",
+      actor: "/home/actor-es.jpg",
+      social: "/home/feed-en.jpg",
+      explore: "/home/explore-es.jpg",
     },
     es: {
-      hero: "/home/explore-es.png",
-      profile: "/home/profile-es.png",
-      actor: "/home/actor-es.png",
-      social: "/home/feed-es.png",
-      explore: "/home/explore-es.png",
+      hero: "/home/explore-es.jpg",
+      profile: "/home/profile-es.jpg",
+      actor: "/home/actor-es.jpg",
+      social: "/home/feed-es.jpg",
+      explore: "/home/explore-es.jpg",
     },
     pt: {
-      hero: "/home/feed-pt.png",
-      profile: "/home/profile-es.png",
-      actor: "/home/actor-pt.png",
-      social: "/home/feed-pt.png",
-      explore: "/home/explore-es.png",
+      hero: "/home/feed-pt.jpg",
+      profile: "/home/profile-es.jpg",
+      actor: "/home/actor-pt.jpg",
+      social: "/home/feed-pt.jpg",
+      explore: "/home/explore-es.jpg",
     },
   }[lang];
 
