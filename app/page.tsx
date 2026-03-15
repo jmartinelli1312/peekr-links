@@ -11,14 +11,14 @@ const BRAND = "#FA0082";
 /*
   REQUIRED SCREENSHOTS IN /public/home/
 
-  /public/home/feed-en.png
-  /public/home/profile-en.png
-  /public/home/explore-es.png
-  /public/home/profile-es.png
-  /public/home/actor-es.png
-  /public/home/feed-es.png
-  /public/home/actor-pt.png
-  /public/home/feed-pt.png
+  /public/home/feed-en.jpg
+  /public/home/profile-en.jpg
+  /public/home/explore-es.jpg
+  /public/home/profile-es.jpg
+  /public/home/actor-es.jpg
+  /public/home/feed-es.jpg
+  /public/home/actor-pt.jpg
+  /public/home/feed-pt.jpg
 
   If you want, later we can rename and standardize these.
 */
