@@ -1,10 +1,11 @@
+
 import "./globals.css"
 import Link from "next/link"
 import { cookies } from "next/headers"
 
 export const metadata = {
   title: "Peekr",
-  description: "Movies • Series • Watchlists",
+  description: "The social network for movies and series",
 }
 
 export default async function RootLayout({
@@ -20,11 +21,10 @@ export default async function RootLayout({
     <html lang={lang}>
       <body
         style={{
-          background: "#0B0B0F",
-          color: "white",
-          margin: 0,
-          fontFamily:
-            "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif",
+          margin:0,
+          background:"#0B0B0F",
+          color:"white",
+          fontFamily:"-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif"
         }}
       >
 
@@ -32,94 +32,52 @@ export default async function RootLayout({
 
         <header
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "14px 24px",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
-            position: "sticky",
-            top: 0,
-            background: "#0B0B0F",
-            zIndex: 1000,
+            display:"flex",
+            justifyContent:"space-between",
+            alignItems:"center",
+            padding:"14px 28px",
+            borderBottom:"1px solid rgba(255,255,255,0.08)",
+            position:"sticky",
+            top:0,
+            background:"#0B0B0F",
+            zIndex:1000
           }}
         >
 
-          {/ LEFT /}
+          {/ LEFT NAV /}
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 28,
-            }}
-          >
-
-            {/ LOGO /}
+          <div style={{display:"flex",alignItems:"center",gap:28}}>
 
             <Link
               href="/"
               style={{
-                fontWeight: 800,
-                fontSize: 20,
-                color: "#FA0082",
-                textDecoration: "none",
+                fontSize:22,
+                fontWeight:800,
+                color:"#FA0082",
+                textDecoration:"none"
               }}
             >
               Peekr
             </Link>
 
-            {/ NAV /}
-
-            <Link
-              href="/explore"
-              style={{
-                color: "white",
-                textDecoration: "none",
-                fontSize: 15,
-                opacity: 0.9,
-              }}
-            >
+            <Link href="/explore" style={nav}>
               Explore
             </Link>
 
-            <Link
-              href="/lists"
-              style={{
-                color: "white",
-                textDecoration: "none",
-                fontSize: 15,
-                opacity: 0.9,
-              }}
-            >
+            <Link href="/lists" style={nav}>
               Lists
             </Link>
 
-            <Link
-              href="/activity"
-              style={{
-                color: "white",
-                textDecoration: "none",
-                fontSize: 15,
-                opacity: 0.9,
-              }}
-            >
+            <Link href="/activity" style={nav}>
               Activity
             </Link>
 
           </div>
 
-          {/ RIGHT /}
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 18,
-              fontSize: 14,
-            }}
-          >
+          {/ RIGHT NAV /}
 
-            {/ LANGUAGE /}
+          <div style={{display:"flex",alignItems:"center",gap:20}}>
 
             <div style={{display:"flex",gap:8}}>
               <a href="/lang/en">🇺🇸</a>
@@ -127,28 +85,19 @@ export default async function RootLayout({
               <a href="/lang/pt">🇧🇷</a>
             </div>
 
-            {/ AUTH /}
-
-            <Link
-              href="/login"
-              style={{
-                color: "white",
-                textDecoration: "none",
-                opacity: 0.9,
-              }}
-            >
+            <Link href="/login" style={nav}>
               Sign in
             </Link>
 
             <Link
               href="/signup"
               style={{
-                background: "#FA0082",
-                padding: "8px 14px",
-                borderRadius: 8,
-                color: "white",
-                fontWeight: 600,
-                textDecoration: "none",
+                background:"#FA0082",
+                padding:"8px 14px",
+                borderRadius:8,
+                fontWeight:600,
+                color:"white",
+                textDecoration:"none"
               }}
             >
               Create account
@@ -158,18 +107,59 @@ export default async function RootLayout({
 
         </header>
 
-        {/ PAGE */}
+
+        {/ PAGE /}
 
         <main
           style={{
-            maxWidth: 1200,
-            margin: "0 auto",
-            padding: "32px 20px",
+            maxWidth:1200,
+            margin:"0 auto",
+            padding:"32px 20px"
           }}
         >
           {children}
         </main>
 
+
+        {/ FOOTER */}
+
+        <footer
+          style={{
+            marginTop:80,
+            borderTop:"1px solid rgba(255,255,255,0.08)",
+            padding:"40px 20px",
+            textAlign:"center",
+            opacity:0.6,
+            fontSize:14
+          }}
+        >
+
+          <div style={{marginBottom:12}}>
+            Peekr © {new Date().getFullYear()}
+          </div>
+
+          <div style={{display:"flex",justifyContent:"center",gap:20}}>
+            <Link href="/about" style={footerLink}>About</Link>
+            <Link href="/privacy" style={footerLink}>Privacy</Link>
+            <Link href="/terms" style={footerLink}>Terms</Link>
+          </div>
+
+        </footer>
+
       </body>
     </html>
   )
+}
+
+
+const nav = {
+  color:"white",
+  textDecoration:"none",
+  fontSize:15,
+  opacity:0.9
+}
+
+const footerLink = {
+  color:"white",
+  textDecoration:"none",
+  opacity
