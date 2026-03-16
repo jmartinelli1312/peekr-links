@@ -4,6 +4,9 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
 
+const TMDB_KEY = process.env.TMDB_API_KEY!;
+const TMDB_BASE = "https://api.themoviedb.org/3";
+const BACKDROP = "https://image.tmdb.org/t/p/w780";
 const BRAND = "#FA0082";
 
 type Lang = "en" | "es" | "pt";
@@ -30,11 +33,23 @@ type EditorialCollection = {
   sort_order: number;
 };
 
+type EditorialCollectionItem = {
+  tmdb_id: number;
+  media_type: string;
+  position: number;
+};
+
 function normalizeLang(value?: string | null): Lang {
   const raw = (value || "en").toLowerCase();
   if (raw.startsWith("es")) return "es";
   if (raw.startsWith("pt")) return "pt";
   return "en";
+}
+
+function tmdbLanguage(lang: Lang) {
+  if (lang === "es") return "es-ES";
+  if (lang === "pt") return "pt-BR";
+  return "en-US";
 }
 
 function dedupePeeklists(items: PeeklistItem[]) {
@@ -57,14 +72,50 @@ function localizedCollectionTitle(item: EditorialCollection, lang: Lang) {
   return item.title_en || item.title_es || item.title_pt;
 }
 
-function collectionToPeeklistItem(
+async function fetchBackdropForCollection(
+  slug: string,
+  lang: Lang
+): Promise<string | null> {
+  const { data: firstItem } = await supabase
+    .from("editorial_collection_items")
+    .select("tmdb_id,media_type,position")
+    .eq("collection_slug", slug)
+    .order("position", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!firstItem?.tmdb_id) return null;
+
+  try {
+    const type = firstItem.media_type === "tv" ? "tv" : "movie";
+    const apiLang = tmdbLanguage(lang);
+
+    const res = await fetch(
+      `${TMDB_BASE}/${type}/${firstItem.tmdb_id}?api_key=${TMDB_KEY}&language=${apiLang}`,
+      { next: { revalidate: 3600 } }
+    );
+
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    return json.backdrop_path ? `${BACKDROP}${json.backdrop_path}` : null;
+  } catch {
+    return null;
+  }
+}
+
+async function collectionToPeeklistItem(
   item: EditorialCollection,
   lang: Lang
-): PeeklistItem {
+): Promise<PeeklistItem> {
+  const fallbackCover = item.cover_url
+    ? item.cover_url
+    : await fetchBackdropForCollection(item.slug, lang);
+
   return {
     id: item.slug,
     title: localizedCollectionTitle(item, lang),
-    cover_url: item.cover_url ?? null,
+    cover_url: fallbackCover ?? null,
   };
 }
 
@@ -94,9 +145,8 @@ async function getEditorialCollectionsByCategory(
     .order("sort_order", { ascending: true })
     .limit(limit);
 
-  return ((data as EditorialCollection[] | null) ?? []).map((item) =>
-    collectionToPeeklistItem(item, lang)
-  );
+  const rows = (data as EditorialCollection[] | null) ?? [];
+  return await Promise.all(rows.map((item) => collectionToPeeklistItem(item, lang)));
 }
 
 function SectionHeader({
