@@ -48,7 +48,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
   const t: HeaderTexts = {
     en: {
       explore: "Explore",
-      lists: "Lists",
+      lists: "Peeklists",
       activity: "Activity",
       peekrbuzz: "PeekrBuzz",
       signIn: "Sign in",
@@ -59,7 +59,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
     },
     es: {
       explore: "Explorar",
-      lists: "Listas",
+      lists: "Peeklists",
       activity: "Actividad",
       peekrbuzz: "PeekrBuzz",
       signIn: "Iniciar sesión",
@@ -70,7 +70,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
     },
     pt: {
       explore: "Explorar",
-      lists: "Listas",
+      lists: "Peeklists",
       activity: "Atividade",
       peekrbuzz: "PeekrBuzz",
       signIn: "Entrar",
