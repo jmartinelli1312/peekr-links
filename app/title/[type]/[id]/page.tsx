@@ -649,25 +649,29 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
           white-space: nowrap;
         }
 
-       .hero-stats {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
+      .hero-stats {
+          display: flex;
           gap: 12px;
-          margin-top: 18px;
+          overflow-x: auto;
+          padding: 18px 0 6px 0;
+          margin-top: 14px;
+          -webkit-overflow-scrolling: touch;
         }
         
         .hero-stat {
-          display: flex;
+          display: inline-flex;
           align-items: center;
           gap: 8px;
-          min-height: 64px;
-          padding: 12px 14px;
-          border-radius: 18px;
+          flex: 0 0 auto;
+          min-height: 52px;
+          padding: 0 16px;
+          border-radius: 999px;
           background: rgba(255,255,255,0.05);
           border: 1px solid rgba(255,255,255,0.08);
-          font-size: 13px;
-          line-height: 1.35;
+          font-size: 14px;
+          line-height: 1;
           color: rgba(255,255,255,0.95);
+          white-space: nowrap;
         }
 
         .action-row {
@@ -903,6 +907,8 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
           .hero-stats {
             display: flex;
             flex-wrap: wrap;
+            overflow: visible;
+            padding: 18px 0 0 0;
           }
 
           .cards-grid {
@@ -985,26 +991,29 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                 ))}
               </div>
 
-              <div className="hero-stats">
-                <div className="hero-stat">⭐ DEBUG: {String(stats.avgRating)} · {t.peekrRating}</div>
-                <div className="hero-stat">👁 {stats.watchedCount ?? 0} {t.watched}</div>
-                <div className="hero-stat">💬 {stats.commentsCount ?? 0} {t.commentsCount}</div>
-                <div className="hero-stat">👀 {stats.viewsCount ?? 0} {t.views}</div>
-              </div>
+                  <div className="action-row">
 
-              <div className="action-row">
                 {trailer ? (
                   <Link
                     href={`https://youtube.com/watch?v=${trailer.key}`}
                     target="_blank"
                     className="btn-primary"
                   >
+                    
                     ▶ {t.watchTrailer}
                   </Link>
                 ) : null}
               </div>
             </div>
           </div>
+                <div className="hero-stats">
+                <div className="hero-stat">⭐ {stats.avgRating ?? "-"} · {t.peekrRating}</div>
+                <div className="hero-stat">👁 {stats.watchedCount ?? 0} {t.watched}</div>
+                <div className="hero-stat">💬 {stats.commentsCount ?? 0} {t.commentsCount}</div>
+                <div className="hero-stat">👀 {stats.viewsCount ?? 0} {t.views}</div>
+              </div>
+
+              
 
           <div className="bubble-tabs">
             <Link href={tabHref("overview")}
