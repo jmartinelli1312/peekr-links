@@ -367,9 +367,11 @@ const [ratingsRes, activityStatsRes, titleStatsRes, watchersRes, commentsRes] =
     .filter((r): r is number => typeof r === "number");
 
   const avgRating =
-    validRatings.length > 0
-      ? (validRatings.reduce((a, b) => a + b, 0) / validRatings.length).toFixed(1)
-      : null;
+  validRatings.length > 0
+    ? (
+        validRatings.reduce((a, b) => a + Number(b), 0) / validRatings.length
+      ).toFixed(1)
+    : null;
 
   const watchedCount =
     (activityStatsRes.data as { watched_count?: number } | null)?.watched_count ?? 0;
@@ -578,27 +580,26 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
 
         .title-header {
           position: relative;
-          margin-top: -56px;
+          margin-top: -72px;
           display: grid;
-          grid-template-columns: 96px 1fr;
-          gap: 14px;
+          grid-template-columns: 126px 1fr;
+          gap: 16px;
           align-items: end;
         }
-
+        
         .poster-wrap {
-          width: 96px;
+          width: 126px;
         }
-
+        
         .poster-image {
-          width: 96px;
+          width: 126px;
           aspect-ratio: 2 / 3;
           object-fit: cover;
-          border-radius: 14px;
+          border-radius: 16px;
           box-shadow: 0 18px 40px rgba(0,0,0,0.42);
           display: block;
           background: rgba(255,255,255,0.08);
         }
-
         .title-main h1 {
           margin: 0;
           font-size: clamp(30px, 9vw, 56px);
@@ -654,22 +655,24 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
           white-space: nowrap;
         }
 
-        .hero-stats {
+       .hero-stats {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 10px;
+          gap: 12px;
           margin-top: 18px;
         }
-
+        
         .hero-stat {
-          display: inline-flex;
+          display: flex;
           align-items: center;
           gap: 8px;
-          padding: 11px 12px;
-          border-radius: 16px;
+          min-height: 64px;
+          padding: 12px 14px;
+          border-radius: 18px;
           background: rgba(255,255,255,0.05);
           border: 1px solid rgba(255,255,255,0.08);
           font-size: 13px;
+          line-height: 1.35;
           color: rgba(255,255,255,0.95);
         }
 
@@ -989,7 +992,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
               </div>
 
               <div className="hero-stats">
-                <div className="hero-stat">⭐ {stats.avgRating ?? "-"} · {t.peekrRating}</div>
+                <div className="hero-stat">⭐ DEBUG: {String(stats.avgRating)} · {t.peekrRating}</div>
                 <div className="hero-stat">👁 {stats.watchedCount ?? 0} {t.watched}</div>
                 <div className="hero-stat">💬 {stats.commentsCount ?? 0} {t.commentsCount}</div>
                 <div className="hero-stat">👀 {stats.viewsCount ?? 0} {t.views}</div>
@@ -1010,25 +1013,37 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
           </div>
 
           <div className="bubble-tabs">
-            <Link href={tabHref("overview")} className={`tab-pill ${activeTab === "overview" ? "active" : ""}`}>
+            <Link href={tabHref("overview")}
+              scroll={false}
+              className={`tab-pill ${activeTab === "overview" ? "active" : ""}`}>
               {t.tabsOverview}
             </Link>
-            <Link href={tabHref("cast")} className={`tab-pill ${activeTab === "cast" ? "active" : ""}`}>
+            <Link href={tabHref("cast")}
+              scroll={false}
+              className={`tab-pill ${activeTab === "cast" ? "active" : ""}`}>
               {t.tabsCast}
             </Link>
-            <Link href={tabHref("crew")} className={`tab-pill ${activeTab === "crew" ? "active" : ""}`}>
+            <Link href={tabHref("crew")}
+              scroll={false}
+              className={`tab-pill ${activeTab === "crew" ? "active" : ""}`}>
               {t.tabsCrew}
             </Link>
-            <Link href={tabHref("awards")} className={`tab-pill ${activeTab === "awards" ? "active" : ""}`}>
+            <Link href={tabHref("awards")} 
+              scroll={false}
+              className={`tab-pill ${activeTab === "awards" ? "active" : ""}`}>
               {t.tabsAwards}
             </Link>
             {providers.length > 0 ? (
-              <Link href={tabHref("platforms")} className={`tab-pill ${activeTab === "platforms" ? "active" : ""}`}>
+              <Link href={tabHref("platforms")} 
+                scroll={false}
+                className={`tab-pill ${activeTab === "platforms" ? "active" : ""}`}>
                 {t.tabsPlatforms}
               </Link>
             ) : null}
             {comments.length > 0 ? (
-              <Link href={tabHref("comments")} className={`tab-pill ${activeTab === "comments" ? "active" : ""}`}>
+              <Link href={tabHref("comments")} 
+                scroll={false}
+                className={`tab-pill ${activeTab === "comments" ? "active" : ""}`}>
                 {t.tabsComments}
               </Link>
             ) : null}
