@@ -38,7 +38,6 @@ type PeeklistItemRow = {
   poster_path?: string | null;
   media_type?: string | null;
   position?: number | null;
-  note?: string | null;
 };
 
 function normalizeLang(value?: string | null): Lang {
@@ -102,7 +101,7 @@ async function getPeeklistItems(id: string, lang: Lang) {
   try {
     const { data } = await supabase
       .from("peeklist_items")
-      .select("tmdb_id,title,poster_path,media_type,position,note")
+      .select("tmdb_id,title,poster_path,media_type,position")
       .eq("peeklist_id", id)
       .order("position", { ascending: true });
 
