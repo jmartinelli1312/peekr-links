@@ -16,9 +16,11 @@ const PROVIDER = "https://image.tmdb.org/t/p/w92";
 const BRAND = "#FA0082";
 
 type Lang = "en" | "es" | "pt";
+type TabKey = "overview" | "cast" | "crew" | "platforms" | "awards" | "comments";
 
 type PageProps = {
   params: Promise<{ type: string; id: string }>;
+  searchParams?: Promise<{ tab?: string }>;
 };
 
 type TmdbCast = {
@@ -192,6 +194,7 @@ function getStrings(lang: Lang) {
       cast: "Cast",
       crew: "Crew",
       platforms: "Platforms",
+      awards: "awards",
       comments: "Comments",
       usersWhoWatched: "Users who watched",
       whereToWatch: "Where to watch",
@@ -200,13 +203,14 @@ function getStrings(lang: Lang) {
       views: "views",
       peekrRating: "Peekr rating",
       noOverview: "No overview available.",
+      noAwards: "Awards data coming soon.",
       min: "min",
       tabsOverview: "Overview",
       tabsCast: "Cast",
       tabsCrew: "Crew",
       tabsPlatforms: "Platforms",
+      tabsAwards: "Awards",
       tabsComments: "Comments",
-      tabsPeople: "People",
     },
     es: {
       directedBy: "Dirigida por",
@@ -216,6 +220,7 @@ function getStrings(lang: Lang) {
       cast: "Cast",
       crew: "Crew",
       platforms: "Plataformas",
+      awards: "Premios",
       comments: "Comentarios",
       usersWhoWatched: "Usuarios que la vieron",
       whereToWatch: "Dónde verla",
@@ -224,13 +229,14 @@ function getStrings(lang: Lang) {
       views: "vistas",
       peekrRating: "Rating en Peekr",
       noOverview: "No hay sinopsis disponible.",
+      noAwards: "Los premios estarán disponibles pronto.",
       min: "min",
       tabsOverview: "Sinopsis",
       tabsCast: "Cast",
       tabsCrew: "Crew",
       tabsPlatforms: "Plataformas",
+      tabsAwards: "Premios",
       tabsComments: "Comentarios",
-      tabsPeople: "Gente",
     },
     pt: {
       directedBy: "Dirigido por",
@@ -240,6 +246,7 @@ function getStrings(lang: Lang) {
       cast: "Cast",
       crew: "Crew",
       platforms: "Plataformas",
+      awards: "Awards",
       comments: "Comentários",
       usersWhoWatched: "Usuários que assistiram",
       whereToWatch: "Onde assistir",
@@ -248,13 +255,14 @@ function getStrings(lang: Lang) {
       views: "views",
       peekrRating: "Rating no Peekr",
       noOverview: "Sem sinopse disponível.",
+      noAwards: "Os prêmios estarão disponíveis em breve.",
       min: "min",
       tabsOverview: "Sinopse",
       tabsCast: "Cast",
       tabsCrew: "Crew",
       tabsPlatforms: "Plataformas",
+      tabsAwards: "Prêmios",
       tabsComments: "Comentários",
-      tabsPeople: "Pessoas",
     },
   }[lang];
 }
@@ -298,12 +306,14 @@ function pickProviders(
 }
 
 async function getPeekrData(tmdbId: number, mediaType: string) {
-  const [ratingsRes, activityStatsRes, titleStatsRes, watchersRes, commentsRes] =
-    await Promise.all([
-      supabase
-        .from("ratings")
-        .select("rating")
-        .eq("tmdb_id", tmdbId),
+const [ratingsRes, activityStatsRes, titleStatsRes, watchersRes, commentsRes] =
+  await Promise.all([
+    supabase
+      .from("user_title_activities")
+      .select("rating")
+      .eq("tmdb_id", tmdbId)
+      .eq("media_type", mediaType)
+      .not("rating", "is", null),
 
       supabase
         .from("title_activity_stats")
@@ -406,6 +416,19 @@ async function getPeekrData(tmdbId: number, mediaType: string) {
   };
 }
 
+function normalizeTab(value?: string): TabKey {
+  if (value === "cast") return "cast";
+  if (value === "crew") return "crew";
+  if (value === "platforms") return "platforms";
+  if (value === "awards") return "awards";
+  if (value === "comments") return "comments";
+  return "overview";
+}
+
+function tabHref(tab: TabKey) {
+  return `?tab=${tab}`;
+}
+
 export async function generateMetadata({ params }: PageProps) {
   const { type, id } = await params;
   const numericId = parseIdSlug(id);
@@ -462,7 +485,7 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-export default async function TitlePage({ params }: PageProps) {
+export default async function TitlePage({ params, searchParams }: PageProps) {
   const { type, id } = await params;
 
   if (type !== "movie" && type !== "tv") {
@@ -474,6 +497,7 @@ export default async function TitlePage({ params }: PageProps) {
     notFound();
   }
 
+  const resolvedSearchParams = searchParams ? await searchParams : {};
   const lang = await getLangFromCookie();
   const t = getStrings(lang);
 
@@ -512,6 +536,18 @@ export default async function TitlePage({ params }: PageProps) {
       ? data.runtime
       : data.episode_run_time?.[0] || null;
 
+  const availableTabs: TabKey[] = [
+    "overview",
+    "cast",
+    "crew",
+    "awards",
+    ...(providers.length > 0 ? (["platforms"] as TabKey[]) : []),
+    ...(comments.length > 0 ? (["comments"] as TabKey[]) : []),
+  ];
+
+  const requestedTab = normalizeTab(resolvedSearchParams?.tab);
+  const activeTab = availableTabs.includes(requestedTab) ? requestedTab : "overview";
+
   return (
     <>
       <style>{`
@@ -522,7 +558,7 @@ export default async function TitlePage({ params }: PageProps) {
 
         .hero-backdrop {
           position: relative;
-          height: 240px;
+          height: 220px;
           overflow: hidden;
           border-radius: 0 0 24px 24px;
         }
@@ -531,7 +567,7 @@ export default async function TitlePage({ params }: PageProps) {
           position: absolute;
           inset: 0;
           background:
-            linear-gradient(180deg, rgba(11,11,15,0.20) 0%, rgba(11,11,15,0.78) 78%, rgba(11,11,15,1) 100%);
+            linear-gradient(180deg, rgba(11,11,15,0.14) 0%, rgba(11,11,15,0.76) 70%, rgba(11,11,15,1) 100%);
         }
 
         .title-shell {
@@ -542,22 +578,22 @@ export default async function TitlePage({ params }: PageProps) {
 
         .title-header {
           position: relative;
-          margin-top: -70px;
+          margin-top: -56px;
           display: grid;
-          grid-template-columns: 110px 1fr;
-          gap: 16px;
+          grid-template-columns: 96px 1fr;
+          gap: 14px;
           align-items: end;
         }
 
         .poster-wrap {
-          width: 110px;
+          width: 96px;
         }
 
         .poster-image {
-          width: 110px;
+          width: 96px;
           aspect-ratio: 2 / 3;
           object-fit: cover;
-          border-radius: 16px;
+          border-radius: 14px;
           box-shadow: 0 18px 40px rgba(0,0,0,0.42);
           display: block;
           background: rgba(255,255,255,0.08);
@@ -565,7 +601,7 @@ export default async function TitlePage({ params }: PageProps) {
 
         .title-main h1 {
           margin: 0;
-          font-size: clamp(32px, 9vw, 56px);
+          font-size: clamp(30px, 9vw, 56px);
           line-height: 0.98;
           letter-spacing: -0.04em;
           font-weight: 900;
@@ -577,7 +613,7 @@ export default async function TitlePage({ params }: PageProps) {
         }
 
         .title-credits {
-          margin-top: 10px;
+          margin-top: 8px;
           display: flex;
           flex-direction: column;
           gap: 6px;
@@ -592,7 +628,7 @@ export default async function TitlePage({ params }: PageProps) {
         }
 
         .meta-line {
-          margin-top: 12px;
+          margin-top: 10px;
           color: rgba(255,255,255,0.65);
           font-size: 14px;
         }
@@ -619,18 +655,18 @@ export default async function TitlePage({ params }: PageProps) {
         }
 
         .hero-stats {
-          display: flex;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
           gap: 10px;
-          flex-wrap: wrap;
-          margin-top: 16px;
+          margin-top: 18px;
         }
 
         .hero-stat {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          padding: 10px 12px;
-          border-radius: 999px;
+          padding: 11px 12px;
+          border-radius: 16px;
           background: rgba(255,255,255,0.05);
           border: 1px solid rgba(255,255,255,0.08);
           font-size: 13px;
@@ -662,13 +698,33 @@ export default async function TitlePage({ params }: PageProps) {
           display: flex;
           gap: 10px;
           overflow-x: auto;
-          padding: 18px 0 6px 0;
+          padding: 18px 0 2px 0;
           margin-top: 24px;
           -webkit-overflow-scrolling: touch;
         }
 
+        .tab-pill {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 10px 16px;
+          border-radius: 999px;
+          text-decoration: none;
+          white-space: nowrap;
+          font-size: 14px;
+          font-weight: 700;
+          color: white;
+          border: 1px solid rgba(255,255,255,0.09);
+          background: rgba(255,255,255,0.05);
+        }
+
+        .tab-pill.active {
+          background: ${BRAND};
+          border-color: ${BRAND};
+        }
+
         .section-block {
-          margin-top: 34px;
+          margin-top: 30px;
         }
 
         .section-title {
@@ -847,6 +903,11 @@ export default async function TitlePage({ params }: PageProps) {
             font-size: 15px;
           }
 
+          .hero-stats {
+            display: flex;
+            flex-wrap: wrap;
+          }
+
           .cards-grid {
             grid-template-columns: repeat(6, minmax(0, 1fr));
             gap: 18px;
@@ -886,8 +947,7 @@ export default async function TitlePage({ params }: PageProps) {
 
             <div className="title-main">
               <h1>
-                {title}{" "}
-                {year ? <span className="title-year">({year})</span> : null}
+                {title} {year ? <span className="title-year">({year})</span> : null}
               </h1>
 
               <div className="title-credits">
@@ -929,18 +989,10 @@ export default async function TitlePage({ params }: PageProps) {
               </div>
 
               <div className="hero-stats">
-                <div className="hero-stat">
-                  ⭐ {stats.avgRating ?? "-"} · {t.peekrRating}
-                </div>
-                <div className="hero-stat">
-                  👁 {stats.watchedCount ?? 0} {t.watched}
-                </div>
-                <div className="hero-stat">
-                  💬 {stats.commentsCount ?? 0} {t.commentsCount}
-                </div>
-                <div className="hero-stat">
-                  👀 {stats.viewsCount ?? 0} {t.views}
-                </div>
+                <div className="hero-stat">⭐ {stats.avgRating ?? "-"} · {t.peekrRating}</div>
+                <div className="hero-stat">👁 {stats.watchedCount ?? 0} {t.watched}</div>
+                <div className="hero-stat">💬 {stats.commentsCount ?? 0} {t.commentsCount}</div>
+                <div className="hero-stat">👀 {stats.viewsCount ?? 0} {t.views}</div>
               </div>
 
               <div className="action-row">
@@ -958,34 +1010,153 @@ export default async function TitlePage({ params }: PageProps) {
           </div>
 
           <div className="bubble-tabs">
-            <a href="#overview" className="pill">
+            <Link href={tabHref("overview")} className={`tab-pill ${activeTab === "overview" ? "active" : ""}`}>
               {t.tabsOverview}
-            </a>
-            <a href="#cast" className="pill">
+            </Link>
+            <Link href={tabHref("cast")} className={`tab-pill ${activeTab === "cast" ? "active" : ""}`}>
               {t.tabsCast}
-            </a>
-            <a href="#crew" className="pill">
+            </Link>
+            <Link href={tabHref("crew")} className={`tab-pill ${activeTab === "crew" ? "active" : ""}`}>
               {t.tabsCrew}
-            </a>
+            </Link>
+            <Link href={tabHref("awards")} className={`tab-pill ${activeTab === "awards" ? "active" : ""}`}>
+              {t.tabsAwards}
+            </Link>
             {providers.length > 0 ? (
-              <a href="#platforms" className="pill">
+              <Link href={tabHref("platforms")} className={`tab-pill ${activeTab === "platforms" ? "active" : ""}`}>
                 {t.tabsPlatforms}
-              </a>
+              </Link>
             ) : null}
             {comments.length > 0 ? (
-              <a href="#comments" className="pill">
+              <Link href={tabHref("comments")} className={`tab-pill ${activeTab === "comments" ? "active" : ""}`}>
                 {t.tabsComments}
-              </a>
+              </Link>
             ) : null}
           </div>
 
-          <section id="overview" className="section-block">
-            <h2 className="section-title">{t.overview}</h2>
-            <p className="overview-text">{data.overview || t.noOverview}</p>
-          </section>
+          {activeTab === "overview" ? (
+            <>
+              <section className="section-block">
+                <h2 className="section-title">{t.overview}</h2>
+                <p className="overview-text">{data.overview || t.noOverview}</p>
+              </section>
 
-          {providers.length > 0 ? (
-            <section id="platforms" className="section-block">
+              {providers.length > 0 ? (
+                <section className="section-block">
+                  <h2 className="section-title">{t.whereToWatch}</h2>
+                  <div className="providers-row">
+                    {providers.map((p) => (
+                      <div key={p.provider_id} className="watcher-link">
+                        <Image
+                          src={`${PROVIDER}${p.logo_path}`}
+                          alt={p.provider_name}
+                          width={50}
+                          height={50}
+                          className="provider-logo"
+                        />
+                        <div className="watcher-name">{p.provider_name}</div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {watchers.length > 0 ? (
+                <section className="section-block">
+                  <h2 className="section-title">{t.usersWhoWatched}</h2>
+                  <div className="watchers-row">
+                    {watchers.map((w) => (
+                      <Link
+                        key={w.user_id}
+                        href={userHref(w.username)}
+                        className="watcher-link"
+                      >
+                        {w.avatar_url ? (
+                          <Image
+                            src={w.avatar_url}
+                            alt={w.username || ""}
+                            width={48}
+                            height={48}
+                            className="watcher-avatar"
+                          />
+                        ) : (
+                          <div className="watcher-fallback" />
+                        )}
+                        <div className="watcher-name">{w.username || "user"}</div>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </>
+          ) : null}
+
+          {activeTab === "cast" ? (
+            <section className="section-block">
+              <h2 className="section-title">{t.cast}</h2>
+              <div className="cards-grid">
+                {cast.map((c) => (
+                  <Link
+                    key={c.id}
+                    href={personHref(c.id, c.name)}
+                    className="person-card"
+                  >
+                    {c.profile_path ? (
+                      <Image
+                        src={`${PERSON}${c.profile_path}`}
+                        alt={c.name}
+                        width={185}
+                        height={246}
+                        className="person-photo"
+                      />
+                    ) : (
+                      <div className="person-photo-fallback" />
+                    )}
+
+                    <div className="person-body">
+                      <div className="person-name">{c.name}</div>
+                      <div className="person-sub">{c.character || ""}</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab === "crew" ? (
+            <section className="section-block">
+              <h2 className="section-title">{t.crew}</h2>
+              <div className="cards-grid">
+                {crew.map((c) => (
+                  <Link
+                    key={`${c.id}-${c.job || ""}`}
+                    href={personHref(c.id, c.name)}
+                    className="person-card"
+                  >
+                    {c.profile_path ? (
+                      <Image
+                        src={`${PERSON}${c.profile_path}`}
+                        alt={c.name}
+                        width={185}
+                        height={246}
+                        className="person-photo"
+                      />
+                    ) : (
+                      <div className="person-photo-fallback" />
+                    )}
+
+                    <div className="person-body">
+                      <div className="person-name">{c.name}</div>
+                      <div className="person-sub">{c.job || ""}</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab === "platforms" && providers.length > 0 ? (
+            <section className="section-block">
               <h2 className="section-title">{t.whereToWatch}</h2>
               <div className="providers-row">
                 {providers.map((p) => (
@@ -1003,97 +1174,14 @@ export default async function TitlePage({ params }: PageProps) {
               </div>
             </section>
           ) : null}
-
-          {watchers.length > 0 ? (
+          {activeTab === "awards" ? (
+              <section className="section-block">
+                <h2 className="section-title">{t.awards}</h2>
+                <p className="overview-text">{t.noAwards}</p>
+              </section>
+            ) : null}
+          {activeTab === "comments" && comments.length > 0 ? (
             <section className="section-block">
-              <h2 className="section-title">{t.usersWhoWatched}</h2>
-              <div className="watchers-row">
-                {watchers.map((w) => (
-                  <Link
-                    key={w.user_id}
-                    href={userHref(w.username)}
-                    className="watcher-link"
-                  >
-                    {w.avatar_url ? (
-                      <Image
-                        src={w.avatar_url}
-                        alt={w.username || ""}
-                        width={48}
-                        height={48}
-                        className="watcher-avatar"
-                      />
-                    ) : (
-                      <div className="watcher-fallback" />
-                    )}
-                    <div className="watcher-name">{w.username || "user"}</div>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          <section id="cast" className="section-block">
-            <h2 className="section-title">{t.cast}</h2>
-            <div className="cards-grid">
-              {cast.map((c) => (
-                <Link
-                  key={c.id}
-                  href={personHref(c.id, c.name)}
-                  className="person-card"
-                >
-                  {c.profile_path ? (
-                    <Image
-                      src={`${PERSON}${c.profile_path}`}
-                      alt={c.name}
-                      width={185}
-                      height={246}
-                      className="person-photo"
-                    />
-                  ) : (
-                    <div className="person-photo-fallback" />
-                  )}
-
-                  <div className="person-body">
-                    <div className="person-name">{c.name}</div>
-                    <div className="person-sub">{c.character || ""}</div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <section id="crew" className="section-block">
-            <h2 className="section-title">{t.crew}</h2>
-            <div className="cards-grid">
-              {crew.map((c) => (
-                <Link
-                  key={`${c.id}-${c.job || ""}`}
-                  href={personHref(c.id, c.name)}
-                  className="person-card"
-                >
-                  {c.profile_path ? (
-                    <Image
-                      src={`${PERSON}${c.profile_path}`}
-                      alt={c.name}
-                      width={185}
-                      height={246}
-                      className="person-photo"
-                    />
-                  ) : (
-                    <div className="person-photo-fallback" />
-                  )}
-
-                  <div className="person-body">
-                    <div className="person-name">{c.name}</div>
-                    <div className="person-sub">{c.job || ""}</div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          {comments.length > 0 ? (
-            <section id="comments" className="section-block">
               <h2 className="section-title">{t.comments}</h2>
 
               <div className="comment-list">
