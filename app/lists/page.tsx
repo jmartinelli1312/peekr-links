@@ -16,6 +16,20 @@ type PeeklistItem = {
   created_by?: string | null;
 };
 
+type EditorialCollection = {
+  slug: string;
+  title_en: string;
+  title_es: string;
+  title_pt: string;
+  description_en?: string | null;
+  description_es?: string | null;
+  description_pt?: string | null;
+  cover_url?: string | null;
+  category?: string | null;
+  is_published: boolean;
+  sort_order: number;
+};
+
 function normalizeLang(value?: string | null): Lang {
   const raw = (value || "en").toLowerCase();
   if (raw.startsWith("es")) return "es";
@@ -37,49 +51,52 @@ function dedupePeeklists(items: PeeklistItem[]) {
   return out;
 }
 
+function localizedCollectionTitle(item: EditorialCollection, lang: Lang) {
+  if (lang === "es") return item.title_es || item.title_en || item.title_pt;
+  if (lang === "pt") return item.title_pt || item.title_en || item.title_es;
+  return item.title_en || item.title_es || item.title_pt;
+}
+
+function collectionToPeeklistItem(
+  item: EditorialCollection,
+  lang: Lang
+): PeeklistItem {
+  return {
+    id: item.slug,
+    title: localizedCollectionTitle(item, lang),
+    cover_url: item.cover_url ?? null,
+  };
+}
+
 async function getUserCreatedPeeklists() {
   const { data } = await supabase
     .from("peeklists")
     .select("id,title,cover_url,visibility,created_by")
+    .eq("visibility", "public")
     .order("id", { ascending: false })
     .limit(20);
 
   return dedupePeeklists((data as PeeklistItem[] | null) ?? []);
 }
 
-async function getSeoPeeklists() {
-  return [
-    {
-      id: "seo-1",
-      title: "Best Psychological Thrillers",
-      cover_url: null,
-    },
-    {
-      id: "seo-2",
-      title: "Top Sci-Fi Movies of All Time",
-      cover_url: null,
-    },
-    {
-      id: "seo-3",
-      title: "Best TV Shows to Binge",
-      cover_url: null,
-    },
-    {
-      id: "seo-4",
-      title: "Best Heist Movies",
-      cover_url: null,
-    },
-    {
-      id: "seo-5",
-      title: "Best Mind-Bending Endings",
-      cover_url: null,
-    },
-    {
-      id: "seo-6",
-      title: "Best Horror Movies for Beginners",
-      cover_url: null,
-    },
-  ] as PeeklistItem[];
+async function getEditorialCollectionsByCategory(
+  category: string,
+  lang: Lang,
+  limit = 12
+) {
+  const { data } = await supabase
+    .from("editorial_collections")
+    .select(
+      "slug,title_en,title_es,title_pt,description_en,description_es,description_pt,cover_url,category,is_published,sort_order"
+    )
+    .eq("is_published", true)
+    .eq("category", category)
+    .order("sort_order", { ascending: true })
+    .limit(limit);
+
+  return ((data as EditorialCollection[] | null) ?? []).map((item) =>
+    collectionToPeeklistItem(item, lang)
+  );
 }
 
 function SectionHeader({
@@ -164,42 +181,60 @@ export default async function ListsPage() {
     en: {
       title: "Peeklists",
       subtitle:
-        "Discover curated collections created by the community and future editorial lists built for discovery.",
+        "Discover curated collections created by the community and editorial collections built for discovery.",
       usersTitle: "Created by users",
-      usersText:
-        "Public Peeklists created by the Peekr community.",
-      editorialTitle: "Editorial Collections",
+      usersText: "Public Peeklists created by the Peekr community.",
+      awardsTitle: "Award winners",
+      awardsText:
+        "Collections built around Oscar winners and other award-season discoveries.",
+      editorialTitle: "Editorial collections",
       editorialText:
         "Curated categories and search-friendly collections to power discovery across the web.",
+      regionalTitle: "Regional picks",
+      regionalText:
+        "Collections tailored to local taste and regional discovery.",
     },
     es: {
       title: "Peeklists",
       subtitle:
-        "Descubre colecciones curadas creadas por la comunidad y futuras listas editoriales pensadas para discovery",
+        "Descubre colecciones curadas creadas por la comunidad y colecciones editoriales pensadas para discovery.",
       usersTitle: "Creadas por usuarios",
-      usersText:
-        "Peeklists públicas creadas por la comunidad de Peekr.",
+      usersText: "Peeklists públicas creadas por la comunidad de Peekr.",
+      awardsTitle: "Ganadores de premios",
+      awardsText:
+        "Colecciones armadas alrededor de los ganadores del Oscar y otros premios.",
       editorialTitle: "Colecciones editoriales",
       editorialText:
         "Categorías curadas y colecciones pensadas para potenciar discovery en la web.",
+      regionalTitle: "Selecciones regionales",
+      regionalText:
+        "Colecciones adaptadas al gusto local y al discovery regional.",
     },
     pt: {
       title: "Peeklists",
       subtitle:
-        "Descubra coleções curadas criadas pela comunidade e futuras listas editoriais pensadas para discovery.",
+        "Descubra coleções curadas criadas pela comunidade e coleções editoriais pensadas para discovery.",
       usersTitle: "Criadas por usuários",
-      usersText:
-        "Peeklists públicas criadas pela comunidade do Peekr.",
+      usersText: "Peeklists públicas criadas pela comunidade do Peekr.",
+      awardsTitle: "Vencedores de prêmios",
+      awardsText:
+        "Coleções construídas em torno dos vencedores do Oscar e de outras premiações.",
       editorialTitle: "Coleções editoriais",
       editorialText:
         "Categorias curadas e coleções pensadas para impulsionar discovery na web.",
+      regionalTitle: "Seleções regionais",
+      regionalText:
+        "Coleções adaptadas ao gosto local e à descoberta regional.",
     },
   }[lang];
 
-  const [userPeeklists, seoPeeklists] = await Promise.all([
-    getUserCreatedPeeklists(),
-    getSeoPeeklists(),
-  ]);
+  const [userPeeklists, awardCollections, editorialCollections, regionalCollections] =
+    await Promise.all([
+      getUserCreatedPeeklists(),
+      getEditorialCollectionsByCategory("awards", lang, 12),
+      getEditorialCollectionsByCategory("genre", lang, 12),
+      getEditorialCollectionsByCategory("regional", lang, 12),
+    ]);
 
   return (
     <>
@@ -317,10 +352,26 @@ export default async function ListsPage() {
           <PeeklistsRow items={userPeeklists} />
         </section>
 
-        <section>
-          <SectionHeader title={t.editorialTitle} text={t.editorialText} />
-          <PeeklistsRow items={seoPeeklists} hrefPrefix="/lists" />
-        </section>
+        {awardCollections.length > 0 ? (
+          <section>
+            <SectionHeader title={t.awardsTitle} text={t.awardsText} />
+            <PeeklistsRow items={awardCollections} hrefPrefix="/lists" />
+          </section>
+        ) : null}
+
+        {editorialCollections.length > 0 ? (
+          <section>
+            <SectionHeader title={t.editorialTitle} text={t.editorialText} />
+            <PeeklistsRow items={editorialCollections} hrefPrefix="/lists" />
+          </section>
+        ) : null}
+
+        {regionalCollections.length > 0 ? (
+          <section>
+            <SectionHeader title={t.regionalTitle} text={t.regionalText} />
+            <PeeklistsRow items={regionalCollections} hrefPrefix="/lists" />
+          </section>
+        ) : null}
       </div>
     </>
   );
