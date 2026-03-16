@@ -93,6 +93,20 @@ function dedupeWatched(items: WatchedRow[]) {
   return out;
 }
 
+function dedupePeeklists(items: PeeklistRow[]) {
+  const seen = new Set<string>();
+  const out: PeeklistRow[] = [];
+
+  for (const item of items) {
+    const key = String(item.id);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+
+  return out;
+}
+
 export default function UserProfileClient({
   username,
   lang,
@@ -273,10 +287,10 @@ export default function UserProfileClient({
     }
   }
 
-  const allPeeklists = useMemo(
-    () => [...peeklistsCreated, ...peeklistsFollowing],
-    [peeklistsCreated, peeklistsFollowing]
-  );
+ const allPeeklists = useMemo(
+  () => dedupePeeklists([...peeklistsCreated, ...peeklistsFollowing]),
+  [peeklistsCreated, peeklistsFollowing]
+);
 
   const canViewContent =
     profile && (!isPrivate || isOwnProfile || isFollowing);
