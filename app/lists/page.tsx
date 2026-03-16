@@ -164,33 +164,33 @@ export default async function ListsPage() {
     en: {
       title: "Peeklists",
       subtitle:
-        "Discover curated collections created by the community and future editorial lists built for discovery and SEO.",
+        "Discover curated collections created by the community and future editorial lists built for discovery.",
       usersTitle: "Created by users",
       usersText:
         "Public Peeklists created by the Peekr community.",
-      editorialTitle: "Editorial & SEO collections",
+      editorialTitle: "Editorial Collections",
       editorialText:
         "Curated categories and search-friendly collections to power discovery across the web.",
     },
     es: {
       title: "Peeklists",
       subtitle:
-        "Descubre colecciones curadas creadas por la comunidad y futuras listas editoriales pensadas para discovery y SEO.",
+        "Descubre colecciones curadas creadas por la comunidad y futuras listas editoriales pensadas para discovery",
       usersTitle: "Creadas por usuarios",
       usersText:
         "Peeklists públicas creadas por la comunidad de Peekr.",
-      editorialTitle: "Colecciones editoriales y SEO",
+      editorialTitle: "Colecciones editoriales",
       editorialText:
         "Categorías curadas y colecciones pensadas para potenciar discovery en la web.",
     },
     pt: {
       title: "Peeklists",
       subtitle:
-        "Descubra coleções curadas criadas pela comunidade e futuras listas editoriais pensadas para discovery e SEO.",
+        "Descubra coleções curadas criadas pela comunidade e futuras listas editoriais pensadas para discovery.",
       usersTitle: "Criadas por usuários",
       usersText:
         "Peeklists públicas criadas pela comunidade do Peekr.",
-      editorialTitle: "Coleções editoriais e SEO",
+      editorialTitle: "Coleções editoriais",
       editorialText:
         "Categorias curadas e coleções pensadas para impulsionar discovery na web.",
     },
