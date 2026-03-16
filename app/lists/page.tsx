@@ -31,6 +31,7 @@ type EditorialCollection = {
   category?: string | null;
   is_published: boolean;
   sort_order: number;
+  item_number?: number | null;
 };
 
 type EditorialCollectionItem = {
@@ -138,15 +139,20 @@ async function getEditorialCollectionsByCategory(
   const { data } = await supabase
     .from("editorial_collections")
     .select(
-      "slug,title_en,title_es,title_pt,description_en,description_es,description_pt,cover_url,category,is_published,sort_order"
+      "slug,title_en,title_es,title_pt,description_en,description_es,description_pt,cover_url,category,is_published,sort_order, item_count"
     )
     .eq("is_published", true)
     .eq("category", category)
     .order("sort_order", { ascending: true })
     .limit(limit);
 
-  const rows = (data as EditorialCollection[] | null) ?? [];
-  return await Promise.all(rows.map((item) => collectionToPeeklistItem(item, lang)));
+ const rows = ((data as EditorialCollection[] | null) ?? []).filter(
+  (item) => (item.item_count ?? 0) > 0
+);
+
+return await Promise.all(
+  rows.map((item) => collectionToPeeklistItem(item, lang))
+);
 }
 
 function SectionHeader({
