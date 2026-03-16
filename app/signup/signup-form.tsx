@@ -162,7 +162,7 @@ export default function SignupForm({
       if (error) throw error;
       if (!data.user) throw new Error("User not created");
 
-      router.push("/follow-onboarding");
+      router.push("/download-app");
     } catch (err: any) {
       setError(err?.message || t.signupError);
     } finally {
