@@ -1,116 +1,77 @@
-import { supabase } from "@/lib/supabase";
+import { cookies } from "next/headers";
+import UserProfileClient from "./user-profile-client";
 
-type PageProps = {
-  params: Promise<{
-    username: string;
-  }>;
-};
+type Lang = "en" | "es" | "pt";
 
-export default async function UserPage({ params }: PageProps) {
+function normalizeLang(value?: string | null): Lang {
+  const raw = (value || "en").toLowerCase();
+  if (raw.startsWith("es")) return "es";
+  if (raw.startsWith("pt")) return "pt";
+  return "en";
+}
 
+export default async function UserProfilePage({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}) {
   const { username } = await params;
-  const decoded = decodeURIComponent(username);
+  const cookieStore = await cookies();
+  const lang = normalizeLang(cookieStore.get("lang")?.value);
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("username", decoded)
-    .maybeSingle();
+  const t = {
+    en: {
+      userNotFound: "User not found",
+      watched: "Watched",
+      peeklists: "Peeklists",
+      followers: "Followers",
+      following: "Following",
+      follow: "Follow",
+      followingBtn: "Following",
+      request: "Request",
+      requested: "Requested",
+      privateAccountMsg: "This account is private.",
+      emptyWatched: "No watched titles yet.",
+      emptyPeeklists: "No Peeklists yet.",
+      creator: "Creator",
+      settings: "Settings",
+      openInApp: "Open in app",
+    },
+    es: {
+      userNotFound: "Usuario no encontrado",
+      watched: "Vistos",
+      peeklists: "Peeklists",
+      followers: "Seguidores",
+      following: "Siguiendo",
+      follow: "Seguir",
+      followingBtn: "Siguiendo",
+      request: "Solicitar",
+      requested: "Solicitado",
+      privateAccountMsg: "Esta cuenta es privada.",
+      emptyWatched: "Todavía no hay títulos vistos.",
+      emptyPeeklists: "Todavía no hay Peeklists.",
+      creator: "Creador",
+      settings: "Settings",
+      openInApp: "Abrir en app",
+    },
+    pt: {
+      userNotFound: "Usuário não encontrado",
+      watched: "Assistidos",
+      peeklists: "Peeklists",
+      followers: "Seguidores",
+      following: "Seguindo",
+      follow: "Seguir",
+      followingBtn: "Seguindo",
+      request: "Solicitar",
+      requested: "Solicitado",
+      privateAccountMsg: "Esta conta é privada.",
+      emptyWatched: "Ainda não há títulos assistidos.",
+      emptyPeeklists: "Ainda não há Peeklists.",
+      creator: "Criador",
+      settings: "Settings",
+      openInApp: "Abrir no app",
+    },
+  }[lang];
 
-  if (!profile) {
-    return (
-      <div style={{ padding: 40 }}>
-        User not found
-      </div>
-    );
-  }
-
-  const { data: watched } = await supabase
-    .from("user_title_activities")
-    .select("tmdb_id,title,poster_path,media_type,rating")
-    .eq("user_id", profile.id);
-
-  const { data: peeklists } = await supabase
-    .from("peeklists")
-    .select("*")
-    .eq("created_by", profile.id);
-
-  return (
-    <div style={{ padding: 40 }}>
-
-      <h1>@{profile.username}</h1>
-
-      {profile.display_name && (
-        <div style={{ marginTop: 4 }}>
-          {profile.display_name}
-        </div>
-      )}
-
-      {profile.bio && (
-        <p style={{ marginTop: 10 }}>
-          {profile.bio}
-        </p>
-      )}
-
-      <h2 style={{ marginTop: 40 }}>Watched</h2>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
-          gap: 20,
-          marginTop: 20
-        }}
-      >
-
-        {watched?.map((w: any) => {
-
-          const media = w.media_type === "tv" ? "tv" : "movie";
-
-          return (
-            <a
-              key={w.tmdb_id}
-              href={`/title/${media}/${w.tmdb_id}`}
-              style={{ textDecoration: "none", color: "white" }}
-            >
-
-              {w.poster_path && (
-                <img
-                  src={`https://image.tmdb.org/t/p/w342${w.poster_path}`}
-                  style={{
-                    width: "100%",
-                    borderRadius: 12
-                  }}
-                />
-              )}
-
-              <div style={{ marginTop: 6 }}>
-                {w.title}
-              </div>
-
-            </a>
-          );
-        })}
-
-      </div>
-
-      <h2 style={{ marginTop: 50 }}>Peeklists</h2>
-
-      <div style={{ marginTop: 10 }}>
-
-        {peeklists?.map((pl: any) => (
-          <div key={pl.id} style={{ marginBottom: 12 }}>
-            <a
-              href={`/peeklist/${pl.id}`}
-              style={{ color: "#FA0082", textDecoration: "none" }}
-            >
-              {pl.title}
-            </a>
-          </div>
-        ))}
-
-      </div>
-
-    </div>
-  );
+  return <UserProfileClient username={username} lang={lang} t={t} />;
 }
