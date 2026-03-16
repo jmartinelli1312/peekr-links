@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -40,6 +40,10 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const desktopLangRef = useRef<HTMLDetailsElement>(null);
+  const desktopUserRef = useRef<HTMLDetailsElement>(null);
+  const mobileLangRef = useRef<HTMLDetailsElement>(null);
+  const mobileMenuRef = useRef<HTMLDetailsElement>(null);
 
   const t: HeaderTexts = {
     en: {
@@ -136,6 +140,12 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
     }
   }
 
+  function closeAllMenus() {
+  if (desktopLangRef.current) desktopLangRef.current.open = false;
+  if (desktopUserRef.current) desktopUserRef.current.open = false;
+  if (mobileLangRef.current) mobileLangRef.current.open = false;
+  if (mobileMenuRef.current) mobileMenuRef.current.open = false;
+}
   const profileHref =
     profile?.username && profile.username.length > 0
       ? `/user/${profile.username}`
@@ -410,22 +420,22 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
           </Link>
 
           <nav className="peekr-nav-desktop">
-            <Link href="/explore" className="peekr-link">
+            <Link href="/explore" className="peekr-mobile-item" onClick={closeAllMenus}>
               {t.explore}
             </Link>
-            <Link href="/lists" className="peekr-link">
+            <Link href="/lists" className="peekr-link" onClick={closeAllMenus}>
               {t.lists}
             </Link>
-            <Link href="/activity" className="peekr-link">
+            <Link href="/activity" className="peekr-link" onClick={closeAllMenus}>
               {t.activity}
             </Link>
-            <Link href="/peekrbuzz" className="peekr-link">
+            <Link href="/peekrbuzz" className="peekr-link"onClick={closeAllMenus}>
               {t.peekrbuzz}
             </Link>
           </nav>
 
           <div className="peekr-actions-desktop">
-            <details className="peekr-lang">
+            <details className="peekr-lang" ref={desktopLangRef}>
               <summary style={{ cursor: "pointer", fontSize: 18 }}>🌍</summary>
               <div className="peekr-lang-menu">
                 <a href="/lang/en" className="peekr-lang-item">
@@ -442,11 +452,8 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
 
             {loadingAuth ? null : isLoggedIn ? (
               <>
-                <Link href="/download-app" className="peekr-secondary-pill">
-                  {t.settings}
-                </Link>
-
-                <details className="peekr-user">
+               
+                <details className="peekr-user" ref={desktopUserRef}>
                   <summary className="peekr-avatar-button">
                     {profile?.avatar_url ? (
                       <img
@@ -473,7 +480,10 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
                     <button
                       type="button"
                       className="peekr-user-item"
-                      onClick={handleSignOut}
+                      onClick={() => {
+                        closeAllMenus();
+                        handleSignOut();
+                      }}
                     >
                       {signingOut ? "..." : t.signOut}
                     </button>
@@ -494,22 +504,22 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
           </div>
 
           <div className="peekr-mobile-right">
-            <details className="peekr-lang">
+            <details className="peekr-lang" ref={mobileLangRef}>
               <summary style={{ cursor: "pointer", fontSize: 18 }}>🌍</summary>
               <div className="peekr-lang-menu">
-                <a href="/lang/en" className="peekr-lang-item">
+                <a href="/lang/en" className="peekr-lang-item" onClick={closeAllMenus}>
                   🇺🇸 English
                 </a>
-                <a href="/lang/es" className="peekr-lang-item">
+                <a href="/lang/es" className="peekr-lang-item" onClick={closeAllMenus}>
                   🇪🇸 Español
                 </a>
-                <a href="/lang/pt" className="peekr-lang-item">
+                <a href="/lang/pt" className="peekr-lang-item" onClick={closeAllMenus}>
                   🇧🇷 Português
                 </a>
               </div>
             </details>
 
-            <details className="peekr-menu">
+            <details className="peekr-menu" ref={mobileMenuRef}>
               <summary className="peekr-menu-button">
                 <span className="peekr-menu-icon">
                   <span />
@@ -534,16 +544,19 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
 
                 {loadingAuth ? null : isLoggedIn ? (
                   <>
-                    <Link href={profileHref} className="peekr-mobile-item">
+                    <Link href={profileHref} className="peekr-user-item" onClick={closeAllMenus}>
                       {t.profile}
                     </Link>
-                    <Link href="/download-app" className="peekr-mobile-item">
+                    <Link href="/download-app" className="peekr-user-item" onClick={closeAllMenus}>
                       {t.settings}
                     </Link>
                     <button
                       type="button"
                       className="peekr-user-item"
-                      onClick={handleSignOut}
+                      onClick={() => {
+                        closeAllMenus();
+                        handleSignOut();
+                      }}
                     >
                       {signingOut ? "..." : t.signOut}
                     </button>
