@@ -5,6 +5,8 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
+const TMDB_KEY = process.env.TMDB_API_KEY!;
+const TMDB_BASE = "https://api.themoviedb.org/3";
 const BRAND = "#FA0082";
 const POSTER = "https://image.tmdb.org/t/p/w342";
 const SITE = "https://www.peekr.app";
@@ -96,7 +98,7 @@ async function getCreator(userId?: string | null) {
   }
 }
 
-async function getPeeklistItems(id: string) {
+async function getPeeklistItems(id: string, lang: Lang) {
   try {
     const { data } = await supabase
       .from("peeklist_items")
@@ -104,9 +106,46 @@ async function getPeeklistItems(id: string) {
       .eq("peeklist_id", id)
       .order("position", { ascending: true });
 
-    return ((data as PeeklistItemRow[] | null) ?? []).filter(
+    const items = ((data as PeeklistItemRow[] | null) ?? []).filter(
       (item) => !!item.tmdb_id
     );
+
+    const apiLang =
+      lang === "es" ? "es-ES" : lang === "pt" ? "pt-BR" : "en-US";
+
+    const hydrated = await Promise.all(
+      items.map(async (item) => {
+        if (item.title && item.title.trim().length > 0) {
+          return item;
+        }
+
+        try {
+          const type = item.media_type === "tv" ? "tv" : "movie";
+
+          const res = await fetch(
+            `${TMDB_BASE}/${type}/${item.tmdb_id}?api_key=${TMDB_KEY}&language=${apiLang}`,
+            { next: { revalidate: 3600 } }
+          );
+
+          if (!res.ok) return item;
+
+          const json = await res.json();
+
+          return {
+            ...item,
+            title: json.title || json.name || item.title || "Untitled",
+            poster_path: item.poster_path || json.poster_path || null,
+          };
+        } catch {
+          return {
+            ...item,
+            title: item.title || "Untitled",
+          };
+        }
+      })
+    );
+
+    return hydrated;
   } catch {
     return [];
   }
@@ -202,10 +241,10 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
   const peeklist = await getPeeklist(id);
   if (!peeklist) notFound();
 
-  const [creator, items] = await Promise.all([
-    getCreator(peeklist.created_by),
-    getPeeklistItems(id),
-  ]);
+ const [creator, items] = await Promise.all([
+  getCreator(peeklist.created_by),
+  getPeeklistItems(id, lang),
+]);
 
   const itemListJsonLd = {
     "@context": "https://schema.org",
