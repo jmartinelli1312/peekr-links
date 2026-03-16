@@ -125,6 +125,45 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
     };
   }, []);
 
+  useEffect(() => {
+  function handleDocClick(e: MouseEvent) {
+    const target = e.target as Node;
+
+    if (
+      desktopUserRef.current &&
+      !desktopUserRef.current.contains(target)
+    ) {
+      desktopUserRef.current.open = false;
+    }
+
+    if (
+      desktopLangRef.current &&
+      !desktopLangRef.current.contains(target)
+    ) {
+      desktopLangRef.current.open = false;
+    }
+
+    if (
+      mobileMenuRef.current &&
+      !mobileMenuRef.current.contains(target)
+    ) {
+      mobileMenuRef.current.open = false;
+    }
+
+    if (
+      mobileLangRef.current &&
+      !mobileLangRef.current.contains(target)
+    ) {
+      mobileLangRef.current.open = false;
+    }
+  }
+
+  document.addEventListener("click", handleDocClick);
+
+  return () => {
+    document.removeEventListener("click", handleDocClick);
+  };
+}, []);
   async function handleSignOut() {
     if (signingOut) return;
     setSigningOut(true);
@@ -141,10 +180,12 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
   }
 
   function closeAllMenus() {
-  if (desktopLangRef.current) desktopLangRef.current.open = false;
-  if (desktopUserRef.current) desktopUserRef.current.open = false;
-  if (mobileLangRef.current) mobileLangRef.current.open = false;
-  if (mobileMenuRef.current) mobileMenuRef.current.open = false;
+  requestAnimationFrame(() => {
+    if (desktopLangRef.current) desktopLangRef.current.open = false;
+    if (desktopUserRef.current) desktopUserRef.current.open = false;
+    if (mobileLangRef.current) mobileLangRef.current.open = false;
+    if (mobileMenuRef.current) mobileMenuRef.current.open = false;
+  });
 }
   const profileHref =
     profile?.username && profile.username.length > 0
@@ -453,7 +494,13 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
             {loadingAuth ? null : isLoggedIn ? (
               <>
                
-                <details className="peekr-user" ref={desktopUserRef}>
+               <details
+                  className="peekr-user"
+                  ref={desktopUserRef}
+                  onMouseLeave={() => {
+                    if (desktopUserRef.current) desktopUserRef.current.open = false;
+                  }}
+                >
                   <summary className="peekr-avatar-button">
                     {profile?.avatar_url ? (
                       <img
@@ -519,7 +566,13 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
               </div>
             </details>
 
-            <details className="peekr-menu" ref={mobileMenuRef}>
+            <details
+                className="peekr-menu"
+                ref={mobileMenuRef}
+                onMouseLeave={() => {
+                  if (mobileMenuRef.current) mobileMenuRef.current.open = false;
+                }}
+              >
               <summary className="peekr-menu-button">
                 <span className="peekr-menu-icon">
                   <span />
