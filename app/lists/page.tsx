@@ -31,7 +31,7 @@ type EditorialCollection = {
   category?: string | null;
   is_published: boolean;
   sort_order: number;
-  item_number?: number | null;
+  item_count?: number | null;
 };
 
 type EditorialCollectionItem = {
