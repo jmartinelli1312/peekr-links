@@ -306,14 +306,12 @@ function pickProviders(
 }
 
 async function getPeekrData(tmdbId: number, mediaType: string) {
-const [ratingsRes, activityStatsRes, titleStatsRes, watchersRes, commentsRes] =
+const [ratingRpcRes, activityStatsRes, titleStatsRes, watchersRes, commentsRes] =
   await Promise.all([
-    supabase
-      .from("user_title_activities")
-      .select("rating")
-      .eq("tmdb_id", tmdbId)
-      .eq("media_type", mediaType)
-      .not("rating", "is", null),
+    supabase.rpc("get_title_peekr_rating", {
+      p_tmdb_id: tmdbId,
+      p_media_type: mediaType,
+    }),
 
       supabase
         .from("title_activity_stats")
@@ -361,17 +359,12 @@ const [ratingsRes, activityStatsRes, titleStatsRes, watchersRes, commentsRes] =
         .limit(10),
     ]);
 
-  const ratingRows = (ratingsRes.data as { rating: number | null }[] | null) ?? [];
-  const validRatings = ratingRows
-    .map((r) => r.rating)
-    .filter((r): r is number => typeof r === "number");
-
+  const ratingRow =
+    ((ratingRpcRes.data as { avg_rating: number | null; ratings_count: number }[] | null) ?? [])[0] ??
+    null;
+  
   const avgRating =
-  validRatings.length > 0
-    ? (
-        validRatings.reduce((a, b) => a + Number(b), 0) / validRatings.length
-      ).toFixed(1)
-    : null;
+    ratingRow?.avg_rating != null ? Number(ratingRow.avg_rating).toFixed(1) : null;
 
   const watchedCount =
     (activityStatsRes.data as { watched_count?: number } | null)?.watched_count ?? 0;
@@ -584,7 +577,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
           display: grid;
           grid-template-columns: 126px 1fr;
           gap: 16px;
-          align-items: end;
+          align-items: start;
         }
         
         .poster-wrap {
@@ -601,9 +594,10 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
           background: rgba(255,255,255,0.08);
         }
         .title-main h1 {
+          padding-top: 6px;
           margin: 0;
-          font-size: clamp(30px, 9vw, 56px);
-          line-height: 0.98;
+          font-size: clamp(28px, 8.5vw, 56px);
+          line-height: 0.96;
           letter-spacing: -0.04em;
           font-weight: 900;
         }
