@@ -36,6 +36,24 @@ type PeekrActivity = {
   watched_at: string | null;
 };
 
+type EditorialCollection = {
+  slug: string;
+  title_en: string;
+  title_es: string;
+  title_pt: string;
+  source_type?: string | null;
+  category?: string | null;
+  item_count?: number | null;
+  is_published: boolean;
+  sort_order: number;
+};
+
+type EditorialCollectionItem = {
+  tmdb_id: number;
+  media_type: "movie" | "tv";
+  position: number;
+};
+
 export async function generateMetadata() {
   return {
     title: "Peekr | The social network for movies and series",
@@ -87,12 +105,12 @@ async function fetchTMDB<T>(url: string): Promise<T | null> {
 async function getTmdbHomeData(lang: Lang) {
   const apiLang = tmdbLanguage(lang);
 
-  const [topMovies, topTV, popularPeople] = await Promise.all([
+  const [trendingMovies, trendingTV, popularPeople] = await Promise.all([
     fetchTMDB<{ results: TmdbTitle[] }>(
-      `${TMDB_BASE}/movie/top_rated?api_key=${TMDB_KEY}&language=${apiLang}`
+      `${TMDB_BASE}/trending/movie/week?api_key=${TMDB_KEY}&language=${apiLang}`
     ),
     fetchTMDB<{ results: TmdbTitle[] }>(
-      `${TMDB_BASE}/tv/top_rated?api_key=${TMDB_KEY}&language=${apiLang}`
+      `${TMDB_BASE}/trending/tv/week?api_key=${TMDB_KEY}&language=${apiLang}`
     ),
     fetchTMDB<{ results: TmdbPerson[] }>(
       `${TMDB_BASE}/person/popular?api_key=${TMDB_KEY}&language=${apiLang}`
@@ -100,25 +118,10 @@ async function getTmdbHomeData(lang: Lang) {
   ]);
 
   return {
-    topMovies: topMovies?.results ?? [],
-    topTV: topTV?.results ?? [],
+    trendingMovies: trendingMovies?.results ?? [],
+    trendingTV: trendingTV?.results ?? [],
     popularPeople: popularPeople?.results ?? [],
   };
-}
-
-function dedupeActivities(items: PeekrActivity[]) {
-  const seen = new Set<string>();
-  const out: PeekrActivity[] = [];
-
-  for (const item of items) {
-    if (!item.tmdb_id || !item.media_type) continue;
-    const key = `${item.media_type}-${item.tmdb_id}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(item);
-  }
-
-  return out;
 }
 
 async function getTrendingOnPeekr() {
@@ -127,14 +130,75 @@ async function getTrendingOnPeekr() {
       limit_count: 12,
     });
 
-    if (error) {
-      return [];
-    }
-
+    if (error) return [];
     return (data as PeekrActivity[] | null) ?? [];
   } catch {
     return [];
   }
+}
+
+function localizedCollectionTitle(
+  item: EditorialCollection,
+  lang: Lang
+): string {
+  if (lang === "es") return item.title_es || item.title_en || item.title_pt;
+  if (lang === "pt") return item.title_pt || item.title_en || item.title_es;
+  return item.title_en || item.title_es || item.title_pt;
+}
+
+async function getHomepagePlatformCollections(lang: Lang) {
+  const { data: collections, error } = await supabase
+    .from("editorial_collections")
+    .select(
+      "slug,title_en,title_es,title_pt,source_type,category,item_count,is_published,sort_order"
+    )
+    .eq("is_published", true)
+    .eq("source_type", "platform_releases")
+    .order("sort_order", { ascending: true })
+    .limit(8);
+
+  if (error || !collections) return [];
+
+  const filtered = (collections as EditorialCollection[]).filter(
+    (item) => (item.item_count ?? 0) > 0
+  );
+
+  const rows = await Promise.all(
+    filtered.map(async (collection) => {
+      const { data: items } = await supabase
+        .from("editorial_collection_items")
+        .select("tmdb_id,media_type,position")
+        .eq("collection_slug", collection.slug)
+        .order("position", { ascending: true })
+        .limit(1);
+
+      const first = (items?.[0] as EditorialCollectionItem | undefined) ?? null;
+      if (!first) return null;
+
+      const type = first.media_type === "tv" ? "tv" : "movie";
+      const detail = await fetchTMDB<TmdbTitle>(
+        `${TMDB_BASE}/${type}/${first.tmdb_id}?api_key=${TMDB_KEY}&language=${tmdbLanguage(lang)}`
+      );
+
+      return {
+        id: collection.slug,
+        title: localizedCollectionTitle(collection, lang),
+        posterPath: detail?.poster_path ?? null,
+        mediaType: type,
+        tmdbId: first.tmdb_id,
+        href: `/lists/${collection.slug}`,
+      };
+    })
+  );
+
+  return rows.filter(Boolean) as Array<{
+    id: string;
+    title: string;
+    posterPath: string | null;
+    mediaType: "movie" | "tv";
+    tmdbId: number;
+    href: string;
+  }>;
 }
 
 function getYear(item: TmdbTitle) {
@@ -226,6 +290,44 @@ function TitleRow({
   );
 }
 
+function PlatformRow({
+  items,
+}: {
+  items: Array<{
+    id: string;
+    title: string;
+    posterPath: string | null;
+    mediaType: "movie" | "tv";
+    tmdbId: number;
+    href: string;
+  }>;
+}) {
+  return (
+    <div className="scroll-row">
+      {items.map((item) => {
+        const poster = item.posterPath ? `${POSTER}${item.posterPath}` : null;
+
+        return (
+          <Link key={item.id} href={item.href} className="poster-card">
+            {poster ? (
+              <img src={poster} alt={item.title} className="poster-image" />
+            ) : (
+              <div className="poster-fallback" />
+            )}
+
+            <div className="poster-meta">
+              <div className="poster-title">{item.title}</div>
+              <div className="poster-year">
+                {item.mediaType === "tv" ? "TV" : "Movie"}
+              </div>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 function PeopleRow({ items }: { items: TmdbPerson[] }) {
   return (
     <div className="scroll-row">
@@ -300,20 +402,21 @@ export default async function HomePage() {
         "Track what you watch, rate titles, create Peeklists and discover what people are watching in real time.",
       createAccount: "Create account",
       downloadApp: "Download app",
-      discoverMovies: "Discover top-rated movies",
-      discoverMoviesText:
-        "A cleaner way to explore the greatest films ever made.",
-      discoverTV: "Discover top-rated TV series",
-      discoverTVText:
-        "Series worth bingeing, discussing and sharing with your friends.",
+      trendingMovies: "Trending movies",
+      trendingMoviesText:
+        "What the world is watching right now in movies.",
+      trendingTV: "Trending TV series",
+      trendingTVText:
+        "Series people are watching, discussing and sharing right now.",
+      platformTitle: "Streaming picks by platform",
+      platformText:
+        "Discover fresh releases and curated picks grouped by platform.",
       peopleTitle: "Popular people",
       peopleText:
         "Go beyond titles and discover the actors and creators shaping what everyone is watching now.",
       peekrTitle: "Trending on Peekr",
       peekrText:
         "Live activity from the community: the latest watched and rated titles on Peekr.",
-      watchedTitle: "Recently watched",
-      ratedTitle: "Recently rated",
       whyTitle: "Why Peekr feels different",
       why1: "Movies and TV series in one place",
       why2: "Real social activity, not just logging",
@@ -329,20 +432,21 @@ export default async function HomePage() {
         "Lleva registro de lo que ves, califica títulos, crea Peeklists y descubre lo que la gente está viendo en tiempo real.",
       createAccount: "Crear cuenta",
       downloadApp: "Bajar app",
-      discoverMovies: "Descubre películas top rated",
-      discoverMoviesText:
-        "Una forma más limpia de explorar las mejores películas de todos los tiempos.",
-      discoverTV: "Descubre series top rated",
-      discoverTVText:
-        "Series que valen la pena maratonear, comentar y compartir con tus amigos.",
+      trendingMovies: "Películas en tendencia",
+      trendingMoviesText:
+        "Lo que el mundo está viendo ahora mismo en cine.",
+      trendingTV: "Series en tendencia",
+      trendingTVText:
+        "Series que la gente está viendo, comentando y compartiendo ahora.",
+      platformTitle: "Picks por plataforma",
+      platformText:
+        "Descubre estrenos recientes y colecciones curadas agrupadas por plataforma.",
       peopleTitle: "Personas populares",
       peopleText:
         "Ve más allá de los títulos y descubre actores y creadores que están definiendo lo que todos están viendo.",
       peekrTitle: "Trending on Peekr",
       peekrText:
         "Actividad en vivo de la comunidad: los últimos títulos vistos y calificados en Peekr.",
-      watchedTitle: "Últimos vistos",
-      ratedTitle: "Últimos calificados",
       whyTitle: "Por qué Peekr se siente diferente",
       why1: "Películas y series en un mismo lugar",
       why2: "Actividad social real, no solo logging",
@@ -358,20 +462,21 @@ export default async function HomePage() {
         "Registre o que você assiste, avalie títulos, crie Peeklists e descubra o que as pessoas estão vendo em tempo real.",
       createAccount: "Criar conta",
       downloadApp: "Baixar app",
-      discoverMovies: "Descubra filmes top rated",
-      discoverMoviesText:
-        "Uma forma mais limpa de explorar os melhores filmes de todos os tempos.",
-      discoverTV: "Descubra séries top rated",
-      discoverTVText:
-        "Séries que valem a maratona, o comentário e o compartilhamento.",
+      trendingMovies: "Filmes em alta",
+      trendingMoviesText:
+        "O que o mundo está assistindo agora em filmes.",
+      trendingTV: "Séries em alta",
+      trendingTVText:
+        "Séries que as pessoas estão assistindo, comentando e compartilhando agora.",
+      platformTitle: "Picks por plataforma",
+      platformText:
+        "Descubra lançamentos recentes e coleções curadas por plataforma.",
       peopleTitle: "Pessoas populares",
       peopleText:
         "Vá além dos títulos e descubra atores e criadores que estão moldando o que todo mundo está assistindo agora.",
       peekrTitle: "Trending on Peekr",
       peekrText:
         "Atividade ao vivo da comunidade: os últimos títulos assistidos e avaliados no Peekr.",
-      watchedTitle: "Assistidos recentemente",
-      ratedTitle: "Avaliados recentemente",
       whyTitle: "Por que Peekr é diferente",
       why1: "Filmes e séries no mesmo lugar",
       why2: "Atividade social real, não só logging",
@@ -383,8 +488,13 @@ export default async function HomePage() {
     },
   }[lang];
 
- const [{ topMovies, topTV, popularPeople }, trendingOnPeekr] =
-  await Promise.all([getTmdbHomeData(lang), getTrendingOnPeekr()]);
+  const [{ trendingMovies, trendingTV, popularPeople }, trendingOnPeekr, platformCollections] =
+    await Promise.all([
+      getTmdbHomeData(lang),
+      getTrendingOnPeekr(),
+      getHomepagePlatformCollections(lang),
+    ]);
+
   return (
     <>
       <style>{`
@@ -656,24 +766,31 @@ export default async function HomePage() {
         </section>
 
         <section>
-          <SectionHeader title={t.discoverMovies} text={t.discoverMoviesText} />
-          <TitleRow items={topMovies} type="movie" />
+          <SectionHeader title={t.trendingMovies} text={t.trendingMoviesText} />
+          <TitleRow items={trendingMovies} type="movie" />
         </section>
 
         <section>
-          <SectionHeader title={t.discoverTV} text={t.discoverTVText} />
-          <TitleRow items={topTV} type="tv" />
+          <SectionHeader title={t.trendingTV} text={t.trendingTVText} />
+          <TitleRow items={trendingTV} type="tv" />
         </section>
+
+        {platformCollections.length > 0 ? (
+          <section>
+            <SectionHeader title={t.platformTitle} text={t.platformText} />
+            <PlatformRow items={platformCollections} />
+          </section>
+        ) : null}
 
         <section>
           <SectionHeader title={t.peopleTitle} text={t.peopleText} />
           <PeopleRow items={popularPeople} />
         </section>
 
-       <section>
-        <SectionHeader title={t.peekrTitle} text={t.peekrText} />
-        <PeekrRow items={trendingOnPeekr} showRating />
-      </section>
+        <section>
+          <SectionHeader title={t.peekrTitle} text={t.peekrText} />
+          <PeekrRow items={trendingOnPeekr} showRating />
+        </section>
 
         <section className="why-box">
           <SectionHeader title={t.whyTitle} />
