@@ -15,7 +15,7 @@ const BRAND = "#FA0082";
 
 type Lang = "en" | "es" | "pt";
 
-type PageProps = {
+ PageProps = {
   params: Promise<{
     id: string;
   }>;
@@ -33,8 +33,8 @@ type PersonCredit = {
   release_date?: string | null;
   first_air_date?: string | null;
   popularity?: number;
+  genre_ids?: number[];
 };
-
 type PersonResponse = {
   id: number;
   name: string;
@@ -55,6 +55,13 @@ type PersonResponse = {
       file_path: string;
     }[];
   };
+};
+
+type GenreListResponse = {
+  genres?: {
+    id: number;
+    name: string;
+  }[];
 };
 
 function normalizeLang(value?: string | null): Lang {
@@ -112,6 +119,33 @@ function dedupeCredits(items: PersonCredit[]) {
   return out;
 }
 
+function buildGenreMap(genres?: { id: number; name: string }[]) {
+  return new Map((genres ?? []).map((g) => [g.id, g.name.toLowerCase()]));
+}
+
+function isTalkLikeTVCredit(
+  credit: PersonCredit,
+  tvGenreMap: Map<number, string>
+) {
+  if (credit.media_type !== "tv") return false;
+
+  const names = (credit.genre_ids ?? [])
+    .map((id) => tvGenreMap.get(id) ?? "")
+    .filter(Boolean);
+
+  return names.some((name) =>
+    ["talk", "news", "reality", "soap"].includes(name)
+  );
+}
+
+function isRealSeriesCredit(
+  credit: PersonCredit,
+  tvGenreMap: Map<number, string>
+) {
+  if (credit.media_type !== "tv") return false;
+  return !isTalkLikeTVCredit(credit, tvGenreMap);
+}
+
 function sortCredits(items: PersonCredit[]) {
   return [...items].sort((a, b) => {
     const aDate = a.release_date || a.first_air_date || "";
@@ -120,8 +154,17 @@ function sortCredits(items: PersonCredit[]) {
   });
 }
 
-function pickKnownFor(cast: PersonCredit[], crew: PersonCredit[]) {
-  const merged = dedupeCredits([...cast, ...crew]);
+function pickKnownFor(
+  cast: PersonCredit[],
+  crew: PersonCredit[],
+  tvGenreMap: Map<number, string>
+) {
+  const merged = dedupeCredits([...cast, ...crew]).filter((credit) => {
+    if (credit.media_type === "movie") return true;
+    if (credit.media_type === "tv") return isRealSeriesCredit(credit, tvGenreMap);
+    return false;
+  });
+
   return [...merged]
     .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
     .slice(0, 12);
@@ -133,9 +176,27 @@ function pickMovies(cast: PersonCredit[], crew: PersonCredit[]) {
   ).slice(0, 18);
 }
 
-function pickTV(cast: PersonCredit[], crew: PersonCredit[]) {
+function pickTV(
+  cast: PersonCredit[],
+  crew: PersonCredit[],
+  tvGenreMap: Map<number, string>
+) {
   return sortCredits(
-    dedupeCredits([...cast, ...crew]).filter((c) => c.media_type === "tv")
+    dedupeCredits([...cast, ...crew]).filter((c) =>
+      isRealSeriesCredit(c, tvGenreMap)
+    )
+  ).slice(0, 18);
+}
+
+function pickAppearances(
+  cast: PersonCredit[],
+  crew: PersonCredit[],
+  tvGenreMap: Map<number, string>
+) {
+  return sortCredits(
+    dedupeCredits([...cast, ...crew]).filter((c) =>
+      isTalkLikeTVCredit(c, tvGenreMap)
+    )
   ).slice(0, 18);
 }
 
@@ -149,6 +210,18 @@ async function getActor(id: number, lang: Lang) {
 
   if (!res.ok) return null;
   return (await res.json()) as PersonResponse;
+}
+
+async function getTVGenres() {
+  const res = await fetch(
+    `${TMDB}/genre/tv/list?api_key=${TMDB_KEY}&language=en-US`,
+    { next: { revalidate: 3600 } }
+  );
+
+  if (!res.ok) return new Map<number, string>();
+
+  const json = (await res.json()) as GenreListResponse;
+  return buildGenreMap(json.genres);
 }
 
 function getStrings(lang: Lang) {
@@ -165,6 +238,7 @@ function getStrings(lang: Lang) {
       knownForDepartment: "Known for",
       aka: "Also known as",
       noBiography: "No biography available.",
+      appearances: "Talk shows & appearances",
     },
     es: {
       actorNotFound: "Persona no encontrada",
@@ -178,6 +252,7 @@ function getStrings(lang: Lang) {
       knownForDepartment: "Conocido por",
       aka: "También conocido como",
       noBiography: "No hay biografía disponible.",
+      appearances: "Talk shows y apariciones",
     },
     pt: {
       actorNotFound: "Pessoa não encontrada",
@@ -191,6 +266,7 @@ function getStrings(lang: Lang) {
       knownForDepartment: "Conhecido por",
       aka: "Também conhecido como",
       noBiography: "Sem biografia disponível.",
+      appearances: "Talk shows e aparições",
     },
   }[lang];
 }
@@ -264,23 +340,27 @@ export default async function ActorPage({ params }: PageProps) {
   const lang = await getLangFromCookie();
   const t = getStrings(lang);
 
-  const actor = await getActor(numericId, lang);
+ const [actor, tvGenreMap] = await Promise.all([
+  getActor(numericId, lang),
+  getTVGenres(),
+]);
 
-  if (!actor) {
-    notFound();
-  }
+if (!actor) {
+  notFound();
+}
 
-  const canonicalIdSlug = `${numericId}-${slugify(actor.name)}`;
-  if (id !== canonicalIdSlug) {
-    redirect(`/actor/${canonicalIdSlug}`);
-  }
+const canonicalIdSlug = `${numericId}-${slugify(actor.name)}`;
+if (id !== canonicalIdSlug) {
+  redirect(`/actor/${canonicalIdSlug}`);
+}
 
-  const cast = actor.combined_credits?.cast || [];
-  const crew = actor.combined_credits?.crew || [];
+const cast = actor.combined_credits?.cast || [];
+const crew = actor.combined_credits?.crew || [];
 
-  const knownFor = pickKnownFor(cast, crew);
-  const movies = pickMovies(cast, crew);
-  const tv = pickTV(cast, crew);
+const knownFor = pickKnownFor(cast, crew, tvGenreMap);
+const movies = pickMovies(cast, crew);
+const tv = pickTV(cast, crew, tvGenreMap);
+const appearances = pickAppearances(cast, crew, tvGenreMap);
 
   const heroImage =
     actor.images?.profiles?.[0]?.file_path || actor.profile_path || null;
@@ -667,6 +747,39 @@ export default async function ActorPage({ params }: PageProps) {
                         <div className="credit-fallback" />
                       )}
 
+                      <div className="credit-meta">
+                        <div className="credit-title">{title}</div>
+                        <div className="credit-sub">
+                          {getYear(item)}
+                          {item.character ? ` · ${item.character}` : item.job ? ` · ${item.job}` : ""}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+          {appearances.length > 0 ? (
+            <section className="section-block">
+              <h2 className="section-title">{t.appearances}</h2>
+              <div className="credit-row">
+                {appearances.map((item) => {
+                  const title = item.title || item.name || "Untitled";
+                  return (
+                    <Link key={`appearance-${item.id}`} href={titleHref(item)} className="credit-card">
+                      {item.poster_path ? (
+                        <Image
+                          src={`${POSTER}${item.poster_path}`}
+                          alt={title}
+                          width={168}
+                          height={252}
+                          className="credit-image"
+                        />
+                      ) : (
+                        <div className="credit-fallback" />
+                      )}
+          
                       <div className="credit-meta">
                         <div className="credit-title">{title}</div>
                         <div className="credit-sub">
