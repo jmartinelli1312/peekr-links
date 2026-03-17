@@ -10,7 +10,7 @@ const TMDB_KEY = process.env.TMDB_API_KEY!;
 const SITE = "https://www.peekr.app";
 const PROFILE = "https://image.tmdb.org/t/p/w500";
 const POSTER = "https://image.tmdb.org/t/p/w342";
-const BACKDROP = "https://image.tmdb.org/t/p/original";
+const BACKDROP = "https://image.tmdb.org/t/p/w1280";
 const BRAND = "#FA0082";
 
 type Lang = "en" | "es" | "pt";
@@ -341,27 +341,27 @@ export default async function ActorPage({ params }: PageProps) {
   const lang = await getLangFromCookie();
   const t = getStrings(lang);
 
- const [actor, tvGenreMap] = await Promise.all([
-  getActor(numericId, lang),
-  getTVGenres(),
-]);
+  const [actor, tvGenreMap] = await Promise.all([
+    getActor(numericId, lang),
+    getTVGenres(),
+  ]);
 
-if (!actor) {
-  notFound();
-}
+  if (!actor) {
+    notFound();
+  }
 
-const canonicalIdSlug = `${numericId}-${slugify(actor.name)}`;
-if (id !== canonicalIdSlug) {
-  redirect(`/actor/${canonicalIdSlug}`);
-}
+  const canonicalIdSlug = `${numericId}-${slugify(actor.name)}`;
+  if (id !== canonicalIdSlug) {
+    redirect(`/actor/${canonicalIdSlug}`);
+  }
 
-const cast = actor.combined_credits?.cast || [];
-const crew = actor.combined_credits?.crew || [];
+  const cast = actor.combined_credits?.cast || [];
+  const crew = actor.combined_credits?.crew || [];
 
-const knownFor = pickKnownFor(cast, crew, tvGenreMap);
-const movies = pickMovies(cast, crew);
-const tv = pickTV(cast, crew, tvGenreMap);
-const appearances = pickAppearances(cast, crew, tvGenreMap);
+  const knownFor = pickKnownFor(cast, crew, tvGenreMap);
+  const movies = pickMovies(cast, crew);
+  const tv = pickTV(cast, crew, tvGenreMap);
+  const appearances = pickAppearances(cast, crew, tvGenreMap);
 
   const heroImage =
     actor.images?.profiles?.[0]?.file_path || actor.profile_path || null;
@@ -587,6 +587,8 @@ const appearances = pickAppearances(cast, crew, tvGenreMap);
               alt={actor.name}
               fill
               priority
+              unoptimized
+              sizes="100vw"
               style={{ objectFit: "cover", opacity: 0.3 }}
             />
           ) : null}
@@ -603,6 +605,7 @@ const appearances = pickAppearances(cast, crew, tvGenreMap);
                   width={220}
                   height={293}
                   className="actor-poster"
+                  unoptimized
                 />
               ) : (
                 <div className="actor-poster" />
@@ -675,6 +678,7 @@ const appearances = pickAppearances(cast, crew, tvGenreMap);
                           width={168}
                           height={252}
                           className="credit-image"
+                          unoptimized
                         />
                       ) : (
                         <div className="credit-fallback" />
@@ -709,6 +713,7 @@ const appearances = pickAppearances(cast, crew, tvGenreMap);
                           width={168}
                           height={252}
                           className="credit-image"
+                          unoptimized
                         />
                       ) : (
                         <div className="credit-fallback" />
@@ -743,6 +748,7 @@ const appearances = pickAppearances(cast, crew, tvGenreMap);
                           width={168}
                           height={252}
                           className="credit-image"
+                          unoptimized
                         />
                       ) : (
                         <div className="credit-fallback" />
@@ -761,6 +767,7 @@ const appearances = pickAppearances(cast, crew, tvGenreMap);
               </div>
             </section>
           ) : null}
+
           {appearances.length > 0 ? (
             <section className="section-block">
               <h2 className="section-title">{t.appearances}</h2>
@@ -776,11 +783,12 @@ const appearances = pickAppearances(cast, crew, tvGenreMap);
                           width={168}
                           height={252}
                           className="credit-image"
+                          unoptimized
                         />
                       ) : (
                         <div className="credit-fallback" />
                       )}
-          
+
                       <div className="credit-meta">
                         <div className="credit-title">{title}</div>
                         <div className="credit-sub">
