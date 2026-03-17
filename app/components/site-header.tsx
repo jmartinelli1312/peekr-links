@@ -470,7 +470,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
             <Link href="/activity" className="peekr-link" onClick={closeAllMenus}>
               {t.activity}
             </Link>
-            <Link href="/peekrbuzz" className="peekr-link"onClick={closeAllMenus}>
+            <Link href="/buzz" className="peekr-link"onClick={closeAllMenus}>
               {t.peekrbuzz}
             </Link>
           </nav>
@@ -589,7 +589,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
                 <Link href="/activity" className="peekr-mobile-item">
                   {t.activity}
                 </Link>
-                <Link href="/peekrbuzz" className="peekr-mobile-item">
+                <Link href="/buzz" className="peekr-mobile-item">
                   {t.peekrbuzz}
                 </Link>
 
