@@ -1,4 +1,4 @@
-   "use client";
+ "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -24,6 +24,8 @@ type DashboardMetrics = {
   totalPeeklists: number;
   publishedBuzz: number;
   onboardingCompleted: number;
+  totalEditorialCollections: number;
+  publishedEditorialCollections: number;
 };
 
 type RecentUser = {
@@ -34,10 +36,17 @@ type RecentUser = {
 };
 
 type RecentRating = {
-  id: number;
+  id: number | string;
   user_id: string;
   tmdb_id: number;
   rating: number;
+  created_at?: string | null;
+};
+
+type RecentWatchlist = {
+  id: number | string;
+  user_id: string;
+  tmdb_id: number;
   created_at?: string | null;
 };
 
@@ -107,16 +116,34 @@ export default function AdminPage() {
     totalPeeklists: 0,
     publishedBuzz: 0,
     onboardingCompleted: 0,
+    totalEditorialCollections: 0,
+    publishedEditorialCollections: 0,
   });
 
   const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
   const [recentRatings, setRecentRatings] = useState<RecentRating[]>([]);
+  const [recentWatchlist, setRecentWatchlist] = useState<RecentWatchlist[]>([]);
   const [recentBuzz, setRecentBuzz] = useState<RecentBuzz[]>([]);
 
   const onboardingRate = useMemo(() => {
     if (!metrics.totalUsers) return 0;
     return (metrics.onboardingCompleted / metrics.totalUsers) * 100;
   }, [metrics.onboardingCompleted, metrics.totalUsers]);
+
+  const dauRate = useMemo(() => {
+    if (!metrics.totalUsers) return 0;
+    return (metrics.dau / metrics.totalUsers) * 100;
+  }, [metrics.dau, metrics.totalUsers]);
+
+  const wauRate = useMemo(() => {
+    if (!metrics.totalUsers) return 0;
+    return (metrics.wau / metrics.totalUsers) * 100;
+  }, [metrics.wau, metrics.totalUsers]);
+
+  const mauRate = useMemo(() => {
+    if (!metrics.totalUsers) return 0;
+    return (metrics.mau / metrics.totalUsers) * 100;
+  }, [metrics.mau, metrics.totalUsers]);
 
   useEffect(() => {
     let mounted = true;
@@ -149,11 +176,14 @@ export default function AdminPage() {
 
           totalPeeklistsRes,
           publishedBuzzRes,
+          totalEditorialCollectionsRes,
+          publishedEditorialCollectionsRes,
 
-          activityFeed30dRes,
+          activity30dRes,
 
           recentUsersRes,
           recentRatingsRes,
+          recentWatchlistRes,
           recentBuzzRes,
         ] = await Promise.all([
           supabase.auth.getUser(),
@@ -180,22 +210,28 @@ export default function AdminPage() {
             .select("*", { count: "exact", head: true })
             .eq("has_completed_onboarding", true),
 
-          supabase.from("ratings").select("*", { count: "exact", head: true }),
+          supabase
+            .from("user_title_activities")
+            .select("*", { count: "exact", head: true })
+            .not("rating", "is", null),
 
           supabase
-            .from("ratings")
+            .from("user_title_activities")
             .select("*", { count: "exact", head: true })
-            .gte("created_at", todayIso),
+            .not("rating", "is", null)
+            .gte("watched_at", todayIso),
 
           supabase
-            .from("ratings")
+            .from("user_title_activities")
             .select("*", { count: "exact", head: true })
-            .gte("created_at", sevenIso),
+            .not("rating", "is", null)
+            .gte("watched_at", sevenIso),
 
           supabase
-            .from("ratings")
+            .from("user_title_activities")
             .select("*", { count: "exact", head: true })
-            .gte("created_at", thirtyIso),
+            .not("rating", "is", null)
+            .gte("watched_at", thirtyIso),
 
           supabase
             .from("watchlist")
@@ -219,10 +255,19 @@ export default function AdminPage() {
             .select("*", { count: "exact", head: true })
             .eq("is_published", true),
 
-         supabase
-           .from("activity_feed")
-           .select("actor_id, created_at")
-           .gte("created_at", thirtyIso),
+          supabase
+            .from("editorial_collections")
+            .select("*", { count: "exact", head: true }),
+
+          supabase
+            .from("editorial_collections")
+            .select("*", { count: "exact", head: true })
+            .eq("is_published", true),
+
+          supabase
+            .from("user_title_activities")
+            .select("user_id, watched_at")
+            .gte("watched_at", thirtyIso),
 
           supabase
             .from("profiles")
@@ -231,8 +276,15 @@ export default function AdminPage() {
             .limit(8),
 
           supabase
-            .from("ratings")
-            .select("id, user_id, tmdb_id, rating, created_at")
+            .from("user_title_activities")
+            .select("id, user_id, tmdb_id, rating, watched_at")
+            .not("rating", "is", null)
+            .order("watched_at", { ascending: false })
+            .limit(8),
+
+          supabase
+            .from("watchlist")
+            .select("id, user_id, tmdb_id, created_at")
             .order("created_at", { ascending: false })
             .limit(8),
 
@@ -272,11 +324,42 @@ export default function AdminPage() {
           return;
         }
 
-      const activityRows =
-        (activityFeed30dRes.data as Array<{
-          actor_id: string;
-          created_at?: string | null;
-        }> | null) ?? [];
+        const queryErrors = [
+          totalUsersRes.error,
+          newUsersTodayRes.error,
+          newUsers7dRes.error,
+          newUsers30dRes.error,
+          onboardingCompletedRes.error,
+          totalRatingsRes.error,
+          ratingsTodayRes.error,
+          ratings7dRes.error,
+          ratings30dRes.error,
+          watchlistTodayRes.error,
+          watchlist7dRes.error,
+          watchlist30dRes.error,
+          totalPeeklistsRes.error,
+          publishedBuzzRes.error,
+          totalEditorialCollectionsRes.error,
+          publishedEditorialCollectionsRes.error,
+          activity30dRes.error,
+          recentUsersRes.error,
+          recentRatingsRes.error,
+          recentWatchlistRes.error,
+          recentBuzzRes.error,
+        ]
+          .filter(Boolean)
+          .map((e: any) => e.message)
+          .join(" · ");
+
+        if (queryErrors) {
+          setError(queryErrors);
+        }
+
+        const activityRows =
+          (activity30dRes.data as Array<{
+            user_id: string;
+            watched_at?: string | null;
+          }> | null) ?? [];
 
         const dauSet = new Set<string>();
         const wauSet = new Set<string>();
@@ -287,15 +370,15 @@ export default function AdminPage() {
         const sevenDayMs = 7 * 24 * 60 * 60 * 1000;
         const thirtyDayMs = 30 * 24 * 60 * 60 * 1000;
 
-       for (const row of activityRows) {
-        if (!row.actor_id || !row.created_at) continue;
-        const ts = new Date(row.created_at).getTime();
-        const diff = now - ts;
-      
-        if (diff <= oneDayMs) dauSet.add(row.actor_id);
-        if (diff <= sevenDayMs) wauSet.add(row.actor_id);
-        if (diff <= thirtyDayMs) mauSet.add(row.actor_id);
-      }
+        for (const row of activityRows) {
+          if (!row.user_id || !row.watched_at) continue;
+          const ts = new Date(row.watched_at).getTime();
+          const diff = now - ts;
+
+          if (diff <= oneDayMs) dauSet.add(row.user_id);
+          if (diff <= sevenDayMs) wauSet.add(row.user_id);
+          if (diff <= thirtyDayMs) mauSet.add(row.user_id);
+        }
 
         setMetrics({
           totalUsers: totalUsersRes.count ?? 0,
@@ -315,10 +398,33 @@ export default function AdminPage() {
           totalPeeklists: totalPeeklistsRes.count ?? 0,
           publishedBuzz: publishedBuzzRes.count ?? 0,
           onboardingCompleted: onboardingCompletedRes.count ?? 0,
+          totalEditorialCollections: totalEditorialCollectionsRes.count ?? 0,
+          publishedEditorialCollections: publishedEditorialCollectionsRes.count ?? 0,
         });
 
         setRecentUsers((recentUsersRes.data as RecentUser[] | null) ?? []);
-        setRecentRatings((recentRatingsRes.data as RecentRating[] | null) ?? []);
+
+        const mappedRecentRatings =
+          ((recentRatingsRes.data as Array<{
+            id: number | string;
+            user_id: string;
+            tmdb_id: number;
+            rating: number;
+            watched_at?: string | null;
+          }> | null) ?? []).map((item) => ({
+            id: item.id,
+            user_id: item.user_id,
+            tmdb_id: item.tmdb_id,
+            rating: item.rating,
+            created_at: item.watched_at ?? null,
+          })) ?? [];
+
+        setRecentRatings(mappedRecentRatings);
+
+        setRecentWatchlist(
+          (recentWatchlistRes.data as RecentWatchlist[] | null) ?? []
+        );
+
         setRecentBuzz((recentBuzzRes.data as RecentBuzz[] | null) ?? []);
 
         setState("authorized");
@@ -549,7 +655,7 @@ export default function AdminPage() {
           }
 
           .tables {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
           }
         }
       `}</style>
@@ -578,19 +684,25 @@ export default function AdminPage() {
               <div className="card">
                 <div className="card-label">DAU</div>
                 <div className="card-value">{formatNumber(metrics.dau)}</div>
-                <div className="card-sub">Usuarios activos últimas 24h</div>
+                <div className="card-sub">
+                  Usuarios activos últimas 24h · {formatPct(dauRate)} of users
+                </div>
               </div>
 
               <div className="card">
                 <div className="card-label">WAU</div>
                 <div className="card-value">{formatNumber(metrics.wau)}</div>
-                <div className="card-sub">Usuarios activos últimos 7 días</div>
+                <div className="card-sub">
+                  Usuarios activos últimos 7 días · {formatPct(wauRate)} of users
+                </div>
               </div>
 
               <div className="card">
                 <div className="card-label">MAU</div>
                 <div className="card-value">{formatNumber(metrics.mau)}</div>
-                <div className="card-sub">Usuarios activos últimos 30 días</div>
+                <div className="card-sub">
+                  Usuarios activos últimos 30 días · {formatPct(mauRate)} of users
+                </div>
               </div>
 
               <div className="card">
@@ -664,20 +776,28 @@ export default function AdminPage() {
                     <div className="mini-name">Published PeekrBuzz</div>
                     <div className="mini-value">{formatNumber(metrics.publishedBuzz)}</div>
                   </div>
+                  <div className="mini-metric">
+                    <div className="mini-name">Editorial collections</div>
+                    <div className="mini-value">{formatNumber(metrics.totalEditorialCollections)}</div>
+                  </div>
+                  <div className="mini-metric">
+                    <div className="mini-name">Published editorial</div>
+                    <div className="mini-value">{formatNumber(metrics.publishedEditorialCollections)}</div>
+                  </div>
                 </div>
 
                 <div className="card">
                   <div className="mini-metric">
-                    <div className="mini-name">DAU / MAU</div>
-                    <div className="mini-value">
-                      {metrics.mau ? formatPct((metrics.dau / metrics.mau) * 100) : "0.0%"}
-                    </div>
+                    <div className="mini-name">DAU / Users</div>
+                    <div className="mini-value">{formatPct(dauRate)}</div>
                   </div>
                   <div className="mini-metric">
-                    <div className="mini-name">WAU / MAU</div>
-                    <div className="mini-value">
-                      {metrics.mau ? formatPct((metrics.wau / metrics.mau) * 100) : "0.0%"}
-                    </div>
+                    <div className="mini-name">WAU / Users</div>
+                    <div className="mini-value">{formatPct(wauRate)}</div>
+                  </div>
+                  <div className="mini-metric">
+                    <div className="mini-name">MAU / Users</div>
+                    <div className="mini-value">{formatPct(mauRate)}</div>
                   </div>
                 </div>
 
@@ -699,7 +819,7 @@ export default function AdminPage() {
 
               <div className="tables">
                 <div className="table-card">
-                  <h3>Recent users</h3>
+                  <h3>Recent signups</h3>
                   {recentUsers.map((item) => (
                     <div key={item.id} className="row">
                       <div className="row-left">
@@ -725,6 +845,19 @@ export default function AdminPage() {
                         ⭐ {item.rating}
                         <div className="row-sub">{formatDate(item.created_at)}</div>
                       </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="table-card">
+                  <h3>Recent watchlist adds</h3>
+                  {recentWatchlist.map((item) => (
+                    <div key={item.id} className="row">
+                      <div className="row-left">
+                        <div className="row-title">TMDB {item.tmdb_id}</div>
+                        <div className="row-sub">user {item.user_id.slice(0, 8)}</div>
+                      </div>
+                      <div className="row-right">{formatDate(item.created_at)}</div>
                     </div>
                   ))}
                 </div>
