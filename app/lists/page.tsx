@@ -34,12 +34,6 @@ type EditorialCollection = {
   item_count?: number | null;
 };
 
-type EditorialCollectionItem = {
-  tmdb_id: number;
-  media_type: string;
-  position: number;
-};
-
 function normalizeLang(value?: string | null): Lang {
   const raw = (value || "en").toLowerCase();
   if (raw.startsWith("es")) return "es";
@@ -131,28 +125,48 @@ async function getUserCreatedPeeklists() {
   return dedupePeeklists((data as PeeklistItem[] | null) ?? []);
 }
 
-async function getEditorialCollectionsByCategory(
-  category: string,
+async function getCollectionsForCategories(
+  categories: string[],
   lang: Lang,
   limit = 12
 ) {
   const { data } = await supabase
     .from("editorial_collections")
     .select(
-      "slug,title_en,title_es,title_pt,description_en,description_es,description_pt,cover_url,category,is_published,sort_order, item_count"
+      "slug,title_en,title_es,title_pt,description_en,description_es,description_pt,cover_url,category,is_published,sort_order,item_count"
     )
     .eq("is_published", true)
-    .eq("category", category)
+    .in("category", categories)
     .order("sort_order", { ascending: true })
     .limit(limit);
 
- const rows = ((data as EditorialCollection[] | null) ?? []).filter(
-  (item) => (item.item_count ?? 0) > 0
-);
+  const rows = ((data as EditorialCollection[] | null) ?? []).filter(
+    (item) => (item.item_count ?? 0) > 0
+  );
 
-return await Promise.all(
-  rows.map((item) => collectionToPeeklistItem(item, lang))
-);
+  return await Promise.all(rows.map((item) => collectionToPeeklistItem(item, lang)));
+}
+
+async function getCollectionsForSourceType(
+  sourceTypes: string[],
+  lang: Lang,
+  limit = 12
+) {
+  const { data } = await supabase
+    .from("editorial_collections")
+    .select(
+      "slug,title_en,title_es,title_pt,description_en,description_es,description_pt,cover_url,category,is_published,sort_order,item_count"
+    )
+    .eq("is_published", true)
+    .in("source_type", sourceTypes)
+    .order("sort_order", { ascending: true })
+    .limit(limit);
+
+  const rows = ((data as EditorialCollection[] | null) ?? []).filter(
+    (item) => (item.item_count ?? 0) > 0
+  );
+
+  return await Promise.all(rows.map((item) => collectionToPeeklistItem(item, lang)));
 }
 
 function SectionHeader({
@@ -208,14 +222,14 @@ export async function generateMetadata() {
   return {
     title: "Peeklists | Peekr",
     description:
-      "Discover Peeklists created by users and editorial collections across movies and series on Peekr.",
+      "Discover Peeklists created by users and curated collections across movies and series on Peekr.",
     alternates: {
       canonical: "https://www.peekr.app/lists",
     },
     openGraph: {
       title: "Peeklists | Peekr",
       description:
-        "Discover Peeklists created by users and editorial collections across movies and series on Peekr.",
+        "Discover Peeklists created by users and curated collections across movies and series on Peekr.",
       url: "https://www.peekr.app/lists",
       siteName: "Peekr",
       type: "website",
@@ -224,7 +238,7 @@ export async function generateMetadata() {
       card: "summary_large_image",
       title: "Peeklists | Peekr",
       description:
-        "Discover Peeklists created by users and editorial collections across movies and series on Peekr.",
+        "Discover Peeklists created by users and curated collections across movies and series on Peekr.",
     },
   };
 }
@@ -237,76 +251,79 @@ export default async function ListsPage() {
     en: {
       title: "Peeklists",
       subtitle:
-        "Discover curated collections created by the community and editorial collections built for discovery.",
+        "Discover public Peeklists, award winners, curated collections and what is trending right now.",
       usersTitle: "Created by users",
       usersText: "Public Peeklists created by the Peekr community.",
       awardsTitle: "Award winners",
       awardsText:
         "Collections built around Oscar winners and other award-season discoveries.",
-      editorialTitle: "Editorial collections",
-      editorialText:
-        "Curated categories and search-friendly collections to power discovery across the web.",
-      trendingTitle: "Trending now",
-      trendingText:
-        "Collections generated from what is trending right now across movies and TV.",
+      curatedTitle: "Curated collections",
+      curatedText:
+        "Manually curated collections built for discovery, taste.",
       regionalTitle: "Regional picks",
       regionalText:
         "Collections tailored to local taste and regional discovery.",
+      trendingTitle: "Trending now",
+      trendingText:
+        "Collections generated from what is trending right now in movies and series.",
     },
     es: {
       title: "Peeklists",
       subtitle:
-        "Descubre colecciones curadas creadas por la comunidad y colecciones editoriales pensadas para discovery.",
+        "Descubre Peeklists públicas, ganadores de premios, listas curadas y lo que está en tendencia ahora.",
       usersTitle: "Creadas por usuarios",
       usersText: "Peeklists públicas creadas por la comunidad de Peekr.",
       awardsTitle: "Ganadores de premios",
       awardsText:
         "Colecciones armadas alrededor de los ganadores del Oscar y otros premios.",
-      editorialTitle: "Colecciones editoriales",
-      editorialText:
-        "Categorías curadas y colecciones pensadas para potenciar discovery en la web.",
-      trendingTitle: "En tendencia ahora",
-      trendingText:
-      "Colecciones generadas a partir de lo que está en tendencia ahora mismo en películas y series.",
+      curatedTitle: "Listas curadas",
+      curatedText:
+        "Colecciones curadas manualmente para discovery, gusto.",
       regionalTitle: "Selecciones regionales",
       regionalText:
         "Colecciones adaptadas al gusto local y al discovery regional.",
+      trendingTitle: "En tendencia ahora",
+      trendingText:
+        "Colecciones generadas a partir de lo que está en tendencia ahora mismo en películas y series.",
     },
     pt: {
       title: "Peeklists",
       subtitle:
-        "Descubra coleções curadas criadas pela comunidade e coleções editoriais pensadas para discovery.",
+        "Descubra Peeklists públicas, vencedores de prêmios, listas curadas e o que está em alta agora.",
       usersTitle: "Criadas por usuários",
       usersText: "Peeklists públicas criadas pela comunidade do Peekr.",
       awardsTitle: "Vencedores de prêmios",
       awardsText:
         "Coleções construídas em torno dos vencedores do Oscar e de outras premiações.",
-      editorialTitle: "Coleções editoriais",
-      editorialText:
-        "Categorias curadas e coleções pensadas para impulsionar discovery na web.",
-      trendingTitle: "Em alta agora",
-      trendingText:
-        "Coleções geradas a partir do que está em alta agora em filmes e séries.",
+      curatedTitle: "Listas curadas",
+      curatedText:
+        "Coleções curadas manualmente para discovery, gosto.",
       regionalTitle: "Seleções regionais",
       regionalText:
         "Coleções adaptadas ao gosto local e à descoberta regional.",
+      trendingTitle: "Em alta agora",
+      trendingText:
+        "Coleções geradas a partir do que está em alta agora em filmes e séries.",
     },
   }[lang];
 
-const [
-  userPeeklists,
-  awardCollections,
-  editorialCollections,
-  trendingCollections,
-  regionalCollections,
-] = await Promise.all([
-  getUserCreatedPeeklists(),
-  getEditorialCollectionsByCategory("awards", lang, 12),
-  getEditorialCollectionsByCategory("genre", lang, 12),
-  getEditorialCollectionsByCategory("trend_driven", lang, 12),
-  getEditorialCollectionsByCategory("regional", lang, 12),
-  
-]);
+  const [
+    userPeeklists,
+    awardCollections,
+    curatedCollections,
+    regionalCollections,
+    trendingCollections,
+  ] = await Promise.all([
+    getUserCreatedPeeklists(),
+    getCollectionsForCategories(["awards"], lang, 12),
+    getCollectionsForSourceType(
+      ["editorial", "search_opportunity"],
+      lang,
+      12
+    ),
+    getCollectionsForCategories(["regional"], lang, 12),
+    getCollectionsForSourceType(["trend_driven"], lang, 12),
+  ]);
 
   return (
     <>
@@ -431,10 +448,17 @@ const [
           </section>
         ) : null}
 
-        {editorialCollections.length > 0 ? (
+        {curatedCollections.length > 0 ? (
           <section>
-            <SectionHeader title={t.editorialTitle} text={t.editorialText} />
-            <PeeklistsRow items={editorialCollections} hrefPrefix="/lists" />
+            <SectionHeader title={t.curatedTitle} text={t.curatedText} />
+            <PeeklistsRow items={curatedCollections} hrefPrefix="/lists" />
+          </section>
+        ) : null}
+
+        {regionalCollections.length > 0 ? (
+          <section>
+            <SectionHeader title={t.regionalTitle} text={t.regionalText} />
+            <PeeklistsRow items={regionalCollections} hrefPrefix="/lists" />
           </section>
         ) : null}
 
@@ -442,13 +466,6 @@ const [
           <section>
             <SectionHeader title={t.trendingTitle} text={t.trendingText} />
             <PeeklistsRow items={trendingCollections} hrefPrefix="/lists" />
-          </section>
-        ) : null}
-                
-        {regionalCollections.length > 0 ? (
-          <section>
-            <SectionHeader title={t.regionalTitle} text={t.regionalText} />
-            <PeeklistsRow items={regionalCollections} hrefPrefix="/lists" />
           </section>
         ) : null}
       </div>
