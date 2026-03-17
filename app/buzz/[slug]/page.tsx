@@ -122,7 +122,52 @@ function categoryLabel(category?: string | null, lang: Lang = "en") {
 
   return map[(category as keyof typeof map) || "movies"] || category || "";
 }
+function extractQuotedTitles(text: string) {
+  const matches = [
+    ...text.matchAll(/[“"‘']([^“”"'‘’]{2,80})[”"’']/g),
+  ].map((m) => m[1]?.trim()).filter(Boolean);
 
+  return Array.from(new Set(matches));
+}
+
+function extractNameCandidates(text: string) {
+  const matches = [
+    ...text.matchAll(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b/g),
+  ]
+    .map((m) => m[1]?.trim())
+    .filter(Boolean)
+    .filter((name) => {
+      const blocked = [
+        "Amazon MGM",
+        "The Studio",
+        "The Hollywood Reporter",
+        "Prime Video",
+        "Disney Plus",
+        "White Lotus",
+      ];
+      return !blocked.includes(name!);
+    });
+
+  return Array.from(new Set(matches)).slice(0, 8);
+}
+
+function buildRelatedQueries(article: BuzzArticle) {
+  const baseText = `${article.title} ${article.summary ?? ""}`;
+
+  const quotedTitles = extractQuotedTitles(baseText);
+  const names = extractNameCandidates(baseText);
+
+  const queries: string[] = [];
+
+  for (const q of quotedTitles) queries.push(q);
+  for (const q of names) queries.push(q);
+
+  if (queries.length === 0) {
+    queries.push(article.title);
+  }
+
+  return Array.from(new Set(queries)).slice(0, 6);
+}
 async function fetchTMDB<T>(url: string): Promise<T | null> {
   try {
     const res = await fetch(url, { next: { revalidate: 3600 } });
@@ -147,64 +192,81 @@ async function getArticle(slug: string) {
 }
 
 async function getRelatedContent(article: BuzzArticle, lang: Lang) {
-  const query = article.title;
   const apiLang = tmdbLanguage(lang);
+  const queries = buildRelatedQueries(article);
 
-  const [movieSearch, tvSearch, personSearch] = await Promise.all([
-    fetchTMDB<{
-      results?: Array<{
-        id: number;
-        title?: string;
-        poster_path?: string | null;
-      }>;
-    }>(
-      `${TMDB_BASE}/search/movie?api_key=${TMDB_KEY}&language=${apiLang}&query=${encodeURIComponent(query)}`
-    ),
-    fetchTMDB<{
-      results?: Array<{
-        id: number;
-        name?: string;
-        poster_path?: string | null;
-      }>;
-    }>(
-      `${TMDB_BASE}/search/tv?api_key=${TMDB_KEY}&language=${apiLang}&query=${encodeURIComponent(query)}`
-    ),
-    fetchTMDB<{
-      results?: Array<{
-        id: number;
-        name?: string;
-        profile_path?: string | null;
-      }>;
-    }>(
-      `${TMDB_BASE}/search/person?api_key=${TMDB_KEY}&language=${apiLang}&query=${encodeURIComponent(query)}`
-    ),
-  ]);
+  const titleMap = new Map<string, RelatedTitle>();
+  const peopleMap = new Map<string, RelatedPerson>();
 
-  const titles: RelatedTitle[] = [
-    ...((movieSearch?.results ?? []).slice(0, 4).map((item) => ({
-      id: item.id,
-      media_type: "movie" as const,
-      title: item.title || "Untitled",
-      image_url: item.poster_path ? `${POSTER}${item.poster_path}` : null,
-    })) ?? []),
-    ...((tvSearch?.results ?? []).slice(0, 4).map((item) => ({
-      id: item.id,
-      media_type: "tv" as const,
-      title: item.name || "Untitled",
-      image_url: item.poster_path ? `${POSTER}${item.poster_path}` : null,
-    })) ?? []),
-  ].slice(0, 8);
+  for (const query of queries) {
+    const [movieSearch, tvSearch, personSearch] = await Promise.all([
+      fetchTMDB<{
+        results?: Array<{
+          id: number;
+          title?: string;
+          poster_path?: string | null;
+        }>;
+      }>(
+        `${TMDB_BASE}/search/movie?api_key=${TMDB_KEY}&language=${apiLang}&query=${encodeURIComponent(query)}`
+      ),
+      fetchTMDB<{
+        results?: Array<{
+          id: number;
+          name?: string;
+          poster_path?: string | null;
+        }>;
+      }>(
+        `${TMDB_BASE}/search/tv?api_key=${TMDB_KEY}&language=${apiLang}&query=${encodeURIComponent(query)}`
+      ),
+      fetchTMDB<{
+        results?: Array<{
+          id: number;
+          name?: string;
+          profile_path?: string | null;
+        }>;
+      }>(
+        `${TMDB_BASE}/search/person?api_key=${TMDB_KEY}&language=${apiLang}&query=${encodeURIComponent(query)}`
+      ),
+    ]);
 
-  const people: RelatedPerson[] =
-    (personSearch?.results ?? []).slice(0, 8).map((item) => ({
-      id: item.id,
-      name: item.name || "Unknown",
-      image_url: item.profile_path ? `${PROFILE}${item.profile_path}` : null,
-    }));
+    for (const item of (movieSearch?.results ?? []).slice(0, 2)) {
+      const key = `movie-${item.id}`;
+      if (titleMap.has(key)) continue;
+      titleMap.set(key, {
+        id: item.id,
+        media_type: "movie",
+        title: item.title || "Untitled",
+        image_url: item.poster_path ? `${POSTER}${item.poster_path}` : null,
+      });
+    }
 
-  return { titles, people };
+    for (const item of (tvSearch?.results ?? []).slice(0, 2)) {
+      const key = `tv-${item.id}`;
+      if (titleMap.has(key)) continue;
+      titleMap.set(key, {
+        id: item.id,
+        media_type: "tv",
+        title: item.name || "Untitled",
+        image_url: item.poster_path ? `${POSTER}${item.poster_path}` : null,
+      });
+    }
+
+    for (const item of (personSearch?.results ?? []).slice(0, 2)) {
+      const key = `person-${item.id}`;
+      if (peopleMap.has(key)) continue;
+      peopleMap.set(key, {
+        id: item.id,
+        name: item.name || "Unknown",
+        image_url: item.profile_path ? `${PROFILE}${item.profile_path}` : null,
+      });
+    }
+  }
+
+  return {
+    titles: Array.from(titleMap.values()).slice(0, 8),
+    people: Array.from(peopleMap.values()).slice(0, 8),
+  };
 }
-
 function titleHref(item: RelatedTitle) {
   return `/title/${item.media_type}/${item.id}-${slugify(item.title)}`;
 }
