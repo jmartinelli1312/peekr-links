@@ -223,14 +223,14 @@ export async function generateMetadata() {
   return {
     title: "Peeklists | Peekr",
     description:
-      "Discover public Peeklists, award winners, curated collections and what is trending right now on Peekr.",
+      "Discover public Peeklists, award winners, curated collections, streaming picks and what is trending right now on Peekr.",
     alternates: {
       canonical: "https://www.peekr.app/lists",
     },
     openGraph: {
       title: "Peeklists | Peekr",
       description:
-        "Discover public Peeklists, award winners, curated collections and what is trending right now on Peekr.",
+        "Discover public Peeklists, award winners, curated collections, streaming picks and what is trending right now on Peekr.",
       url: "https://www.peekr.app/lists",
       siteName: "Peekr",
       type: "website",
@@ -239,7 +239,7 @@ export async function generateMetadata() {
       card: "summary_large_image",
       title: "Peeklists | Peekr",
       description:
-        "Discover public Peeklists, award winners, curated collections and what is trending right now on Peekr.",
+        "Discover public Peeklists, award winners, curated collections, streaming picks and what is trending right now on Peekr.",
     },
   };
 }
@@ -252,7 +252,7 @@ export default async function ListsPage() {
     en: {
       title: "Peeklists",
       subtitle:
-        "Discover public Peeklists, award winners, curated collections and what is trending right now.",
+        "Discover public Peeklists, award winners, curated collections, streaming picks and what is trending right now.",
       usersTitle: "Created by users",
       usersText: "Public Peeklists created by the Peekr community.",
       awardsTitle: "Award winners",
@@ -260,10 +260,16 @@ export default async function ListsPage() {
         "Collections built around Oscar winners and other award-season discoveries.",
       curatedTitle: "Curated collections",
       curatedText:
-        "Manually curated collections built for discovery, and good taste.",
+        "Manually curated collections built for discovery, and taste.",
       regionalTitle: "Regional picks",
       regionalText:
         "Collections tailored to local taste and regional discovery.",
+      platformTitle: "By platform",
+      platformText:
+        "Recent releases and discovery lists grouped by streaming platform.",
+      peopleTitle: "Popular people",
+      peopleText:
+        "Discover actors and directors that are trending right now.",
       trendingTitle: "Trending now",
       trendingText:
         "Collections generated from what is trending right now in movies and series.",
@@ -271,7 +277,7 @@ export default async function ListsPage() {
     es: {
       title: "Peeklists",
       subtitle:
-        "Descubre Peeklists públicas, ganadores de premios, listas curadas y lo que está en tendencia ahora.",
+        "Descubre Peeklists públicas, ganadores de premios, listas curadas, picks por plataforma y lo que está en tendencia ahora.",
       usersTitle: "Creadas por usuarios",
       usersText: "Peeklists públicas creadas por la comunidad de Peekr.",
       awardsTitle: "Ganadores de premios",
@@ -279,10 +285,16 @@ export default async function ListsPage() {
         "Colecciones armadas alrededor de los ganadores del Oscar y otros premios.",
       curatedTitle: "Listas curadas",
       curatedText:
-        "Colecciones curadas manualmente para discovery, y buen gusto.",
+        "Colecciones curadas manualmente para discovery, y gusto.",
       regionalTitle: "Selecciones regionales",
       regionalText:
         "Colecciones adaptadas al gusto local y al discovery regional.",
+      platformTitle: "Por plataforma",
+      platformText:
+        "Estrenos recientes y listas de descubrimiento agrupadas por plataforma.",
+      peopleTitle: "Personas populares",
+      peopleText:
+        "Descubre actores y directores que están en tendencia ahora mismo.",
       trendingTitle: "En tendencia ahora",
       trendingText:
         "Colecciones generadas a partir de lo que está en tendencia ahora mismo en películas y series.",
@@ -290,7 +302,7 @@ export default async function ListsPage() {
     pt: {
       title: "Peeklists",
       subtitle:
-        "Descubra Peeklists públicas, vencedores de prêmios, listas curadas e o que está em alta agora.",
+        "Descubra Peeklists públicas, vencedores de prêmios, listas curadas, picks por plataforma e o que está em alta agora.",
       usersTitle: "Criadas por usuários",
       usersText: "Peeklists públicas criadas pela comunidade do Peekr.",
       awardsTitle: "Vencedores de prêmios",
@@ -302,6 +314,12 @@ export default async function ListsPage() {
       regionalTitle: "Seleções regionais",
       regionalText:
         "Coleções adaptadas ao gosto local e à descoberta regional.",
+      platformTitle: "Por plataforma",
+      platformText:
+        "Lançamentos recentes e listas de descoberta agrupadas por plataforma.",
+      peopleTitle: "Pessoas populares",
+      peopleText:
+        "Descubra atores e diretores que estão em alta agora.",
       trendingTitle: "Em alta agora",
       trendingText:
         "Coleções geradas a partir do que está em alta agora em filmes e séries.",
@@ -313,12 +331,16 @@ export default async function ListsPage() {
     awardCollections,
     curatedCollections,
     regionalCollections,
+    platformCollections,
+    peopleCollections,
     trendingCollections,
   ] = await Promise.all([
     getUserCreatedPeeklists(),
     getCollectionsByCategory(["awards"], lang, 12),
     getCollectionsBySourceType(["editorial", "search_opportunity"], lang, 12),
     getCollectionsByCategory(["regional"], lang, 12),
+    getCollectionsBySourceType(["platform_releases"], lang, 12),
+    getCollectionsBySourceType(["trending_actors", "trending_directors"], lang, 12),
     getCollectionsBySourceType(["trend_driven"], lang, 12),
   ]);
 
@@ -456,6 +478,20 @@ export default async function ListsPage() {
           <section>
             <SectionHeader title={t.regionalTitle} text={t.regionalText} />
             <PeeklistsRow items={regionalCollections} hrefPrefix="/lists" />
+          </section>
+        ) : null}
+
+        {platformCollections.length > 0 ? (
+          <section>
+            <SectionHeader title={t.platformTitle} text={t.platformText} />
+            <PeeklistsRow items={platformCollections} hrefPrefix="/lists" />
+          </section>
+        ) : null}
+
+        {peopleCollections.length > 0 ? (
+          <section>
+            <SectionHeader title={t.peopleTitle} text={t.peopleText} />
+            <PeeklistsRow items={peopleCollections} hrefPrefix="/lists" />
           </section>
         ) : null}
 
