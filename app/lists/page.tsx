@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const BACKDROP = "https://image.tmdb.org/t/p/w780";
+const PROFILE = "https://image.tmdb.org/t/p/w185";
 const BRAND = "#FA0082";
 
 type Lang = "en" | "es" | "pt";
@@ -33,6 +34,14 @@ type EditorialCollection = {
   item_count?: number | null;
 };
 
+type TmdbPerson = {
+  id: number;
+  name: string;
+  profile_path?: string | null;
+  known_for_department?: string | null;
+  popularity?: number | null;
+};
+
 function normalizeLang(value?: string | null): Lang {
   const raw = (value || "en").toLowerCase();
   if (raw.startsWith("es")) return "es";
@@ -46,10 +55,34 @@ function tmdbLanguage(lang: Lang) {
   return "en-US";
 }
 
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+function actorHref(person: TmdbPerson) {
+  return `/actor/${person.id}-${slugify(person.name)}`;
+}
+
 function localizedCollectionTitle(item: EditorialCollection, lang: Lang) {
   if (lang === "es") return item.title_es || item.title_en || item.title_pt;
   if (lang === "pt") return item.title_pt || item.title_en || item.title_es;
   return item.title_en || item.title_es || item.title_pt;
+}
+
+async function fetchTMDB<T>(url: string): Promise<T | null> {
+  try {
+    const res = await fetch(url, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchBackdropForCollection(
@@ -143,6 +176,32 @@ async function getCollectionsBySourceType(
   return await Promise.all(rows.map((item) => collectionToPeeklistItem(item, lang)));
 }
 
+async function getPopularPeople(lang: Lang) {
+  const apiLang = tmdbLanguage(lang);
+
+  const data = await fetchTMDB<{ results: TmdbPerson[] }>(
+    `${TMDB_BASE}/trending/person/week?api_key=${TMDB_KEY}&language=${apiLang}`
+  );
+
+  const all = data?.results ?? [];
+
+  const actors = all
+    .filter(
+      (person) =>
+        (person.known_for_department ?? "").toLowerCase() === "acting"
+    )
+    .slice(0, 20);
+
+  const directors = all
+    .filter(
+      (person) =>
+        (person.known_for_department ?? "").toLowerCase() === "directing"
+    )
+    .slice(0, 20);
+
+  return { actors, directors };
+}
+
 function SectionHeader({
   title,
   text,
@@ -192,18 +251,54 @@ function PeeklistsRow({
   );
 }
 
+function PeopleRow({
+  items,
+}: {
+  items: TmdbPerson[];
+}) {
+  return (
+    <div className="people-row">
+      {items.map((person) => {
+        const photo = person.profile_path ? `${PROFILE}${person.profile_path}` : null;
+
+        return (
+          <Link
+            key={person.id}
+            href={actorHref(person)}
+            className="person-card"
+          >
+            {photo ? (
+              <img
+                src={photo}
+                alt={person.name}
+                className="person-image"
+              />
+            ) : (
+              <div className="person-fallback" />
+            )}
+
+            <div className="person-meta">
+              <div className="person-name">{person.name}</div>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 export async function generateMetadata() {
   return {
     title: "Peeklists | Peekr",
     description:
-      "Discover award winners, curated collections, streaming picks, people-based lists and trending movie and TV collections on Peekr.",
+      "Discover award winners, curated collections, streaming picks, popular actors, popular directors and trending movie and TV collections on Peekr.",
     alternates: {
       canonical: "https://www.peekr.app/lists",
     },
     openGraph: {
       title: "Peeklists | Peekr",
       description:
-        "Discover award winners, curated collections, streaming picks, people-based lists and trending movie and TV collections on Peekr.",
+        "Discover award winners, curated collections, streaming picks, popular actors, popular directors and trending movie and TV collections on Peekr.",
       url: "https://www.peekr.app/lists",
       siteName: "Peekr",
       type: "website",
@@ -212,7 +307,7 @@ export async function generateMetadata() {
       card: "summary_large_image",
       title: "Peeklists | Peekr",
       description:
-        "Discover award winners, curated collections, streaming picks, people-based lists and trending movie and TV collections on Peekr.",
+        "Discover award winners, curated collections, streaming picks, popular actors, popular directors and trending movie and TV collections on Peekr.",
     },
   };
 }
@@ -225,51 +320,57 @@ export default async function ListsPage() {
     en: {
       title: "Peeklists",
       subtitle:
-        "Discover award winners, curated collections, streaming picks, people-based lists and what is trending right now.",
+        "Discover award winners, curated collections, streaming picks, popular actors, popular directors and what is trending right now.",
       awardsTitle: "Award winners",
       awardsText: "Oscars, Emmys, Golden Globes, BAFTA and festival winners.",
       curatedTitle: "Curated collections",
-      curatedText: "Handpicked lists built for discovery, and taste.",
+      curatedText: "Handpicked lists built for discovery and taste.",
       regionalTitle: "Regional picks",
       regionalText: "Collections tailored to Latin America and local taste.",
       platformTitle: "By platform",
       platformText: "Recent releases grouped by streaming platform.",
-      peopleTitle: "Popular people picks",
-      peopleText: "Best titles with actors and best movies by directors.",
+      actorsTitle: "Popular actors",
+      actorsText: "Discover actors people are searching and watching right now.",
+      directorsTitle: "Popular directors",
+      directorsText: "Discover directors shaping what people are watching now.",
       trendingTitle: "Trending now",
       trendingText: "Strictly filtered trending collections by category.",
     },
     es: {
       title: "Peeklists",
       subtitle:
-        "Descubre ganadores de premios, listas curadas, picks por plataforma, listas por personas y lo que está en tendencia ahora.",
+        "Descubre ganadores de premios, listas curadas, picks por plataforma, actores populares, directores populares y lo que está en tendencia ahora.",
       awardsTitle: "Ganadores de premios",
       awardsText: "Oscars, Emmys, Golden Globes, BAFTA y ganadores de festivales.",
       curatedTitle: "Listas curadas",
-      curatedText: "Listas elegidas a mano para discovery, y gusto.",
+      curatedText: "Listas elegidas a mano para discovery y gusto.",
       regionalTitle: "Selecciones regionales",
       regionalText: "Colecciones pensadas para LATAM y el gusto local.",
       platformTitle: "Por plataforma",
       platformText: "Estrenos recientes agrupados por plataforma.",
-      peopleTitle: "Títulos por personas populares",
-      peopleText: "Mejores títulos con actores y mejores películas de directores.",
+      actorsTitle: "Actores populares",
+      actorsText: "Descubre actores que la gente está buscando y viendo ahora.",
+      directorsTitle: "Directores populares",
+      directorsText: "Descubre directores que están marcando lo que la gente ve hoy.",
       trendingTitle: "En tendencia ahora",
       trendingText: "Colecciones trending con filtros estrictos por categoría.",
     },
     pt: {
       title: "Peeklists",
       subtitle:
-        "Descubra vencedores de prêmios, listas curadas, picks por plataforma, listas por pessoas e o que está em alta agora.",
+        "Descubra vencedores de prêmios, listas curadas, picks por plataforma, atores populares, diretores populares e o que está em alta agora.",
       awardsTitle: "Vencedores de prêmios",
       awardsText: "Oscars, Emmys, Golden Globes, BAFTA e vencedores de festivais.",
       curatedTitle: "Listas curadas",
-      curatedText: "Listas escolhidas à mão para discovery, e gosto.",
+      curatedText: "Listas escolhidas à mão para discovery e gosto.",
       regionalTitle: "Seleções regionais",
       regionalText: "Coleções pensadas para LATAM e gosto local.",
       platformTitle: "Por plataforma",
       platformText: "Lançamentos recentes agrupados por plataforma.",
-      peopleTitle: "Títulos por pessoas populares",
-      peopleText: "Melhores títulos com atores e melhores filmes de diretores.",
+      actorsTitle: "Atores populares",
+      actorsText: "Descubra atores que as pessoas estão buscando e assistindo agora.",
+      directorsTitle: "Diretores populares",
+      directorsText: "Descubra diretores que estão moldando o que as pessoas assistem agora.",
       trendingTitle: "Em alta agora",
       trendingText: "Coleções em alta com filtros estritos por categoria.",
     },
@@ -280,19 +381,15 @@ export default async function ListsPage() {
     curated,
     regional,
     platform,
-    people,
     trending,
+    people,
   ] = await Promise.all([
     getCollectionsByCategory(["awards"], lang, 24),
     getCollectionsByCategory(["curated"], lang, 40),
     getCollectionsByCategory(["regional"], lang, 20),
     getCollectionsBySourceType(["platform_releases"], lang, 16),
-    getCollectionsBySourceType(
-      ["popular_actor_titles", "popular_director_titles"],
-      lang,
-      48
-    ),
     getCollectionsBySourceType(["trend_driven"], lang, 16),
+    getPopularPeople(lang),
   ]);
 
   return (
@@ -342,7 +439,8 @@ export default async function ListsPage() {
           max-width: 840px;
         }
 
-        .peeklists-row {
+        .peeklists-row,
+        .people-row {
           display: flex;
           gap: 14px;
           overflow-x: auto;
@@ -351,16 +449,20 @@ export default async function ListsPage() {
           scroll-snap-type: x proximity;
         }
 
+        .peeklist-card,
+        .person-card {
+          text-decoration: none;
+          color: white;
+          scroll-snap-align: start;
+        }
+
         .peeklist-card {
           width: 260px;
           min-width: 260px;
-          text-decoration: none;
-          color: white;
           background: rgba(255,255,255,0.04);
           border: 1px solid rgba(255,255,255,0.08);
           border-radius: 18px;
           overflow: hidden;
-          scroll-snap-align: start;
         }
 
         .peeklist-cover,
@@ -383,6 +485,33 @@ export default async function ListsPage() {
           color: rgba(255,255,255,0.96);
         }
 
+        .person-card {
+          width: 132px;
+          min-width: 132px;
+        }
+
+        .person-image,
+        .person-fallback {
+          width: 132px;
+          aspect-ratio: 3 / 4;
+          border-radius: 16px;
+          object-fit: cover;
+          display: block;
+          background: rgba(255,255,255,0.08);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.28);
+        }
+
+        .person-meta {
+          margin-top: 10px;
+        }
+
+        .person-name {
+          font-size: 13px;
+          font-weight: 700;
+          line-height: 1.35;
+          color: rgba(255,255,255,0.95);
+        }
+
         @media (min-width: 900px) {
           .lists-page {
             gap: 72px;
@@ -396,6 +525,16 @@ export default async function ListsPage() {
           .peeklist-cover,
           .peeklist-fallback {
             height: 170px;
+          }
+
+          .person-card {
+            width: 150px;
+            min-width: 150px;
+          }
+
+          .person-image,
+          .person-fallback {
+            width: 150px;
           }
         }
       `}</style>
@@ -434,10 +573,17 @@ export default async function ListsPage() {
           </section>
         ) : null}
 
-        {people.length > 0 ? (
+        {people.actors.length > 0 ? (
           <section>
-            <SectionHeader title={t.peopleTitle} text={t.peopleText} />
-            <PeeklistsRow items={people} />
+            <SectionHeader title={t.actorsTitle} text={t.actorsText} />
+            <PeopleRow items={people.actors} />
+          </section>
+        ) : null}
+
+        {people.directors.length > 0 ? (
+          <section>
+            <SectionHeader title={t.directorsTitle} text={t.directorsText} />
+            <PeopleRow items={people.directors} />
           </section>
         ) : null}
 
