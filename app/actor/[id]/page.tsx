@@ -15,7 +15,7 @@ const BRAND = "#FA0082";
 
 type Lang = "en" | "es" | "pt";
 
- PageProps = {
+type PageProps = {
   params: Promise<{
     id: string;
   }>;
@@ -35,6 +35,7 @@ type PersonCredit = {
   popularity?: number;
   genre_ids?: number[];
 };
+
 type PersonResponse = {
   id: number;
   name: string;
