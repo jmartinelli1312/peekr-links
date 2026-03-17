@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB = "https://api.themoviedb.org/3";
 const SITE = "https://www.peekr.app";
-const IMG = "https://image.tmdb.org/t/p/original";
+const IMG = "https://image.tmdb.org/t/p/w1280";
 const POSTER = "https://image.tmdb.org/t/p/w342";
 const PERSON = "https://image.tmdb.org/t/p/w185";
 const PROVIDER = "https://image.tmdb.org/t/p/w92";
@@ -306,12 +306,12 @@ function pickProviders(
 }
 
 async function getPeekrData(tmdbId: number, mediaType: string) {
-const [ratingRpcRes, activityStatsRes, titleStatsRes, watchersRes, commentsRes] =
-  await Promise.all([
-    supabase.rpc("get_title_peekr_rating", {
-      p_tmdb_id: tmdbId,
-      p_media_type: mediaType,
-    }),
+  const [ratingRpcRes, activityStatsRes, titleStatsRes, watchersRes, commentsRes] =
+    await Promise.all([
+      supabase.rpc("get_title_peekr_rating", {
+        p_tmdb_id: tmdbId,
+        p_media_type: mediaType,
+      }),
 
       supabase
         .from("title_activity_stats")
@@ -362,7 +362,7 @@ const [ratingRpcRes, activityStatsRes, titleStatsRes, watchersRes, commentsRes] 
   const ratingRow =
     ((ratingRpcRes.data as { avg_rating: number | null; ratings_count: number }[] | null) ?? [])[0] ??
     null;
-  
+
   const avgRating =
     ratingRow?.avg_rating != null ? Number(ratingRow.avg_rating).toFixed(1) : null;
 
@@ -579,11 +579,11 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
           gap: 16px;
           align-items: start;
         }
-        
+
         .poster-wrap {
           width: 126px;
         }
-        
+
         .poster-image {
           width: 126px;
           aspect-ratio: 2 / 3;
@@ -593,6 +593,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
           display: block;
           background: rgba(255,255,255,0.08);
         }
+
         .title-main h1 {
           padding-top: 6px;
           margin: 0;
@@ -649,7 +650,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
           white-space: nowrap;
         }
 
-      .hero-stats {
+        .hero-stats {
           display: flex;
           gap: 12px;
           overflow-x: auto;
@@ -657,7 +658,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
           margin-top: 14px;
           -webkit-overflow-scrolling: touch;
         }
-        
+
         .hero-stat {
           display: inline-flex;
           align-items: center;
@@ -926,6 +927,8 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
               alt={title}
               fill
               priority
+              unoptimized
+              sizes="100vw"
               style={{ objectFit: "cover", opacity: 0.42 }}
             />
             <div className="hero-backdrop-overlay" />
@@ -942,6 +945,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                   width={220}
                   height={330}
                   className="poster-image"
+                  unoptimized
                 />
               ) : (
                 <div className="poster-image" />
@@ -991,62 +995,71 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                 ))}
               </div>
 
-                  <div className="action-row">
-
+              <div className="action-row">
                 {trailer ? (
                   <Link
                     href={`https://youtube.com/watch?v=${trailer.key}`}
                     target="_blank"
                     className="btn-primary"
                   >
-                    
                     ▶ {t.watchTrailer}
                   </Link>
                 ) : null}
               </div>
             </div>
           </div>
-                <div className="hero-stats">
-                <div className="hero-stat">⭐ {stats.avgRating ?? "-"} · {t.peekrRating}</div>
-                <div className="hero-stat">👁 {stats.watchedCount ?? 0} {t.watched}</div>
-                <div className="hero-stat">💬 {stats.commentsCount ?? 0} {t.commentsCount}</div>
-                <div className="hero-stat">👀 {stats.viewsCount ?? 0} {t.views}</div>
-              </div>
 
-              
+          <div className="hero-stats">
+            <div className="hero-stat">⭐ {stats.avgRating ?? "-"} · {t.peekrRating}</div>
+            <div className="hero-stat">👁 {stats.watchedCount ?? 0} {t.watched}</div>
+            <div className="hero-stat">💬 {stats.commentsCount ?? 0} {t.commentsCount}</div>
+            <div className="hero-stat">👀 {stats.viewsCount ?? 0} {t.views}</div>
+          </div>
 
           <div className="bubble-tabs">
-            <Link href={tabHref("overview")}
+            <Link
+              href={tabHref("overview")}
               scroll={false}
-              className={`tab-pill ${activeTab === "overview" ? "active" : ""}`}>
+              className={`tab-pill ${activeTab === "overview" ? "active" : ""}`}
+            >
               {t.tabsOverview}
             </Link>
-            <Link href={tabHref("cast")}
+            <Link
+              href={tabHref("cast")}
               scroll={false}
-              className={`tab-pill ${activeTab === "cast" ? "active" : ""}`}>
+              className={`tab-pill ${activeTab === "cast" ? "active" : ""}`}
+            >
               {t.tabsCast}
             </Link>
-            <Link href={tabHref("crew")}
+            <Link
+              href={tabHref("crew")}
               scroll={false}
-              className={`tab-pill ${activeTab === "crew" ? "active" : ""}`}>
+              className={`tab-pill ${activeTab === "crew" ? "active" : ""}`}
+            >
               {t.tabsCrew}
             </Link>
-            <Link href={tabHref("awards")} 
+            <Link
+              href={tabHref("awards")}
               scroll={false}
-              className={`tab-pill ${activeTab === "awards" ? "active" : ""}`}>
+              className={`tab-pill ${activeTab === "awards" ? "active" : ""}`}
+            >
               {t.tabsAwards}
             </Link>
             {providers.length > 0 ? (
-              <Link href={tabHref("platforms")} 
+              <Link
+                href={tabHref("platforms")}
                 scroll={false}
-                className={`tab-pill ${activeTab === "platforms" ? "active" : ""}`}>
+                className={`tab-pill ${activeTab === "platforms" ? "active" : ""}`}
+              >
                 {t.tabsPlatforms}
               </Link>
             ) : null}
             {comments.length > 0 ? (
-              <Link href={tabHref("comments")} 
+              <Link
+                href={tabHref("comments")}
                 scroll={false}
-                className={`tab-pill ${activeTab === "comments" ? "active" : ""}`}>
+                className={`tab-pill ${activeTab === "comments" ? "active" : ""}`}
+              >
                 {t.tabsComments}
               </Link>
             ) : null}
@@ -1071,6 +1084,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                           width={50}
                           height={50}
                           className="provider-logo"
+                          unoptimized
                         />
                         <div className="watcher-name">{p.provider_name}</div>
                       </div>
@@ -1096,6 +1110,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                             width={48}
                             height={48}
                             className="watcher-avatar"
+                            unoptimized
                           />
                         ) : (
                           <div className="watcher-fallback" />
@@ -1126,6 +1141,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                         width={185}
                         height={246}
                         className="person-photo"
+                        unoptimized
                       />
                     ) : (
                       <div className="person-photo-fallback" />
@@ -1158,6 +1174,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                         width={185}
                         height={246}
                         className="person-photo"
+                        unoptimized
                       />
                     ) : (
                       <div className="person-photo-fallback" />
@@ -1185,6 +1202,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                       width={50}
                       height={50}
                       className="provider-logo"
+                      unoptimized
                     />
                     <div className="watcher-name">{p.provider_name}</div>
                   </div>
@@ -1192,12 +1210,14 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
               </div>
             </section>
           ) : null}
+
           {activeTab === "awards" ? (
-              <section className="section-block">
-                <h2 className="section-title">{t.awards}</h2>
-                <p className="overview-text">{t.noAwards}</p>
-              </section>
-            ) : null}
+            <section className="section-block">
+              <h2 className="section-title">{t.awards}</h2>
+              <p className="overview-text">{t.noAwards}</p>
+            </section>
+          ) : null}
+
           {activeTab === "comments" && comments.length > 0 ? (
             <section className="section-block">
               <h2 className="section-title">{t.comments}</h2>
@@ -1212,6 +1232,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                         width={42}
                         height={42}
                         className="comment-avatar"
+                        unoptimized
                       />
                     ) : (
                       <div className="comment-avatar-fallback" />
