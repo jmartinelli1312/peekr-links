@@ -219,10 +219,10 @@ export default function AdminPage() {
             .select("*", { count: "exact", head: true })
             .eq("is_published", true),
 
-          supabase
-            .from("activity_feed")
-            .select("user_id, created_at")
-            .gte("created_at", thirtyIso),
+         supabase
+           .from("activity_feed")
+           .select("actor_id, created_at")
+           .gte("created_at", thirtyIso),
 
           supabase
             .from("profiles")
@@ -272,11 +272,11 @@ export default function AdminPage() {
           return;
         }
 
-        const activityRows =
-          (activityFeed30dRes.data as Array<{
-            user_id: string;
-            created_at?: string | null;
-          }> | null) ?? [];
+      const activityRows =
+        (activityFeed30dRes.data as Array<{
+          actor_id: string;
+          created_at?: string | null;
+        }> | null) ?? [];
 
         const dauSet = new Set<string>();
         const wauSet = new Set<string>();
@@ -287,15 +287,15 @@ export default function AdminPage() {
         const sevenDayMs = 7 * 24 * 60 * 60 * 1000;
         const thirtyDayMs = 30 * 24 * 60 * 60 * 1000;
 
-        for (const row of activityRows) {
-          if (!row.user_id || !row.created_at) continue;
-          const ts = new Date(row.created_at).getTime();
-          const diff = now - ts;
-
-          if (diff <= oneDayMs) dauSet.add(row.user_id);
-          if (diff <= sevenDayMs) wauSet.add(row.user_id);
-          if (diff <= thirtyDayMs) mauSet.add(row.user_id);
-        }
+       for (const row of activityRows) {
+        if (!row.actor_id || !row.created_at) continue;
+        const ts = new Date(row.created_at).getTime();
+        const diff = now - ts;
+      
+        if (diff <= oneDayMs) dauSet.add(row.actor_id);
+        if (diff <= sevenDayMs) wauSet.add(row.actor_id);
+        if (diff <= thirtyDayMs) mauSet.add(row.actor_id);
+      }
 
         setMetrics({
           totalUsers: totalUsersRes.count ?? 0,
