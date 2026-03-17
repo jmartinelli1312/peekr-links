@@ -29,6 +29,7 @@ type EditorialCollection = {
   description_pt?: string | null;
   cover_url?: string | null;
   category?: string | null;
+  source_type?: string | null;
   is_published: boolean;
   sort_order: number;
   item_count?: number | null;
@@ -125,7 +126,7 @@ async function getUserCreatedPeeklists() {
   return dedupePeeklists((data as PeeklistItem[] | null) ?? []);
 }
 
-async function getCollectionsForCategories(
+async function getCollectionsByCategory(
   categories: string[],
   lang: Lang,
   limit = 12
@@ -133,7 +134,7 @@ async function getCollectionsForCategories(
   const { data } = await supabase
     .from("editorial_collections")
     .select(
-      "slug,title_en,title_es,title_pt,description_en,description_es,description_pt,cover_url,category,is_published,sort_order,item_count"
+      "slug,title_en,title_es,title_pt,description_en,description_es,description_pt,cover_url,category,source_type,is_published,sort_order,item_count"
     )
     .eq("is_published", true)
     .in("category", categories)
@@ -147,7 +148,7 @@ async function getCollectionsForCategories(
   return await Promise.all(rows.map((item) => collectionToPeeklistItem(item, lang)));
 }
 
-async function getCollectionsForSourceType(
+async function getCollectionsBySourceType(
   sourceTypes: string[],
   lang: Lang,
   limit = 12
@@ -155,7 +156,7 @@ async function getCollectionsForSourceType(
   const { data } = await supabase
     .from("editorial_collections")
     .select(
-      "slug,title_en,title_es,title_pt,description_en,description_es,description_pt,cover_url,category,is_published,sort_order,item_count"
+      "slug,title_en,title_es,title_pt,description_en,description_es,description_pt,cover_url,category,source_type,is_published,sort_order,item_count"
     )
     .eq("is_published", true)
     .in("source_type", sourceTypes)
@@ -222,14 +223,14 @@ export async function generateMetadata() {
   return {
     title: "Peeklists | Peekr",
     description:
-      "Discover Peeklists created by users and curated collections across movies and series on Peekr.",
+      "Discover public Peeklists, award winners, curated collections and what is trending right now on Peekr.",
     alternates: {
       canonical: "https://www.peekr.app/lists",
     },
     openGraph: {
       title: "Peeklists | Peekr",
       description:
-        "Discover Peeklists created by users and curated collections across movies and series on Peekr.",
+        "Discover public Peeklists, award winners, curated collections and what is trending right now on Peekr.",
       url: "https://www.peekr.app/lists",
       siteName: "Peekr",
       type: "website",
@@ -238,7 +239,7 @@ export async function generateMetadata() {
       card: "summary_large_image",
       title: "Peeklists | Peekr",
       description:
-        "Discover Peeklists created by users and curated collections across movies and series on Peekr.",
+        "Discover public Peeklists, award winners, curated collections and what is trending right now on Peekr.",
     },
   };
 }
@@ -259,7 +260,7 @@ export default async function ListsPage() {
         "Collections built around Oscar winners and other award-season discoveries.",
       curatedTitle: "Curated collections",
       curatedText:
-        "Manually curated collections built for discovery, taste.",
+        "Manually curated collections built for discovery, and good taste.",
       regionalTitle: "Regional picks",
       regionalText:
         "Collections tailored to local taste and regional discovery.",
@@ -278,7 +279,7 @@ export default async function ListsPage() {
         "Colecciones armadas alrededor de los ganadores del Oscar y otros premios.",
       curatedTitle: "Listas curadas",
       curatedText:
-        "Colecciones curadas manualmente para discovery, gusto.",
+        "Colecciones curadas manualmente para discovery, y buen gusto.",
       regionalTitle: "Selecciones regionales",
       regionalText:
         "Colecciones adaptadas al gusto local y al discovery regional.",
@@ -297,7 +298,7 @@ export default async function ListsPage() {
         "Coleções construídas em torno dos vencedores do Oscar e de outras premiações.",
       curatedTitle: "Listas curadas",
       curatedText:
-        "Coleções curadas manualmente para discovery, gosto.",
+        "Coleções curadas manualmente para discovery, e gosto.",
       regionalTitle: "Seleções regionais",
       regionalText:
         "Coleções adaptadas ao gosto local e à descoberta regional.",
@@ -315,14 +316,10 @@ export default async function ListsPage() {
     trendingCollections,
   ] = await Promise.all([
     getUserCreatedPeeklists(),
-    getCollectionsForCategories(["awards"], lang, 12),
-    getCollectionsForSourceType(
-      ["editorial", "search_opportunity"],
-      lang,
-      12
-    ),
-    getCollectionsForCategories(["regional"], lang, 12),
-    getCollectionsForSourceType(["trend_driven"], lang, 12),
+    getCollectionsByCategory(["awards"], lang, 12),
+    getCollectionsBySourceType(["editorial", "search_opportunity"], lang, 12),
+    getCollectionsByCategory(["regional"], lang, 12),
+    getCollectionsBySourceType(["trend_driven"], lang, 12),
   ]);
 
   return (
