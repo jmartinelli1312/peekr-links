@@ -246,6 +246,9 @@ export default async function ListsPage() {
       editorialTitle: "Editorial collections",
       editorialText:
         "Curated categories and search-friendly collections to power discovery across the web.",
+      trendingTitle: "Trending now",
+      trendingText:
+        "Collections generated from what is trending right now across movies and TV.",
       regionalTitle: "Regional picks",
       regionalText:
         "Collections tailored to local taste and regional discovery.",
@@ -262,6 +265,9 @@ export default async function ListsPage() {
       editorialTitle: "Colecciones editoriales",
       editorialText:
         "Categorías curadas y colecciones pensadas para potenciar discovery en la web.",
+      trendingTitle: "En tendencia ahora",
+      trendingText:
+      "Colecciones generadas a partir de lo que está en tendencia ahora mismo en películas y series.",
       regionalTitle: "Selecciones regionales",
       regionalText:
         "Colecciones adaptadas al gusto local y al discovery regional.",
@@ -278,19 +284,29 @@ export default async function ListsPage() {
       editorialTitle: "Coleções editoriais",
       editorialText:
         "Categorias curadas e coleções pensadas para impulsionar discovery na web.",
+      trendingTitle: "Em alta agora",
+      trendingText:
+        "Coleções geradas a partir do que está em alta agora em filmes e séries.",
       regionalTitle: "Seleções regionais",
       regionalText:
         "Coleções adaptadas ao gosto local e à descoberta regional.",
     },
   }[lang];
 
-  const [userPeeklists, awardCollections, editorialCollections, regionalCollections] =
-    await Promise.all([
-      getUserCreatedPeeklists(),
-      getEditorialCollectionsByCategory("awards", lang, 12),
-      getEditorialCollectionsByCategory("genre", lang, 12),
-      getEditorialCollectionsByCategory("regional", lang, 12),
-    ]);
+const [
+  userPeeklists,
+  awardCollections,
+  editorialCollections,
+  trendingCollections,
+  regionalCollections,
+] = await Promise.all([
+  getUserCreatedPeeklists(),
+  getEditorialCollectionsByCategory("awards", lang, 12),
+  getEditorialCollectionsByCategory("genre", lang, 12),
+  getEditorialCollectionsByCategory("trend_driven", lang, 12),
+  getEditorialCollectionsByCategory("regional", lang, 12),
+  
+]);
 
   return (
     <>
@@ -422,6 +438,13 @@ export default async function ListsPage() {
           </section>
         ) : null}
 
+        {trendingCollections.length > 0 ? (
+          <section>
+            <SectionHeader title={t.trendingTitle} text={t.trendingText} />
+            <PeeklistsRow items={trendingCollections} hrefPrefix="/lists" />
+          </section>
+        ) : null}
+                
         {regionalCollections.length > 0 ? (
           <section>
             <SectionHeader title={t.regionalTitle} text={t.regionalText} />
