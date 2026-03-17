@@ -1,10 +1,25 @@
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
-export default async function DashboardPage() {
-  const supabase = await createClient();
+export default async function AdminPage() {
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set() {},
+        remove() {},
+      },
+    }
+  );
 
   const {
     data: { user },
@@ -14,20 +29,20 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const { data: profile, error } = await supabase
+  const { data: profile } = await supabase
     .from("profiles")
     .select("is_admin")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (error || !profile?.is_admin) {
+  if (!profile?.is_admin) {
     redirect("/");
   }
 
   return (
-    <div style={{ color: "white" }}>
+    <main style={{ color: "white", padding: "24px" }}>
       <h1>Admin Dashboard</h1>
-      <p>Solo admins pueden ver esto.</p>
-    </div>
+      <p>Acceso autorizado.</p>
+    </main>
   );
 }
