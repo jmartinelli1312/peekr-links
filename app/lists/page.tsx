@@ -179,29 +179,104 @@ async function getCollectionsBySourceType(
 async function getPopularPeople(lang: Lang) {
   const apiLang = tmdbLanguage(lang);
 
-  const data = await fetchTMDB<{ results: TmdbPerson[] }>(
+  const trending = await fetchTMDB<{ results: TmdbPerson[] }>(
     `${TMDB_BASE}/trending/person/week?api_key=${TMDB_KEY}&language=${apiLang}`
   );
 
-  const all = data?.results ?? [];
+  const all = trending?.results ?? [];
 
-  const actors = all
-    .filter(
-      (person) =>
-        (person.known_for_department ?? "").toLowerCase() === "acting"
-    )
-    .slice(0, 20);
+  const actorCandidates = all.filter(
+    (person) => (person.known_for_department ?? "").toLowerCase() === "acting"
+  );
 
-  const directors = all
-    .filter(
-      (person) =>
-        (person.known_for_department ?? "").toLowerCase() === "directing"
-    )
-    .slice(0, 20);
+  const actors = actorCandidates.slice(0, 20);
+
+  const directorMatches: TmdbPerson[] = [];
+
+  for (const person of all) {
+    try {
+      const credits = await fetchTMDB<{
+        crew?: Array<{
+          job?: string | null;
+          department?: string | null;
+          media_type?: string | null;
+        }>;
+      }>(
+        `${TMDB_BASE}/person/${person.id}/combined_credits?api_key=${TMDB_KEY}&language=${apiLang}`
+      );
+
+      const isDirector = (credits?.crew ?? []).some((item) => {
+        const job = (item.job ?? "").toLowerCase();
+        const dept = (item.department ?? "").toLowerCase();
+        const media = item.media_type ?? "";
+        return (
+          (media === "movie" || media === "tv") &&
+          (job === "director" || dept === "directing")
+        );
+      });
+
+      if (isDirector) {
+        directorMatches.push(person);
+      }
+    } catch {
+      // ignore
+    }
+
+    if (directorMatches.length >= 20) break;
+  }
+
+  const fallbackDirectors: TmdbPerson[] = [
+    { id: 525, name: "Christopher Nolan" },
+    { id: 488, name: "Steven Spielberg" },
+    { id: 137427, name: "Denis Villeneuve" },
+    { id: 1032, name: "Martin Scorsese" },
+    { id: 138, name: "Quentin Tarantino" },
+    { id: 65540, name: "Pedro Almodóvar" },
+    { id: 138, name: "Quentin Tarantino" },
+    { id: 819, name: "David Fincher" },
+    { id: 138, name: "Quentin Tarantino" },
+    { id: 5655, name: "Guillermo del Toro" },
+    { id: 2740, name: "Alfonso Cuarón" },
+    { id: 6384, name: "Alejandro González Iñárritu" },
+    { id: 2939, name: "J. A. Bayona" },
+    { id: 4292, name: "Wes Anderson" },
+    { id: 138, name: "Quentin Tarantino" },
+    { id: 11431, name: "Damián Szifron" },
+    { id: 11432, name: "Juan José Campanella" },
+    { id: 8462, name: "Pablo Trapero" },
+    { id: 18124, name: "Lucrecia Martel" },
+    { id: 14784, name: "James Cameron" },
+  ];
+
+  const seen = new Set<number>();
+  const directors: TmdbPerson[] = [];
+
+  for (const person of directorMatches) {
+    if (seen.has(person.id)) continue;
+    seen.add(person.id);
+    directors.push(person);
+    if (directors.length >= 20) break;
+  }
+
+  if (directors.length < 20) {
+    for (const fallback of fallbackDirectors) {
+      if (seen.has(fallback.id)) continue;
+
+      const searched = await fetchTMDB<{ results: TmdbPerson[] }>(
+        `${TMDB_BASE}/search/person?api_key=${TMDB_KEY}&language=${apiLang}&query=${encodeURIComponent(fallback.name)}`
+      );
+
+      const match = searched?.results?.[0];
+      if (!match || seen.has(match.id)) continue;
+
+      seen.add(match.id);
+      directors.push(match);
+      if (directors.length >= 20) break;
+    }
+  }
 
   return { actors, directors };
 }
-
 function SectionHeader({
   title,
   text,
