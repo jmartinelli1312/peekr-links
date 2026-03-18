@@ -29,16 +29,22 @@ export default async function RootLayout({
       about: "About",
       privacy: "Privacy",
       terms: "Terms",
+      contact: "Contact",
+      ownedBy: "Owned and operated by Emanation Films, Inc.",
     },
     es: {
       about: "Acerca de",
       privacy: "Privacidad",
       terms: "Términos",
+      contact: "Contacto",
+      ownedBy: "Propiedad y operación de Emanation Films, Inc.",
     },
     pt: {
       about: "Sobre",
       privacy: "Privacidade",
       terms: "Termos",
+      contact: "Contato",
+      ownedBy: "De propriedade e operado por Emanation Films, Inc.",
     },
   }[lang];
 
@@ -66,12 +72,24 @@ export default async function RootLayout({
             padding: 40px 20px;
             text-align: center;
             font-size: 14px;
-            opacity: 0.7;
+            opacity: 0.88;
           }
 
           .peekr-footer-inner {
             max-width: 1200px;
             margin: 0 auto;
+          }
+
+          .peekr-footer-top {
+            margin-bottom: 12px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.92);
+          }
+
+          .peekr-footer-owned {
+            margin-bottom: 18px;
+            color: rgba(255,255,255,0.72);
+            line-height: 1.6;
           }
 
           .peekr-footer-links,
@@ -89,7 +107,11 @@ export default async function RootLayout({
           .peekr-footer-link {
             color: white;
             text-decoration: none;
-            opacity: 0.7;
+            opacity: 0.78;
+          }
+
+          .peekr-footer-link:hover {
+            opacity: 1;
           }
         `}</style>
 
@@ -99,9 +121,11 @@ export default async function RootLayout({
 
         <footer className="peekr-footer">
           <div className="peekr-footer-inner">
-            <div style={{ marginBottom: 18 }}>
+            <div className="peekr-footer-top">
               Peekr © {new Date().getFullYear()}
             </div>
+
+            <div className="peekr-footer-owned">{t.ownedBy}</div>
 
             <div className="peekr-footer-links">
               <a href="/about" className="peekr-footer-link">
@@ -113,12 +137,16 @@ export default async function RootLayout({
               <a href="/terms" className="peekr-footer-link">
                 {t.terms}
               </a>
+              <a href="/contact" className="peekr-footer-link">
+                {t.contact}
+              </a>
             </div>
 
             <div className="peekr-footer-social">
               <a
                 href="https://instagram.com/peekr.app"
                 target="_blank"
+                rel="noreferrer"
                 className="peekr-footer-link"
               >
                 Instagram
@@ -126,6 +154,7 @@ export default async function RootLayout({
               <a
                 href="https://x.com/peekr_oficial"
                 target="_blank"
+                rel="noreferrer"
                 className="peekr-footer-link"
               >
                 X
