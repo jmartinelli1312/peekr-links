@@ -1,5 +1,6 @@
 import "./globals.css";
 import { cookies } from "next/headers";
+import { Analytics } from "@vercel/analytics/next";
 import SiteHeader from "./components/site-header";
 
 export const metadata = {
@@ -165,6 +166,8 @@ export default async function RootLayout({
             </div>
           </div>
         </footer>
+
+        <Analytics />
       </body>
     </html>
   );
