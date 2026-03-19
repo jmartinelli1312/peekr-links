@@ -1,4 +1,4 @@
- "use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -645,6 +645,48 @@ export default function AdminPage() {
           padding: 14px 16px;
         }
 
+        .analytics-card {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .analytics-links {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .analytics-link {
+          display: block;
+          text-decoration: none;
+          color: white;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.10);
+          border-radius: 16px;
+          padding: 14px 16px;
+          transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .analytics-link:hover {
+          transform: translateY(-1px);
+          border-color: rgba(250,0,130,0.55);
+          background: rgba(250,0,130,0.08);
+        }
+
+        .analytics-link-title {
+          font-size: 15px;
+          font-weight: 800;
+          color: white;
+        }
+
+        .analytics-link-sub {
+          margin-top: 6px;
+          font-size: 13px;
+          color: rgba(255,255,255,0.68);
+          line-height: 1.5;
+        }
+
         @media (min-width: 900px) {
           .grid-cards {
             grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -656,6 +698,10 @@ export default function AdminPage() {
 
           .tables {
             grid-template-columns: repeat(4, minmax(0, 1fr));
+          }
+
+          .analytics-links {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
       `}</style>
@@ -801,15 +847,72 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="card">
+                <div className="card analytics-card">
                   <div className="mini-metric">
-                    <div className="mini-name">Instrumentation pending</div>
-                    <div className="mini-value">Phase 2</div>
+                    <div className="mini-name">Web analytics</div>
+                    <div className="mini-value">Live</div>
                   </div>
                   <div className="section-note">
-                    tráfico web por página, búsquedas y adquisición web/app
+                    Vercel ya está midiendo tráfico web. Desde aquí entras rápido a páginas, visitantes y fuentes.
                   </div>
                 </div>
+              </div>
+            </section>
+
+            <section className="section">
+              <h2>Web Analytics</h2>
+              <p className="section-note">
+                Accesos rápidos al panel de Vercel para revisar tráfico web, páginas más vistas y adquisición.
+              </p>
+
+              <div className="analytics-links">
+                <a
+                  href="https://vercel.com/dashboard"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="analytics-link"
+                >
+                  <div className="analytics-link-title">Open Vercel dashboard</div>
+                  <div className="analytics-link-sub">
+                    Entra al proyecto y revisa el overview general de deployment, usage y analytics.
+                  </div>
+                </a>
+
+                <a
+                  href="https://vercel.com/analytics"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="analytics-link"
+                >
+                  <div className="analytics-link-title">Open Web Analytics</div>
+                  <div className="analytics-link-sub">
+                    Pageviews, visitantes únicos, top pages y tendencias recientes del sitio.
+                  </div>
+                </a>
+
+                <a
+                  href="https://vercel.com/analytics?view=pages"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="analytics-link"
+                >
+                  <div className="analytics-link-title">Top pages</div>
+                  <div className="analytics-link-sub">
+                    Revisa qué URLs están concentrando el tráfico y cuáles conviene optimizar primero.
+                  </div>
+                </a>
+
+                <a
+                  href="https://vercel.com/analytics?view=sources"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="analytics-link"
+                >
+                  <div className="analytics-link-title">Traffic sources</div>
+                  <div className="analytics-link-sub">
+                    Mira referrers, adquisición y desde dónde llega la gente a Peekr web.
+                  </div>
+                </a>
               </div>
             </section>
 
