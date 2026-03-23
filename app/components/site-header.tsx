@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type Lang = "en" | "es" | "pt";
@@ -26,20 +26,22 @@ type HeaderTexts = {
 };
 
 function normalizeLang(value?: string | null): Lang {
-  const raw = (value || "en").toLowerCase();
-  if (raw.startsWith("es")) return "es";
+  const raw = (value || "es").toLowerCase();
+  if (raw.startsWith("en")) return "en";
   if (raw.startsWith("pt")) return "pt";
-  return "en";
+  return "es";
 }
 
 export default function SiteHeader({ lang }: { lang: Lang }) {
   const router = useRouter();
+  const pathname = usePathname();
 
-  const [currentLang, setCurrentLang] = useState<Lang>(normalizeLang(lang));
+  const [currentLang] = useState<Lang>(normalizeLang(lang));
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+
   const desktopLangRef = useRef<HTMLDetailsElement>(null);
   const desktopUserRef = useRef<HTMLDetailsElement>(null);
   const mobileLangRef = useRef<HTMLDetailsElement>(null);
@@ -64,7 +66,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
       peekrbuzz: "PeekrBuzz",
       signIn: "Iniciar sesión",
       createAccount: "Crear cuenta",
-      settings: "Settings",
+      settings: "Configuración",
       signOut: "Cerrar sesión",
       profile: "Perfil",
     },
@@ -75,11 +77,32 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
       peekrbuzz: "PeekrBuzz",
       signIn: "Entrar",
       createAccount: "Criar conta",
-      settings: "Settings",
+      settings: "Configurações",
       signOut: "Sair",
       profile: "Perfil",
     },
   }[currentLang];
+
+  const pathWithoutLang = useMemo(() => {
+    if (!pathname) return "";
+    const parts = pathname.split("/").filter(Boolean);
+
+    if (parts.length > 0 && ["en", "es", "pt"].includes(parts[0])) {
+      const rest = parts.slice(1).join("/");
+      return rest ? `/${rest}` : "";
+    }
+
+    return pathname === "/" ? "" : pathname;
+  }, [pathname]);
+
+  function localizedHref(path: string) {
+    const clean = path.startsWith("/") ? path : `/${path}`;
+    return `/${currentLang}${clean === "/" ? "" : clean}`;
+  }
+
+  function switchLangHref(targetLang: Lang) {
+    return `/${targetLang}${pathWithoutLang}`;
+  }
 
   async function loadSessionAndProfile() {
     try {
@@ -126,44 +149,33 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
   }, []);
 
   useEffect(() => {
-  function handleDocClick(e: MouseEvent) {
-    const target = e.target as Node;
+    function handleDocClick(e: MouseEvent) {
+      const target = e.target as Node;
 
-    if (
-      desktopUserRef.current &&
-      !desktopUserRef.current.contains(target)
-    ) {
-      desktopUserRef.current.open = false;
+      if (desktopUserRef.current && !desktopUserRef.current.contains(target)) {
+        desktopUserRef.current.open = false;
+      }
+
+      if (desktopLangRef.current && !desktopLangRef.current.contains(target)) {
+        desktopLangRef.current.open = false;
+      }
+
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(target)) {
+        mobileMenuRef.current.open = false;
+      }
+
+      if (mobileLangRef.current && !mobileLangRef.current.contains(target)) {
+        mobileLangRef.current.open = false;
+      }
     }
 
-    if (
-      desktopLangRef.current &&
-      !desktopLangRef.current.contains(target)
-    ) {
-      desktopLangRef.current.open = false;
-    }
+    document.addEventListener("click", handleDocClick);
 
-    if (
-      mobileMenuRef.current &&
-      !mobileMenuRef.current.contains(target)
-    ) {
-      mobileMenuRef.current.open = false;
-    }
+    return () => {
+      document.removeEventListener("click", handleDocClick);
+    };
+  }, []);
 
-    if (
-      mobileLangRef.current &&
-      !mobileLangRef.current.contains(target)
-    ) {
-      mobileLangRef.current.open = false;
-    }
-  }
-
-  document.addEventListener("click", handleDocClick);
-
-  return () => {
-    document.removeEventListener("click", handleDocClick);
-  };
-}, []);
   async function handleSignOut() {
     if (signingOut) return;
     setSigningOut(true);
@@ -172,7 +184,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
       await supabase.auth.signOut();
       setIsLoggedIn(false);
       setProfile(null);
-      router.push("/");
+      router.push(`/${currentLang}`);
       router.refresh();
     } finally {
       setSigningOut(false);
@@ -180,17 +192,18 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
   }
 
   function closeAllMenus() {
-  requestAnimationFrame(() => {
-    if (desktopLangRef.current) desktopLangRef.current.open = false;
-    if (desktopUserRef.current) desktopUserRef.current.open = false;
-    if (mobileLangRef.current) mobileLangRef.current.open = false;
-    if (mobileMenuRef.current) mobileMenuRef.current.open = false;
-  });
-}
+    requestAnimationFrame(() => {
+      if (desktopLangRef.current) desktopLangRef.current.open = false;
+      if (desktopUserRef.current) desktopUserRef.current.open = false;
+      if (mobileLangRef.current) mobileLangRef.current.open = false;
+      if (mobileMenuRef.current) mobileMenuRef.current.open = false;
+    });
+  }
+
   const profileHref =
     profile?.username && profile.username.length > 0
-      ? `/user/${profile.username}`
-      : "/download-app";
+      ? localizedHref(`/user/${profile.username}`)
+      : localizedHref("/download-app");
 
   return (
     <>
@@ -456,21 +469,37 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
 
       <header className="peekr-header">
         <div className="peekr-header-inner">
-          <Link href="/" className="peekr-logo">
+          <Link href={`/${currentLang}`} className="peekr-logo">
             Peekr
           </Link>
 
           <nav className="peekr-nav-desktop">
-            <Link href="/explore" className="peekr-mobile-item" onClick={closeAllMenus}>
+            <Link
+              href={localizedHref("/explore")}
+              className="peekr-link"
+              onClick={closeAllMenus}
+            >
               {t.explore}
             </Link>
-            <Link href="/lists" className="peekr-link" onClick={closeAllMenus}>
+            <Link
+              href={localizedHref("/lists")}
+              className="peekr-link"
+              onClick={closeAllMenus}
+            >
               {t.lists}
             </Link>
-            <Link href="/activity" className="peekr-link" onClick={closeAllMenus}>
+            <Link
+              href={localizedHref("/activity")}
+              className="peekr-link"
+              onClick={closeAllMenus}
+            >
               {t.activity}
             </Link>
-            <Link href="/buzz" className="peekr-link"onClick={closeAllMenus}>
+            <Link
+              href={localizedHref("/buzz")}
+              className="peekr-link"
+              onClick={closeAllMenus}
+            >
               {t.peekrbuzz}
             </Link>
           </nav>
@@ -479,71 +508,88 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
             <details className="peekr-lang" ref={desktopLangRef}>
               <summary style={{ cursor: "pointer", fontSize: 18 }}>🌍</summary>
               <div className="peekr-lang-menu">
-                <a href="/lang/en" className="peekr-lang-item">
+                <Link
+                  href={switchLangHref("en")}
+                  className="peekr-lang-item"
+                  onClick={closeAllMenus}
+                >
                   🇺🇸 English
-                </a>
-                <a href="/lang/es" className="peekr-lang-item">
+                </Link>
+                <Link
+                  href={switchLangHref("es")}
+                  className="peekr-lang-item"
+                  onClick={closeAllMenus}
+                >
                   🇪🇸 Español
-                </a>
-                <a href="/lang/pt" className="peekr-lang-item">
+                </Link>
+                <Link
+                  href={switchLangHref("pt")}
+                  className="peekr-lang-item"
+                  onClick={closeAllMenus}
+                >
                   🇧🇷 Português
-                </a>
+                </Link>
               </div>
             </details>
 
             {loadingAuth ? null : isLoggedIn ? (
-              <>
-               
-               <details
-                  className="peekr-user"
-                  ref={desktopUserRef}
-                  onMouseLeave={() => {
-                    if (desktopUserRef.current) desktopUserRef.current.open = false;
-                  }}
-                >
-                  <summary className="peekr-avatar-button">
-                    {profile?.avatar_url ? (
-                      <img
-                        src={profile.avatar_url}
-                        alt={profile?.username || "user"}
-                        className="peekr-avatar"
-                      />
-                    ) : (
-                      <div className="peekr-avatar-fallback" />
-                    )}
+              <details
+                className="peekr-user"
+                ref={desktopUserRef}
+                onMouseLeave={() => {
+                  if (desktopUserRef.current) desktopUserRef.current.open = false;
+                }}
+              >
+                <summary className="peekr-avatar-button">
+                  {profile?.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile?.username || "user"}
+                      className="peekr-avatar"
+                    />
+                  ) : (
+                    <div className="peekr-avatar-fallback" />
+                  )}
 
-                    <span className="peekr-avatar-name">
-                      {profile?.display_name || profile?.username || "User"}
-                    </span>
-                  </summary>
+                  <span className="peekr-avatar-name">
+                    {profile?.display_name || profile?.username || "User"}
+                  </span>
+                </summary>
 
-                  <div className="peekr-user-menu">
-                    <Link href={profileHref} className="peekr-user-item">
-                      {t.profile}
-                    </Link>
-                    <Link href="/download-app" className="peekr-user-item">
-                      {t.settings}
-                    </Link>
-                    <button
-                      type="button"
-                      className="peekr-user-item"
-                      onClick={() => {
-                        closeAllMenus();
-                        handleSignOut();
-                      }}
-                    >
-                      {signingOut ? "..." : t.signOut}
-                    </button>
-                  </div>
-                </details>
-              </>
+                <div className="peekr-user-menu">
+                  <Link
+                    href={profileHref}
+                    className="peekr-user-item"
+                    onClick={closeAllMenus}
+                  >
+                    {t.profile}
+                  </Link>
+                  <Link
+                    href={localizedHref("/download-app")}
+                    className="peekr-user-item"
+                    onClick={closeAllMenus}
+                  >
+                    {t.settings}
+                  </Link>
+                  <button
+                    type="button"
+                    className="peekr-user-item"
+                    onClick={() => {
+                      closeAllMenus();
+                      handleSignOut();
+                    }}
+                  >
+                    {signingOut ? "..." : t.signOut}
+                  </button>
+                </div>
+              </details>
             ) : (
               <>
-                <Link href="/login" className="peekr-link">
+                <Link href={localizedHref("/login")} className="peekr-link">
                   {t.signIn}
                 </Link>
 
-                <Link href="/signup" className="peekr-pill">
+                <Link href={localizedHref("/signup")} className="peekr-pill">
                   {t.createAccount}
                 </Link>
               </>
@@ -554,25 +600,37 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
             <details className="peekr-lang" ref={mobileLangRef}>
               <summary style={{ cursor: "pointer", fontSize: 18 }}>🌍</summary>
               <div className="peekr-lang-menu">
-                <a href="/lang/en" className="peekr-lang-item" onClick={closeAllMenus}>
+                <Link
+                  href={switchLangHref("en")}
+                  className="peekr-lang-item"
+                  onClick={closeAllMenus}
+                >
                   🇺🇸 English
-                </a>
-                <a href="/lang/es" className="peekr-lang-item" onClick={closeAllMenus}>
+                </Link>
+                <Link
+                  href={switchLangHref("es")}
+                  className="peekr-lang-item"
+                  onClick={closeAllMenus}
+                >
                   🇪🇸 Español
-                </a>
-                <a href="/lang/pt" className="peekr-lang-item" onClick={closeAllMenus}>
+                </Link>
+                <Link
+                  href={switchLangHref("pt")}
+                  className="peekr-lang-item"
+                  onClick={closeAllMenus}
+                >
                   🇧🇷 Português
-                </a>
+                </Link>
               </div>
             </details>
 
             <details
-                className="peekr-menu"
-                ref={mobileMenuRef}
-                onMouseLeave={() => {
-                  if (mobileMenuRef.current) mobileMenuRef.current.open = false;
-                }}
-              >
+              className="peekr-menu"
+              ref={mobileMenuRef}
+              onMouseLeave={() => {
+                if (mobileMenuRef.current) mobileMenuRef.current.open = false;
+              }}
+            >
               <summary className="peekr-menu-button">
                 <span className="peekr-menu-icon">
                   <span />
@@ -580,16 +638,32 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
               </summary>
 
               <div className="peekr-mobile-panel">
-                <Link href="/explore" className="peekr-mobile-item">
+                <Link
+                  href={localizedHref("/explore")}
+                  className="peekr-mobile-item"
+                  onClick={closeAllMenus}
+                >
                   {t.explore}
                 </Link>
-                <Link href="/lists" className="peekr-mobile-item">
+                <Link
+                  href={localizedHref("/lists")}
+                  className="peekr-mobile-item"
+                  onClick={closeAllMenus}
+                >
                   {t.lists}
                 </Link>
-                <Link href="/activity" className="peekr-mobile-item">
+                <Link
+                  href={localizedHref("/activity")}
+                  className="peekr-mobile-item"
+                  onClick={closeAllMenus}
+                >
                   {t.activity}
                 </Link>
-                <Link href="/buzz" className="peekr-mobile-item">
+                <Link
+                  href={localizedHref("/buzz")}
+                  className="peekr-mobile-item"
+                  onClick={closeAllMenus}
+                >
                   {t.peekrbuzz}
                 </Link>
 
@@ -597,10 +671,18 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
 
                 {loadingAuth ? null : isLoggedIn ? (
                   <>
-                    <Link href={profileHref} className="peekr-user-item" onClick={closeAllMenus}>
+                    <Link
+                      href={profileHref}
+                      className="peekr-user-item"
+                      onClick={closeAllMenus}
+                    >
                       {t.profile}
                     </Link>
-                    <Link href="/download-app" className="peekr-user-item" onClick={closeAllMenus}>
+                    <Link
+                      href={localizedHref("/download-app")}
+                      className="peekr-user-item"
+                      onClick={closeAllMenus}
+                    >
                       {t.settings}
                     </Link>
                     <button
@@ -616,10 +698,18 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
                   </>
                 ) : (
                   <>
-                    <Link href="/login" className="peekr-mobile-item">
+                    <Link
+                      href={localizedHref("/login")}
+                      className="peekr-mobile-item"
+                      onClick={closeAllMenus}
+                    >
                       {t.signIn}
                     </Link>
-                    <Link href="/signup" className="peekr-mobile-item">
+                    <Link
+                      href={localizedHref("/signup")}
+                      className="peekr-mobile-item"
+                      onClick={closeAllMenus}
+                    >
                       {t.createAccount}
                     </Link>
                   </>
