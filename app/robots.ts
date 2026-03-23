@@ -29,9 +29,11 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: "*",
-        allow: ["/", "/title/", "/actor/", "/lists/", "/buzz/"],
+        allow: ["/"],
         disallow: [
           "/api/",
+          "/admin",
+          "/activity",
           "/login",
           "/signup",
           "/forgot-password",
@@ -42,6 +44,6 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: "https://www.peekr.app/sitemap.xml",
+    sitemap: `${process.env.NEXT_PUBLIC_SITE_URL || "https://www.peekr.app"}/sitemap.xml`,
   };
 }
