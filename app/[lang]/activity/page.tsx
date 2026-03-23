@@ -1,7 +1,12 @@
-import { cookies } from "next/headers";
 import ActivityClient from "./activity-client";
 
 type Lang = "en" | "es" | "pt";
+
+type PageProps = {
+  params: Promise<{
+    lang: string;
+  }>;
+};
 
 function normalizeLang(value?: string | null): Lang {
   const raw = (value || "en").toLowerCase();
@@ -10,9 +15,9 @@ function normalizeLang(value?: string | null): Lang {
   return "en";
 }
 
-export default async function ActivityPage() {
-  const cookieStore = await cookies();
-  const lang = normalizeLang(cookieStore.get("lang")?.value);
+export default async function ActivityPage({ params }: PageProps) {
+  const { lang: rawLang } = await params;
+  const lang = normalizeLang(rawLang);
 
   const t = {
     en: {
