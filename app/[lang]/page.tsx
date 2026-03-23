@@ -1,7 +1,7 @@
 export const revalidate = 21600; // 6 horas
 
 import Link from "next/link";
-import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
@@ -9,8 +9,15 @@ const TMDB_BASE = "https://api.themoviedb.org/3";
 const POSTER = "https://image.tmdb.org/t/p/w342";
 const PERSON = "https://image.tmdb.org/t/p/w185";
 const BRAND = "#FA0082";
+const SITE = "https://www.peekr.app";
 
 type Lang = "en" | "es" | "pt";
+
+type PageProps = {
+  params: Promise<{
+    lang: string;
+  }>;
+};
 
 type TmdbTitle = {
   id: number;
@@ -54,42 +61,163 @@ type EditorialCollectionItem = {
   position: number;
 };
 
-export async function generateMetadata() {
-  return {
-    title: "Peekr | The social network for movies and series",
-    description:
-      "Discover movies, TV series, actors and real social activity around what people are watching on Peekr.",
-    openGraph: {
-      title: "Peekr | The social network for movies and series",
-      description:
-        "Track what you watch, rate titles, create Peeklists and discover what people are watching in real time.",
-      type: "website",
-      url: "https://www.peekr.app",
-      siteName: "Peekr",
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: "Peekr | The social network for movies and series",
-      description:
-        "Track what you watch, rate titles, create Peeklists and discover what people are watching in real time.",
-    },
-    alternates: {
-      canonical: "https://www.peekr.app",
-    },
-  };
-}
-
 function normalizeLang(value?: string | null): Lang {
-  const raw = (value || "en").toLowerCase();
-  if (raw.startsWith("es")) return "es";
+  const raw = (value || "es").toLowerCase();
+  if (raw.startsWith("en")) return "en";
   if (raw.startsWith("pt")) return "pt";
-  return "en";
+  if (raw.startsWith("es")) return "es";
+  return "es";
 }
 
 function tmdbLanguage(lang: Lang) {
   if (lang === "es") return "es-ES";
   if (lang === "pt") return "pt-BR";
   return "en-US";
+}
+
+function getStrings(lang: Lang) {
+  return {
+    en: {
+      metaTitle: "Peekr | The social network for movies and series",
+      metaDescription:
+        "Discover movies, TV series, actors and real social activity around what people are watching on Peekr.",
+      ogDescription:
+        "Track what you watch, rate titles, create Peeklists and discover what people are watching in real time.",
+      heroTitle: "The social network for movies and series.",
+      heroText:
+        "Track what you watch, rate titles, create Peeklists and discover what people are watching in real time.",
+      createAccount: "Create account",
+      downloadApp: "Download app",
+      trendingMovies: "Trending movies",
+      trendingMoviesText: "What the world is watching right now in movies.",
+      trendingTV: "Trending TV series",
+      trendingTVText:
+        "Series people are watching, discussing and sharing right now.",
+      platformTitle: "Streaming picks by platform",
+      platformText:
+        "Discover fresh releases and curated picks grouped by platform.",
+      peopleTitle: "Popular people",
+      peopleText:
+        "Go beyond titles and discover the actors and creators shaping what everyone is watching now.",
+      peekrTitle: "Trending on Peekr",
+      peekrText:
+        "Live activity from the community: the latest watched and rated titles on Peekr.",
+      whyTitle: "Why Peekr feels different",
+      why1: "Movies and TV series in one place",
+      why2: "Real social activity, not just logging",
+      why3: "Peeklists built to share taste",
+      why4: "Discover actors, titles and awards",
+      ctaTitle: "Start building your taste graph.",
+      ctaText:
+        "Create your account, track what you watch and discover your next obsession.",
+      movieLabel: "Movie",
+      tvLabel: "TV",
+    },
+    es: {
+      metaTitle: "Peekr | La red social para películas y series",
+      metaDescription:
+        "Descubre películas, series, actores y actividad social real alrededor de lo que la gente está viendo en Peekr.",
+      ogDescription:
+        "Lleva registro de lo que ves, califica títulos, crea Peeklists y descubre lo que la gente está viendo en tiempo real.",
+      heroTitle: "La red social para películas y series.",
+      heroText:
+        "Lleva registro de lo que ves, califica títulos, crea Peeklists y descubre lo que la gente está viendo en tiempo real.",
+      createAccount: "Crear cuenta",
+      downloadApp: "Bajar app",
+      trendingMovies: "Películas en tendencia",
+      trendingMoviesText: "Lo que el mundo está viendo ahora mismo en cine.",
+      trendingTV: "Series en tendencia",
+      trendingTVText:
+        "Series que la gente está viendo, comentando y compartiendo ahora.",
+      platformTitle: "Picks por plataforma",
+      platformText:
+        "Descubre estrenos recientes y colecciones curadas agrupadas por plataforma.",
+      peopleTitle: "Personas populares",
+      peopleText:
+        "Ve más allá de los títulos y descubre actores y creadores que están definiendo lo que todos están viendo.",
+      peekrTitle: "Trending on Peekr",
+      peekrText:
+        "Actividad en vivo de la comunidad: los últimos títulos vistos y calificados en Peekr.",
+      whyTitle: "Por qué Peekr se siente diferente",
+      why1: "Películas y series en un mismo lugar",
+      why2: "Actividad social real, no solo logging",
+      why3: "Peeklists hechas para compartir gusto",
+      why4: "Descubre actores, títulos y premios",
+      ctaTitle: "Empieza a construir tu mapa de gustos.",
+      ctaText:
+        "Crea tu cuenta, registra lo que ves y descubre tu próxima obsesión.",
+      movieLabel: "Película",
+      tvLabel: "TV",
+    },
+    pt: {
+      metaTitle: "Peekr | A rede social para filmes e séries",
+      metaDescription:
+        "Descubra filmes, séries, atores e atividade social real sobre o que as pessoas estão assistindo no Peekr.",
+      ogDescription:
+        "Registre o que você assiste, avalie títulos, crie Peeklists e descubra o que as pessoas estão vendo em tempo real.",
+      heroTitle: "A rede social para filmes e séries.",
+      heroText:
+        "Registre o que você assiste, avalie títulos, crie Peeklists e descubra o que as pessoas estão vendo em tempo real.",
+      createAccount: "Criar conta",
+      downloadApp: "Baixar app",
+      trendingMovies: "Filmes em alta",
+      trendingMoviesText: "O que o mundo está assistindo agora em filmes.",
+      trendingTV: "Séries em alta",
+      trendingTVText:
+        "Séries que as pessoas estão assistindo, comentando e compartilhando agora.",
+      platformTitle: "Picks por plataforma",
+      platformText:
+        "Descubra lançamentos recentes e coleções curadas por plataforma.",
+      peopleTitle: "Pessoas populares",
+      peopleText:
+        "Vá além dos títulos e descubra atores e criadores que estão moldando o que todo mundo está assistindo agora.",
+      peekrTitle: "Trending on Peekr",
+      peekrText:
+        "Atividade ao vivo da comunidade: os últimos títulos assistidos e avaliados no Peekr.",
+      whyTitle: "Por que Peekr é diferente",
+      why1: "Filmes e séries no mesmo lugar",
+      why2: "Atividade social real, não só logging",
+      why3: "Peeklists feitas para compartilhar gosto",
+      why4: "Descubra atores, títulos e premiações",
+      ctaTitle: "Comece a construir seu mapa de gosto.",
+      ctaText:
+        "Crie sua conta, registre o que assiste e descubra sua próxima obsessão.",
+      movieLabel: "Filme",
+      tvLabel: "TV",
+    },
+  }[lang];
+}
+
+export async function generateMetadata({ params }: PageProps) {
+  const { lang: rawLang } = await params;
+  const lang = normalizeLang(rawLang);
+  const t = getStrings(lang);
+
+  return {
+    title: t.metaTitle,
+    description: t.metaDescription,
+    openGraph: {
+      title: t.metaTitle,
+      description: t.ogDescription,
+      type: "website",
+      url: `${SITE}/${lang}`,
+      siteName: "Peekr",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: t.metaTitle,
+      description: t.ogDescription,
+    },
+    alternates: {
+      canonical: `${SITE}/${lang}`,
+      languages: {
+        es: `${SITE}/es`,
+        en: `${SITE}/en`,
+        pt: `${SITE}/pt`,
+        "x-default": `${SITE}/es`,
+      },
+    },
+  };
 }
 
 async function fetchTMDB<T>(url: string): Promise<T | null> {
@@ -186,7 +314,7 @@ async function getHomepagePlatformCollections(lang: Lang) {
         posterPath: detail?.poster_path ?? null,
         mediaType: type,
         tmdbId: first.tmdb_id,
-        href: `/lists/${collection.slug}`,
+        href: `/${lang}/lists/${collection.slug}`,
       };
     })
   );
@@ -216,22 +344,25 @@ function slugify(text: string) {
     .slice(0, 80);
 }
 
-function titleHref(item: {
-  tmdb_id?: number | null;
-  id?: number | null;
-  media_type?: string | null;
-  title?: string | null;
-  name?: string | null;
-}) {
+function titleHref(
+  lang: Lang,
+  item: {
+    tmdb_id?: number | null;
+    id?: number | null;
+    media_type?: string | null;
+    title?: string | null;
+    name?: string | null;
+  }
+) {
   const id = item.tmdb_id ?? item.id;
   const type = item.media_type === "tv" ? "tv" : "movie";
   const rawTitle = item.title || item.name || "title";
   const slug = slugify(rawTitle);
-  return `/title/${type}/${id}-${slug}`;
+  return `/${lang}/title/${type}/${id}-${slug}`;
 }
 
-function actorHref(person: TmdbPerson) {
-  return `/actor/${person.id}-${slugify(person.name)}`;
+function actorHref(lang: Lang, person: TmdbPerson) {
+  return `/${lang}/actor/${person.id}-${slugify(person.name)}`;
 }
 
 function SectionHeader({
@@ -252,9 +383,11 @@ function SectionHeader({
 function TitleRow({
   items,
   type,
+  lang,
 }: {
   items: TmdbTitle[];
   type: "movie" | "tv";
+  lang: Lang;
 }) {
   return (
     <div className="scroll-row">
@@ -265,7 +398,7 @@ function TitleRow({
         return (
           <Link
             key={`${type}-${item.id}`}
-            href={titleHref({
+            href={titleHref(lang, {
               id: item.id,
               media_type: type,
               title: item.title,
@@ -292,6 +425,9 @@ function TitleRow({
 
 function PlatformRow({
   items,
+  lang,
+  movieLabel,
+  tvLabel,
 }: {
   items: Array<{
     id: string;
@@ -301,6 +437,9 @@ function PlatformRow({
     tmdbId: number;
     href: string;
   }>;
+  lang: Lang;
+  movieLabel: string;
+  tvLabel: string;
 }) {
   return (
     <div className="scroll-row">
@@ -318,7 +457,7 @@ function PlatformRow({
             <div className="poster-meta">
               <div className="poster-title">{item.title}</div>
               <div className="poster-year">
-                {item.mediaType === "tv" ? "TV" : "Movie"}
+                {item.mediaType === "tv" ? tvLabel : movieLabel}
               </div>
             </div>
           </Link>
@@ -328,7 +467,13 @@ function PlatformRow({
   );
 }
 
-function PeopleRow({ items }: { items: TmdbPerson[] }) {
+function PeopleRow({
+  items,
+  lang,
+}: {
+  items: TmdbPerson[];
+  lang: Lang;
+}) {
   return (
     <div className="scroll-row">
       {items.slice(0, 12).map((person) => {
@@ -337,7 +482,11 @@ function PeopleRow({ items }: { items: TmdbPerson[] }) {
           : null;
 
         return (
-          <Link key={person.id} href={actorHref(person)} className="person-card">
+          <Link
+            key={person.id}
+            href={actorHref(lang, person)}
+            className="person-card"
+          >
             {photo ? (
               <img src={photo} alt={person.name} className="person-image" />
             ) : (
@@ -355,16 +504,18 @@ function PeopleRow({ items }: { items: TmdbPerson[] }) {
 function PeekrRow({
   items,
   showRating,
+  lang,
 }: {
   items: PeekrActivity[];
   showRating: boolean;
+  lang: Lang;
 }) {
   return (
     <div className="scroll-row">
       {items.map((item, index) => {
         const title = item.title || "Untitled";
         const poster = item.poster_path ? `${POSTER}${item.poster_path}` : null;
-        const href = titleHref(item);
+        const href = titleHref(lang, item);
 
         return (
           <Link
@@ -391,109 +542,25 @@ function PeekrRow({
   );
 }
 
-export default async function HomePage() {
-  const cookieStore = await cookies();
-  const lang = normalizeLang(cookieStore.get("lang")?.value);
+export default async function HomePage({ params }: PageProps) {
+  const { lang: rawLang } = await params;
+  const lang = normalizeLang(rawLang);
 
-  const t = {
-    en: {
-      heroTitle: "The social network for movies and series.",
-      heroText:
-        "Track what you watch, rate titles, create Peeklists and discover what people are watching in real time.",
-      createAccount: "Create account",
-      downloadApp: "Download app",
-      trendingMovies: "Trending movies",
-      trendingMoviesText:
-        "What the world is watching right now in movies.",
-      trendingTV: "Trending TV series",
-      trendingTVText:
-        "Series people are watching, discussing and sharing right now.",
-      platformTitle: "Streaming picks by platform",
-      platformText:
-        "Discover fresh releases and curated picks grouped by platform.",
-      peopleTitle: "Popular people",
-      peopleText:
-        "Go beyond titles and discover the actors and creators shaping what everyone is watching now.",
-      peekrTitle: "Trending on Peekr",
-      peekrText:
-        "Live activity from the community: the latest watched and rated titles on Peekr.",
-      whyTitle: "Why Peekr feels different",
-      why1: "Movies and TV series in one place",
-      why2: "Real social activity, not just logging",
-      why3: "Peeklists built to share taste",
-      why4: "Discover actors, titles and awards",
-      ctaTitle: "Start building your taste graph.",
-      ctaText:
-        "Create your account, track what you watch and discover your next obsession.",
-    },
-    es: {
-      heroTitle: "La red social para películas y series.",
-      heroText:
-        "Lleva registro de lo que ves, califica títulos, crea Peeklists y descubre lo que la gente está viendo en tiempo real.",
-      createAccount: "Crear cuenta",
-      downloadApp: "Bajar app",
-      trendingMovies: "Películas en tendencia",
-      trendingMoviesText:
-        "Lo que el mundo está viendo ahora mismo en cine.",
-      trendingTV: "Series en tendencia",
-      trendingTVText:
-        "Series que la gente está viendo, comentando y compartiendo ahora.",
-      platformTitle: "Picks por plataforma",
-      platformText:
-        "Descubre estrenos recientes y colecciones curadas agrupadas por plataforma.",
-      peopleTitle: "Personas populares",
-      peopleText:
-        "Ve más allá de los títulos y descubre actores y creadores que están definiendo lo que todos están viendo.",
-      peekrTitle: "Trending on Peekr",
-      peekrText:
-        "Actividad en vivo de la comunidad: los últimos títulos vistos y calificados en Peekr.",
-      whyTitle: "Por qué Peekr se siente diferente",
-      why1: "Películas y series en un mismo lugar",
-      why2: "Actividad social real, no solo logging",
-      why3: "Peeklists hechas para compartir gusto",
-      why4: "Descubre actores, títulos y premios",
-      ctaTitle: "Empieza a construir tu mapa de gustos.",
-      ctaText:
-        "Crea tu cuenta, registra lo que ves y descubre tu próxima obsesión.",
-    },
-    pt: {
-      heroTitle: "A rede social para filmes e séries.",
-      heroText:
-        "Registre o que você assiste, avalie títulos, crie Peeklists e descubra o que as pessoas estão vendo em tempo real.",
-      createAccount: "Criar conta",
-      downloadApp: "Baixar app",
-      trendingMovies: "Filmes em alta",
-      trendingMoviesText:
-        "O que o mundo está assistindo agora em filmes.",
-      trendingTV: "Séries em alta",
-      trendingTVText:
-        "Séries que as pessoas estão assistindo, comentando e compartilhando agora.",
-      platformTitle: "Picks por plataforma",
-      platformText:
-        "Descubra lançamentos recentes e coleções curadas por plataforma.",
-      peopleTitle: "Pessoas populares",
-      peopleText:
-        "Vá além dos títulos e descubra atores e criadores que estão moldando o que todo mundo está assistindo agora.",
-      peekrTitle: "Trending on Peekr",
-      peekrText:
-        "Atividade ao vivo da comunidade: os últimos títulos assistidos e avaliados no Peekr.",
-      whyTitle: "Por que Peekr é diferente",
-      why1: "Filmes e séries no mesmo lugar",
-      why2: "Atividade social real, não só logging",
-      why3: "Peeklists feitas para compartilhar gosto",
-      why4: "Descubra atores, títulos e premiações",
-      ctaTitle: "Comece a construir seu mapa de gosto.",
-      ctaText:
-        "Crie sua conta, registre o que assiste e descubra sua próxima obsessão.",
-    },
-  }[lang];
+  if (!["en", "es", "pt"].includes(lang)) {
+    notFound();
+  }
 
-  const [{ trendingMovies, trendingTV, popularPeople }, trendingOnPeekr, platformCollections] =
-    await Promise.all([
-      getTmdbHomeData(lang),
-      getTrendingOnPeekr(),
-      getHomepagePlatformCollections(lang),
-    ]);
+  const t = getStrings(lang);
+
+  const [
+    { trendingMovies, trendingTV, popularPeople },
+    trendingOnPeekr,
+    platformCollections,
+  ] = await Promise.all([
+    getTmdbHomeData(lang),
+    getTrendingOnPeekr(),
+    getHomepagePlatformCollections(lang),
+  ]);
 
   return (
     <>
@@ -752,7 +819,7 @@ export default async function HomePage() {
           <p>{t.heroText}</p>
 
           <div className="hero-actions">
-            <Link href="/signup" className="btn-primary">
+            <Link href={`/${lang}/signup`} className="btn-primary">
               {t.createAccount}
             </Link>
 
@@ -767,29 +834,34 @@ export default async function HomePage() {
 
         <section>
           <SectionHeader title={t.trendingMovies} text={t.trendingMoviesText} />
-          <TitleRow items={trendingMovies} type="movie" />
+          <TitleRow items={trendingMovies} type="movie" lang={lang} />
         </section>
 
         <section>
           <SectionHeader title={t.trendingTV} text={t.trendingTVText} />
-          <TitleRow items={trendingTV} type="tv" />
+          <TitleRow items={trendingTV} type="tv" lang={lang} />
         </section>
 
         {platformCollections.length > 0 ? (
           <section>
             <SectionHeader title={t.platformTitle} text={t.platformText} />
-            <PlatformRow items={platformCollections} />
+            <PlatformRow
+              items={platformCollections}
+              lang={lang}
+              movieLabel={t.movieLabel}
+              tvLabel={t.tvLabel}
+            />
           </section>
         ) : null}
 
         <section>
           <SectionHeader title={t.peopleTitle} text={t.peopleText} />
-          <PeopleRow items={popularPeople} />
+          <PeopleRow items={popularPeople} lang={lang} />
         </section>
 
         <section>
           <SectionHeader title={t.peekrTitle} text={t.peekrText} />
-          <PeekrRow items={trendingOnPeekr} showRating />
+          <PeekrRow items={trendingOnPeekr} showRating lang={lang} />
         </section>
 
         <section className="why-box">
@@ -808,7 +880,7 @@ export default async function HomePage() {
           <p>{t.ctaText}</p>
 
           <div className="cta-actions">
-            <Link href="/signup" className="btn-primary">
+            <Link href={`/${lang}/signup`} className="btn-primary">
               {t.createAccount}
             </Link>
 
