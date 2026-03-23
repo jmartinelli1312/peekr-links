@@ -1,7 +1,7 @@
- export const revalidate = 3600;
+export const revalidate = 3600;
 
 import Link from "next/link";
-import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
@@ -9,6 +9,7 @@ const TMDB_BASE = "https://api.themoviedb.org/3";
 const POSTER = "https://image.tmdb.org/t/p/w342";
 const PERSON = "https://image.tmdb.org/t/p/w185";
 const BRAND = "#FA0082";
+const SITE = "https://www.peekr.app";
 
 type Lang = "en" | "es" | "pt";
 
@@ -18,6 +19,9 @@ type SearchParams = {
 };
 
 type ExplorePageProps = {
+  params: Promise<{
+    lang: string;
+  }>;
   searchParams: Promise<SearchParams>;
 };
 
@@ -61,10 +65,11 @@ type PeekrActivity = {
 };
 
 function normalizeLang(value?: string | null): Lang {
-  const raw = (value || "en").toLowerCase();
-  if (raw.startsWith("es")) return "es";
+  const raw = (value || "es").toLowerCase();
+  if (raw.startsWith("en")) return "en";
   if (raw.startsWith("pt")) return "pt";
-  return "en";
+  if (raw.startsWith("es")) return "es";
+  return "es";
 }
 
 function tmdbLanguage(lang: Lang) {
@@ -83,21 +88,32 @@ function slugify(text: string) {
     .slice(0, 80);
 }
 
-function titleHref(item: {
-  tmdb_id?: number | null;
-  id?: number | null;
-  media_type?: string | null;
-  title?: string | null;
-  name?: string | null;
-}) {
+function titleHref(
+  lang: Lang,
+  item: {
+    tmdb_id?: number | null;
+    id?: number | null;
+    media_type?: string | null;
+    title?: string | null;
+    name?: string | null;
+  }
+) {
   const id = item.tmdb_id ?? item.id;
   const type = item.media_type === "tv" ? "tv" : "movie";
   const rawTitle = item.title || item.name || "title";
-  return `/title/${type}/${id}-${slugify(rawTitle)}`;
+  return `/${lang}/title/${type}/${id}-${slugify(rawTitle)}`;
 }
 
-function actorHref(person: PersonItem) {
-  return `/actor/${person.id}-${slugify(person.name)}`;
+function actorHref(lang: Lang, person: PersonItem) {
+  return `/${lang}/actor/${person.id}-${slugify(person.name)}`;
+}
+
+function userHref(lang: Lang, username?: string | null) {
+  return username ? `/${lang}/user/${username}` : "#";
+}
+
+function peeklistHref(lang: Lang, id: string | number) {
+  return `/${lang}/peeklist/${id}`;
 }
 
 function getYear(item: {
@@ -201,6 +217,9 @@ async function searchUsers(q: string): Promise<ProfileItem[]> {
 function getStrings(lang: Lang) {
   return {
     en: {
+      metaTitle: "Explore | Peekr",
+      metaDescription:
+        "Explore movies, TV series, people, users and Peeklists on Peekr.",
       title: "Explore",
       searchPlaceholder: "Search movies, series, cast, crew or users",
       clear: "Clear",
@@ -213,20 +232,20 @@ function getStrings(lang: Lang) {
       peeklistsText: "Curated collections built to discover and share taste.",
       trendingPeekrMovies: "Trending on Peekr · Movies",
       trendingPeekrTV: "Trending on Peekr · TV",
-      trendingPeekrText:
-        "Live social activity from the Peekr community.",
+      trendingPeekrText: "Live social activity from the Peekr community.",
       trendingMovies: "Trending Movies",
-      trendingMoviesText:
-        "What’s breaking out this week across film.",
+      trendingMoviesText: "What’s breaking out this week across film.",
       trendingTV: "Trending TV",
-      trendingTVText:
-        "The series people are discovering right now.",
+      trendingTVText: "The series people are discovering right now.",
       popularPeople: "Popular People",
       popularPeopleText:
         "Actors and creators shaping what everyone is watching.",
       noResults: "No results found.",
     },
     es: {
+      metaTitle: "Explorar | Peekr",
+      metaDescription:
+        "Explora películas, series, personas, usuarios y Peeklists en Peekr.",
       title: "Explorar",
       searchPlaceholder: "Buscar películas, series, cast, crew o usuarios",
       clear: "Limpiar",
@@ -234,7 +253,7 @@ function getStrings(lang: Lang) {
       titles: "Títulos",
       people: "Cast y Crew",
       users: "Usuarios",
-      searchResults: 'Resultados para',
+      searchResults: "Resultados para",
       peeklists: "Peeklists",
       peeklistsText:
         "Colecciones curadas para descubrir y compartir gustos.",
@@ -243,8 +262,7 @@ function getStrings(lang: Lang) {
       trendingPeekrText:
         "Actividad social en vivo de la comunidad de Peekr.",
       trendingMovies: "Películas en tendencia",
-      trendingMoviesText:
-        "Lo que está explotando esta semana en cine.",
+      trendingMoviesText: "Lo que está explotando esta semana en cine.",
       trendingTV: "Series en tendencia",
       trendingTVText:
         "Las series que la gente está descubriendo ahora mismo.",
@@ -254,6 +272,9 @@ function getStrings(lang: Lang) {
       noResults: "No se encontraron resultados.",
     },
     pt: {
+      metaTitle: "Explorar | Peekr",
+      metaDescription:
+        "Explore filmes, séries, pessoas, usuários e Peeklists no Peekr.",
       title: "Explorar",
       searchPlaceholder: "Buscar filmes, séries, cast, crew ou usuários",
       clear: "Limpar",
@@ -273,14 +294,45 @@ function getStrings(lang: Lang) {
       trendingMoviesText:
         "O que está crescendo esta semana no cinema.",
       trendingTV: "Séries em alta",
-      trendingTVText:
-        "As séries que as pessoas estão descobrindo agora.",
+      trendingTVText: "As séries que as pessoas estão descobrindo agora.",
       popularPeople: "Pessoas populares",
       popularPeopleText:
         "Atores e criadores moldando o que todo mundo está assistindo.",
       noResults: "Nenhum resultado encontrado.",
     },
   }[lang];
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }) {
+  const { lang: rawLang } = await params;
+  const lang = normalizeLang(rawLang);
+  const t = getStrings(lang);
+
+  return {
+    title: t.metaTitle,
+    description: t.metaDescription,
+    alternates: {
+      canonical: `${SITE}/${lang}/explore`,
+      languages: {
+        es: `${SITE}/es/explore`,
+        en: `${SITE}/en/explore`,
+        pt: `${SITE}/pt/explore`,
+        "x-default": `${SITE}/es/explore`,
+      },
+    },
+    openGraph: {
+      title: t.metaTitle,
+      description: t.metaDescription,
+      url: `${SITE}/${lang}/explore`,
+      siteName: "Peekr",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: t.metaTitle,
+      description: t.metaDescription,
+    },
+  };
 }
 
 function SectionHeader({
@@ -321,9 +373,11 @@ function Bubble({
 function PosterRow({
   items,
   type,
+  lang,
 }: {
   items: TmdbItem[];
   type: "movie" | "tv";
+  lang: Lang;
 }) {
   return (
     <div className="scroll-row">
@@ -333,7 +387,7 @@ function PosterRow({
         return (
           <Link
             key={`${type}-${item.id}`}
-            href={titleHref({
+            href={titleHref(lang, {
               id: item.id,
               media_type: type,
               title: item.title,
@@ -362,79 +416,12 @@ function PosterRow({
   );
 }
 
-function PeekrRow({ items }: { items: PeekrActivity[] }) {
-  const movies = items.filter((i) => i.media_type === "movie");
-  const tv = items.filter((i) => i.media_type === "tv");
-
-  return (
-    <>
-      <div className="scroll-row">
-        {movies.map((item, index) => {
-          const title = item.title || "Untitled";
-          return (
-            <Link
-              key={`movie-${item.tmdb_id}-${index}`}
-              href={titleHref(item)}
-              className="poster-card"
-            >
-              {item.poster_path ? (
-                <img
-                  src={`${POSTER}${item.poster_path}`}
-                  alt={title}
-                  className="poster-image"
-                />
-              ) : (
-                <div className="poster-fallback" />
-              )}
-
-              <div className="poster-meta">
-                <div className="poster-title">{title}</div>
-                <div className="poster-year">
-                  {item.rating != null ? `⭐ ${item.rating}/10` : ""}
-                </div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      <div className="scroll-row" style={{ marginTop: 16 }}>
-        {tv.map((item, index) => {
-          const title = item.title || "Untitled";
-          return (
-            <Link
-              key={`tv-${item.tmdb_id}-${index}`}
-              href={titleHref(item)}
-              className="poster-card"
-            >
-              {item.poster_path ? (
-                <img
-                  src={`${POSTER}${item.poster_path}`}
-                  alt={title}
-                  className="poster-image"
-                />
-              ) : (
-                <div className="poster-fallback" />
-              )}
-
-              <div className="poster-meta">
-                <div className="poster-title">{title}</div>
-                <div className="poster-year">
-                  {item.rating != null ? `⭐ ${item.rating}/10` : ""}
-                </div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
 function PeekrOnlyRow({
   items,
+  lang,
 }: {
   items: PeekrActivity[];
+  lang: Lang;
 }) {
   return (
     <div className="scroll-row">
@@ -443,7 +430,7 @@ function PeekrOnlyRow({
         return (
           <Link
             key={`${item.media_type}-${item.tmdb_id}-${index}`}
-            href={titleHref(item)}
+            href={titleHref(lang, item)}
             className="poster-card"
           >
             {item.poster_path ? (
@@ -469,11 +456,21 @@ function PeekrOnlyRow({
   );
 }
 
-function PeopleRow({ items }: { items: PersonItem[] }) {
+function PeopleRow({
+  items,
+  lang,
+}: {
+  items: PersonItem[];
+  lang: Lang;
+}) {
   return (
     <div className="scroll-row">
       {items.slice(0, 20).map((person) => (
-        <Link key={person.id} href={actorHref(person)} className="person-card">
+        <Link
+          key={person.id}
+          href={actorHref(lang, person)}
+          className="person-card"
+        >
           {person.profile_path ? (
             <img
               src={`${PERSON}${person.profile_path}`}
@@ -494,7 +491,13 @@ function PeopleRow({ items }: { items: PersonItem[] }) {
   );
 }
 
-function TitleGrid({ items }: { items: TmdbItem[] }) {
+function TitleGrid({
+  items,
+  lang,
+}: {
+  items: TmdbItem[];
+  lang: Lang;
+}) {
   return (
     <div className="search-grid">
       {items.map((item) => {
@@ -504,7 +507,7 @@ function TitleGrid({ items }: { items: TmdbItem[] }) {
         return (
           <Link
             key={`${type}-${item.id}`}
-            href={titleHref({
+            href={titleHref(lang, {
               id: item.id,
               media_type: type,
               title: item.title,
@@ -533,11 +536,21 @@ function TitleGrid({ items }: { items: TmdbItem[] }) {
   );
 }
 
-function PeopleGrid({ items }: { items: PersonItem[] }) {
+function PeopleGrid({
+  items,
+  lang,
+}: {
+  items: PersonItem[];
+  lang: Lang;
+}) {
   return (
     <div className="search-grid people-grid">
       {items.map((p) => (
-        <Link key={p.id} href={actorHref(p)} className="people-search-card">
+        <Link
+          key={p.id}
+          href={actorHref(lang, p)}
+          className="people-search-card"
+        >
           {p.profile_path ? (
             <img
               src={`${PERSON}${p.profile_path}`}
@@ -558,11 +571,21 @@ function PeopleGrid({ items }: { items: PersonItem[] }) {
   );
 }
 
-function UsersGrid({ items }: { items: ProfileItem[] }) {
+function UsersGrid({
+  items,
+  lang,
+}: {
+  items: ProfileItem[];
+  lang: Lang;
+}) {
   return (
     <div className="users-grid">
       {items.map((u) => (
-        <Link key={u.id} href={`/user/${u.username}`} className="user-card">
+        <Link
+          key={u.id}
+          href={userHref(lang, u.username)}
+          className="user-card"
+        >
           {u.avatar_url ? (
             <img src={u.avatar_url} alt={u.username} className="user-avatar" />
           ) : (
@@ -579,11 +602,21 @@ function UsersGrid({ items }: { items: ProfileItem[] }) {
   );
 }
 
-function PeeklistsRow({ items }: { items: PeeklistItem[] }) {
+function PeeklistsRow({
+  items,
+  lang,
+}: {
+  items: PeeklistItem[];
+  lang: Lang;
+}) {
   return (
     <div className="peeklists-row">
       {items.map((pl) => (
-        <Link key={String(pl.id)} href={`/peeklist/${pl.id}`} className="peeklist-card">
+        <Link
+          key={String(pl.id)}
+          href={peeklistHref(lang, pl.id)}
+          className="peeklist-card"
+        >
           {pl.cover_url ? (
             <img
               src={pl.cover_url}
@@ -602,10 +635,16 @@ function PeeklistsRow({ items }: { items: PeeklistItem[] }) {
 }
 
 export default async function ExplorePage({
+  params,
   searchParams,
 }: ExplorePageProps) {
-  const cookieStore = await cookies();
-  const lang = normalizeLang(cookieStore.get("lang")?.value);
+  const { lang: rawLang } = await params;
+  const lang = normalizeLang(rawLang);
+
+  if (!["en", "es", "pt"].includes(lang)) {
+    notFound();
+  }
+
   const t = getStrings(lang);
 
   const { q = "", tab = "titles" } = await searchParams;
@@ -977,7 +1016,7 @@ export default async function ExplorePage({
         <section className="hero">
           <h1>{t.title}</h1>
 
-          <form action="/explore" method="GET" className="search-form">
+          <form action={`/${lang}/explore`} method="GET" className="search-form">
             <input
               type="text"
               name="q"
@@ -989,7 +1028,7 @@ export default async function ExplorePage({
             <input type="hidden" name="tab" value={tab} />
 
             {query ? (
-              <Link href="/explore" className="btn-secondary">
+              <Link href={`/${lang}/explore`} className="btn-secondary">
                 {t.clear}
               </Link>
             ) : null}
@@ -1004,17 +1043,17 @@ export default async function ExplorePage({
               <Bubble
                 label={t.titles}
                 active={tab === "titles"}
-                href={`/explore?q=${encodeURIComponent(query)}&tab=titles`}
+                href={`/${lang}/explore?q=${encodeURIComponent(query)}&tab=titles`}
               />
               <Bubble
                 label={t.people}
                 active={tab === "people"}
-                href={`/explore?q=${encodeURIComponent(query)}&tab=people`}
+                href={`/${lang}/explore?q=${encodeURIComponent(query)}&tab=people`}
               />
               <Bubble
                 label={t.users}
                 active={tab === "users"}
-                href={`/explore?q=${encodeURIComponent(query)}&tab=users`}
+                href={`/${lang}/explore?q=${encodeURIComponent(query)}&tab=users`}
               />
             </div>
           ) : null}
@@ -1025,7 +1064,7 @@ export default async function ExplorePage({
             <SectionHeader title={`${t.searchResults} "${query}"`} />
             {tab === "titles" ? (
               titleResults.length > 0 ? (
-                <TitleGrid items={titleResults} />
+                <TitleGrid items={titleResults} lang={lang} />
               ) : (
                 <div className="empty-state">{t.noResults}</div>
               )
@@ -1033,7 +1072,7 @@ export default async function ExplorePage({
 
             {tab === "people" ? (
               peopleResults.length > 0 ? (
-                <PeopleGrid items={peopleResults} />
+                <PeopleGrid items={peopleResults} lang={lang} />
               ) : (
                 <div className="empty-state">{t.noResults}</div>
               )
@@ -1041,7 +1080,7 @@ export default async function ExplorePage({
 
             {tab === "users" ? (
               userResults.length > 0 ? (
-                <UsersGrid items={userResults} />
+                <UsersGrid items={userResults} lang={lang} />
               ) : (
                 <div className="empty-state">{t.noResults}</div>
               )
@@ -1051,7 +1090,7 @@ export default async function ExplorePage({
           <>
             <section>
               <SectionHeader title={t.peeklists} text={t.peeklistsText} />
-              <PeeklistsRow items={peeklists} />
+              <PeeklistsRow items={peeklists} lang={lang} />
             </section>
 
             <section>
@@ -1059,7 +1098,7 @@ export default async function ExplorePage({
                 title={t.trendingPeekrMovies}
                 text={t.trendingPeekrText}
               />
-              <PeekrOnlyRow items={peekrMovies} />
+              <PeekrOnlyRow items={peekrMovies} lang={lang} />
             </section>
 
             <section>
@@ -1067,7 +1106,7 @@ export default async function ExplorePage({
                 title={t.trendingPeekrTV}
                 text={t.trendingPeekrText}
               />
-              <PeekrOnlyRow items={peekrTV} />
+              <PeekrOnlyRow items={peekrTV} lang={lang} />
             </section>
 
             <section>
@@ -1075,7 +1114,7 @@ export default async function ExplorePage({
                 title={t.trendingMovies}
                 text={t.trendingMoviesText}
               />
-              <PosterRow items={trendingMovies} type="movie" />
+              <PosterRow items={trendingMovies} type="movie" lang={lang} />
             </section>
 
             <section>
@@ -1083,7 +1122,7 @@ export default async function ExplorePage({
                 title={t.trendingTV}
                 text={t.trendingTVText}
               />
-              <PosterRow items={trendingTV} type="tv" />
+              <PosterRow items={trendingTV} type="tv" lang={lang} />
             </section>
 
             <section>
@@ -1091,7 +1130,7 @@ export default async function ExplorePage({
                 title={t.popularPeople}
                 text={t.popularPeopleText}
               />
-              <PeopleRow items={popularPeople} />
+              <PeopleRow items={popularPeople} lang={lang} />
             </section>
           </>
         )}
