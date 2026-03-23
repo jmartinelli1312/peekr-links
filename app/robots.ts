@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 
+const SITE = "https://www.peekr.app";
+
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
@@ -29,11 +31,36 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: "*",
-        allow: ["/"],
+        allow: [
+          "/",
+          "/es",
+          "/en",
+          "/pt",
+          "/es/title/",
+          "/en/title/",
+          "/pt/title/",
+          "/es/actor/",
+          "/en/actor/",
+          "/pt/actor/",
+          "/es/lists",
+          "/en/lists",
+          "/pt/lists",
+          "/es/lists/",
+          "/en/lists/",
+          "/pt/lists/",
+          "/es/buzz",
+          "/en/buzz",
+          "/pt/buzz",
+          "/es/buzz/",
+          "/en/buzz/",
+          "/pt/buzz/",
+        ],
         disallow: [
-          "/api/",
           "/admin",
+          "/admin/",
           "/activity",
+          "/activity/",
+          "/api/",
           "/login",
           "/signup",
           "/forgot-password",
@@ -41,9 +68,12 @@ export default function robots(): MetadataRoute.Robots {
           "/settings",
           "/notifications",
           "/messages",
+          "/download-app",
+          "/user/",
+          "/peeklist/",
         ],
       },
     ],
-    sitemap: `${process.env.NEXT_PUBLIC_SITE_URL || "https://www.peekr.app"}/sitemap.xml`,
+    sitemap: `${SITE}/sitemap.xml`,
   };
 }
