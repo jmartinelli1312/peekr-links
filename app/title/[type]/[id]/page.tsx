@@ -75,16 +75,17 @@ type TmdbTitleResponse = {
     id: number;
     name: string;
   }[];
-  ["watch/providers"]?: {
-    results?: Record<
-      string,
-      {
-        flatrate?: ProviderItem[];
-        rent?: ProviderItem[];
-        buy?: ProviderItem[];
-      }
-    >;
-  };
+};
+
+type TmdbProvidersResponse = {
+  results?: Record<
+    string,
+    {
+      flatrate?: ProviderItem[];
+      rent?: ProviderItem[];
+      buy?: ProviderItem[];
+    }
+  >;
 };
 
 type PeekrStats = {
@@ -273,9 +274,9 @@ function getStrings(lang: Lang) {
   }[lang];
 }
 
-async function getTitle(type: string, id: number, lang: string) {
+async function getTitleCore(type: string, id: number, lang: string) {
   const res = await fetch(
-    `${TMDB}/${type}/${id}?api_key=${TMDB_KEY}&language=${lang}&append_to_response=credits,videos,watch/providers`,
+    `${TMDB}/${type}/${id}?api_key=${TMDB_KEY}&language=${lang}&append_to_response=credits,videos`,
     { next: { revalidate: 3600 } }
   );
 
@@ -283,8 +284,18 @@ async function getTitle(type: string, id: number, lang: string) {
   return (await res.json()) as TmdbTitleResponse;
 }
 
+async function getTitleProviders(type: string, id: number) {
+  const res = await fetch(
+    `${TMDB}/${type}/${id}/watch/providers?api_key=${TMDB_KEY}`,
+    { next: { revalidate: 3600 } }
+  );
+
+  if (!res.ok) return null;
+  return (await res.json()) as TmdbProvidersResponse;
+}
+
 function pickProviders(
-  providersData: TmdbTitleResponse["watch/providers"],
+  providersData: TmdbProvidersResponse | null,
   lang: Lang
 ) {
   const results = providersData?.results || {};
@@ -311,13 +322,12 @@ function pickProviders(
   return [];
 }
 
-async function getPeekrData(tmdbId: number, mediaType: string) {
+async function getPeekrStats(tmdbId: number, mediaType: string): Promise<PeekrStats> {
   const [
     ratingRpcRes,
     activityStatsRes,
     titleStatsRes,
-    watchersRes,
-    commentsRes,
+    commentsCountRes,
   ] = await Promise.all([
     supabase.rpc("get_title_peekr_rating", {
       p_tmdb_id: tmdbId,
@@ -339,35 +349,10 @@ async function getPeekrData(tmdbId: number, mediaType: string) {
       .maybeSingle(),
 
     supabase
-      .from("user_title_activities")
-      .select(`
-          user_id,
-          profiles (
-            username,
-            avatar_url
-          )
-        `)
-      .eq("tmdb_id", tmdbId)
-      .eq("media_type", mediaType)
-      .order("watched_at", { ascending: false })
-      .limit(12),
-
-    supabase
       .from("ratings")
-      .select(`
-          id,
-          rating,
-          comment,
-          user_id,
-          profiles (
-            username,
-            avatar_url
-          )
-        `)
+      .select("id", { count: "exact", head: true })
       .eq("tmdb_id", tmdbId)
-      .not("comment", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(10),
+      .not("comment", "is", null),
   ]);
 
   const ratingRow =
@@ -387,9 +372,33 @@ async function getPeekrData(tmdbId: number, mediaType: string) {
   const viewsCount =
     (titleStatsRes.data as { views_count?: number } | null)?.views_count ?? 0;
 
+  const commentsCount = commentsCountRes.count ?? 0;
+
+  return {
+    avgRating,
+    watchedCount,
+    commentsCount,
+    viewsCount,
+  };
+}
+
+async function getWatchers(tmdbId: number, mediaType: string): Promise<PeekrWatcher[]> {
+  const watchersRes = await supabase
+    .from("user_title_activities")
+    .select(`
+      user_id,
+      profiles (
+        username,
+        avatar_url
+      )
+    `)
+    .eq("tmdb_id", tmdbId)
+    .eq("media_type", mediaType)
+    .order("watched_at", { ascending: false })
+    .limit(12);
+
   const rawWatchers =
-    ((watchersRes.data as any[] | null) ?? []).filter((w) => !!w?.user_id) ??
-    [];
+    ((watchersRes.data as any[] | null) ?? []).filter((w) => !!w?.user_id) ?? [];
 
   const seenUsers = new Set<string>();
   const watchers: PeekrWatcher[] = [];
@@ -405,26 +414,34 @@ async function getPeekrData(tmdbId: number, mediaType: string) {
     });
   }
 
-  const comments: PeekrComment[] = (((commentsRes.data as any[] | null) ?? []).map(
-    (row) => ({
-      id: String(row.id),
-      username: row.profiles?.username ?? null,
-      avatar_url: row.profiles?.avatar_url ?? null,
-      content: row.comment ?? null,
-      rating: typeof row.rating === "number" ? row.rating : null,
-    }))
-  );
+  return watchers;
+}
 
-  return {
-    stats: {
-      avgRating,
-      watchedCount,
-      commentsCount: comments.length,
-      viewsCount,
-    } as PeekrStats,
-    watchers,
-    comments,
-  };
+async function getComments(tmdbId: number): Promise<PeekrComment[]> {
+  const commentsRes = await supabase
+    .from("ratings")
+    .select(`
+      id,
+      rating,
+      comment,
+      user_id,
+      profiles (
+        username,
+        avatar_url
+      )
+    `)
+    .eq("tmdb_id", tmdbId)
+    .not("comment", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  return (((commentsRes.data as any[] | null) ?? []).map((row) => ({
+    id: String(row.id),
+    username: row.profiles?.username ?? null,
+    avatar_url: row.profiles?.avatar_url ?? null,
+    content: row.comment ?? null,
+    rating: typeof row.rating === "number" ? row.rating : null,
+  })));
 }
 
 function normalizeTab(value?: string): TabKey {
@@ -488,10 +505,12 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
   }
 
   const resolvedSearchParams = searchParams ? await searchParams : {};
+  const requestedTab = normalizeTab(resolvedSearchParams?.tab);
+
   const lang = await getLangFromCookie();
   const t = getStrings(lang);
 
-  const data = await getTitle(type, numericId, tmdbLanguage(lang));
+  const data = await getTitleCore(type, numericId, tmdbLanguage(lang));
   if (!data) {
     notFound();
   }
@@ -504,7 +523,18 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
     redirect(`/title/${type}/${canonicalIdSlug}`);
   }
 
-  const { stats, watchers, comments } = await getPeekrData(numericId, type);
+  const needProviders = requestedTab === "overview" || requestedTab === "platforms";
+  const needWatchers = requestedTab === "overview";
+  const needComments = requestedTab === "comments";
+
+  const [stats, providersData, watchers, comments] = await Promise.all([
+    getPeekrStats(numericId, type),
+    needProviders ? getTitleProviders(type, numericId) : Promise.resolve(null),
+    needWatchers ? getWatchers(numericId, type) : Promise.resolve([]),
+    needComments ? getComments(numericId) : Promise.resolve([]),
+  ]);
+
+  const providers = pickProviders(providersData, lang);
 
   const backdrop = data.backdrop_path;
   const poster = data.poster_path;
@@ -512,7 +542,6 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
   const crew = pickImportantCrew(data.credits?.crew || []);
   const director = data.credits?.crew?.find((c) => c.job === "Director") || null;
   const creator = data.created_by?.[0] || null;
-  const providers = pickProviders(data["watch/providers"], lang);
   const trailer =
     data.videos?.results?.find(
       (v) => v.type === "Trailer" && v.site === "YouTube"
@@ -529,10 +558,9 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
     "crew",
     "awards",
     ...(providers.length > 0 ? (["platforms"] as TabKey[]) : []),
-    ...(comments.length > 0 ? (["comments"] as TabKey[]) : []),
+    ...(stats.commentsCount > 0 ? (["comments"] as TabKey[]) : []),
   ];
 
-  const requestedTab = normalizeTab(resolvedSearchParams?.tab);
   const activeTab = availableTabs.includes(requestedTab)
     ? requestedTab
     : "overview";
@@ -1056,7 +1084,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                 {t.tabsPlatforms}
               </Link>
             ) : null}
-            {comments.length > 0 ? (
+            {stats.commentsCount > 0 ? (
               <Link
                 href={tabHref("comments")}
                 scroll={false}
