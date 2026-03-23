@@ -1,12 +1,16 @@
 export const revalidate = 3600;
 
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
 
 const BRAND = "#FA0082";
+const SITE = "https://www.peekr.app";
 
 type Lang = "en" | "es" | "pt";
+
+type PageProps = {
+  params: Promise<{ lang: string }>;
+};
 
 type BuzzArticle = {
   id: number;
@@ -97,6 +101,44 @@ function categoryLabel(category?: string | null, lang: Lang = "en") {
   return map[(category as keyof typeof map) || "movies"] || category || "";
 }
 
+function getStrings(lang: Lang) {
+  return {
+    en: {
+      pageTitle: "PeekrBuzz | Peekr",
+      metaDescription:
+        "Latest movie, TV, streaming, trailer, casting and awards news on Peekr.",
+      title: "PeekrBuzz",
+      subtitle:
+        "Fresh stories from movies, TV, streaming, trailers, casting and awards.",
+      latestTitle: "Latest stories",
+      latestText:
+        "Entertainment headlines curated for discovery across movies and series.",
+    },
+    es: {
+      pageTitle: "PeekrBuzz | Peekr",
+      metaDescription:
+        "Últimas noticias de películas, series, streaming, trailers, casting y premios en Peekr.",
+      title: "PeekrBuzz",
+      subtitle:
+        "Historias frescas sobre películas, series, streaming, trailers, casting y premios.",
+      latestTitle: "Últimas historias",
+      latestText:
+        "Titulares de entretenimiento curados para discovery en películas y series.",
+    },
+    pt: {
+      pageTitle: "PeekrBuzz | Peekr",
+      metaDescription:
+        "Últimas notícias de filmes, séries, streaming, trailers, casting e prêmios no Peekr.",
+      title: "PeekrBuzz",
+      subtitle:
+        "Histórias frescas sobre filmes, séries, streaming, trailers, casting e prêmios.",
+      latestTitle: "Últimas histórias",
+      latestText:
+        "Manchetes de entretenimento curadas para discovery em filmes e séries.",
+    },
+  }[lang];
+}
+
 async function getBuzzArticles() {
   const { data } = await supabase
     .from("peekrbuzz_articles")
@@ -136,7 +178,7 @@ function FeaturedCard({
   const cleanSummary = decodeHtmlEntities(item.summary);
 
   return (
-    <Link href={`/buzz/${item.slug}`} className="featured-card">
+    <Link href={`/${lang}/buzz/${item.slug}`} className="featured-card">
       {item.image_url ? (
         <img
           src={item.image_url}
@@ -187,7 +229,11 @@ function ArticleGrid({
         const cleanSummary = decodeHtmlEntities(item.summary);
 
         return (
-          <Link key={item.id} href={`/buzz/${item.slug}`} className="buzz-card">
+          <Link
+            key={item.id}
+            href={`/${lang}/buzz/${item.slug}`}
+            className="buzz-card"
+          >
             {item.image_url ? (
               <img src={item.image_url} alt={cleanTitle} className="buzz-image" />
             ) : (
@@ -223,61 +269,42 @@ function ArticleGrid({
   );
 }
 
-export async function generateMetadata() {
+export async function generateMetadata({ params }: PageProps) {
+  const { lang: rawLang } = await params;
+  const lang = normalizeLang(rawLang);
+  const t = getStrings(lang);
+
   return {
-    title: "PeekrBuzz | Peekr",
-    description:
-      "Latest movie, TV, streaming, trailer, casting and awards news on Peekr.",
+    title: t.pageTitle,
+    description: t.metaDescription,
     alternates: {
-      canonical: "https://www.peekr.app/buzz",
+      canonical: `${SITE}/${lang}/buzz`,
+      languages: {
+        es: `${SITE}/es/buzz`,
+        en: `${SITE}/en/buzz`,
+        pt: `${SITE}/pt/buzz`,
+        "x-default": `${SITE}/es/buzz`,
+      },
     },
     openGraph: {
-      title: "PeekrBuzz | Peekr",
-      description:
-        "Latest movie, TV, streaming, trailer, casting and awards news on Peekr.",
-      url: "https://www.peekr.app/buzz",
+      title: t.pageTitle,
+      description: t.metaDescription,
+      url: `${SITE}/${lang}/buzz`,
       siteName: "Peekr",
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
-      title: "PeekrBuzz | Peekr",
-      description:
-        "Latest movie, TV, streaming, trailer, casting and awards news on Peekr.",
+      title: t.pageTitle,
+      description: t.metaDescription,
     },
   };
 }
 
-export default async function BuzzPage() {
-  const cookieStore = await cookies();
-  const lang = normalizeLang(cookieStore.get("lang")?.value);
-
-  const t = {
-    en: {
-      title: "PeekrBuzz",
-      subtitle:
-        "Fresh stories from movies, TV, streaming, trailers, casting and awards.",
-      latestTitle: "Latest stories",
-      latestText:
-        "Entertainment headlines curated for discovery across movies and series.",
-    },
-    es: {
-      title: "PeekrBuzz",
-      subtitle:
-        "Historias frescas sobre películas, series, streaming, trailers, casting y premios.",
-      latestTitle: "Últimas historias",
-      latestText:
-        "Titulares de entretenimiento curados para discovery en películas y series.",
-    },
-    pt: {
-      title: "PeekrBuzz",
-      subtitle:
-        "Histórias frescas sobre filmes, séries, streaming, trailers, casting e prêmios.",
-      latestTitle: "Últimas histórias",
-      latestText:
-        "Manchetes de entretenimento curadas para discovery em filmes e séries.",
-    },
-  }[lang];
+export default async function BuzzPage({ params }: PageProps) {
+  const { lang: rawLang } = await params;
+  const lang = normalizeLang(rawLang);
+  const t = getStrings(lang);
 
   const articles = await getBuzzArticles();
   const featured = articles[0] ?? null;
