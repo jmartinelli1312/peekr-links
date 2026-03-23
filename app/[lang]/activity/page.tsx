@@ -1,4 +1,4 @@
-import ActivityClient from "../../activity/activity-client";
+import ActivityClient from "./activity-client";
 
 type Lang = "en" | "es" | "pt";
 
