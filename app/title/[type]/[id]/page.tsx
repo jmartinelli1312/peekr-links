@@ -16,7 +16,13 @@ const PROVIDER = "https://image.tmdb.org/t/p/w92";
 const BRAND = "#FA0082";
 
 type Lang = "en" | "es" | "pt";
-type TabKey = "overview" | "cast" | "crew" | "platforms" | "awards" | "comments";
+type TabKey =
+  | "overview"
+  | "cast"
+  | "crew"
+  | "platforms"
+  | "awards"
+  | "comments";
 
 type PageProps = {
   params: Promise<{ type: string; id: string }>;
@@ -306,44 +312,49 @@ function pickProviders(
 }
 
 async function getPeekrData(tmdbId: number, mediaType: string) {
-  const [ratingRpcRes, activityStatsRes, titleStatsRes, watchersRes, commentsRes] =
-    await Promise.all([
-      supabase.rpc("get_title_peekr_rating", {
-        p_tmdb_id: tmdbId,
-        p_media_type: mediaType,
-      }),
+  const [
+    ratingRpcRes,
+    activityStatsRes,
+    titleStatsRes,
+    watchersRes,
+    commentsRes,
+  ] = await Promise.all([
+    supabase.rpc("get_title_peekr_rating", {
+      p_tmdb_id: tmdbId,
+      p_media_type: mediaType,
+    }),
 
-      supabase
-        .from("title_activity_stats")
-        .select("watched_count")
-        .eq("tmdb_id", tmdbId)
-        .eq("media_type", mediaType)
-        .maybeSingle(),
+    supabase
+      .from("title_activity_stats")
+      .select("watched_count")
+      .eq("tmdb_id", tmdbId)
+      .eq("media_type", mediaType)
+      .maybeSingle(),
 
-      supabase
-        .from("title_stats")
-        .select("views_count")
-        .eq("tmdb_id", tmdbId)
-        .eq("media_type", mediaType)
-        .maybeSingle(),
+    supabase
+      .from("title_stats")
+      .select("views_count")
+      .eq("tmdb_id", tmdbId)
+      .eq("media_type", mediaType)
+      .maybeSingle(),
 
-      supabase
-        .from("user_title_activities")
-        .select(`
+    supabase
+      .from("user_title_activities")
+      .select(`
           user_id,
           profiles (
             username,
             avatar_url
           )
         `)
-        .eq("tmdb_id", tmdbId)
-        .eq("media_type", mediaType)
-        .order("watched_at", { ascending: false })
-        .limit(12),
+      .eq("tmdb_id", tmdbId)
+      .eq("media_type", mediaType)
+      .order("watched_at", { ascending: false })
+      .limit(12),
 
-      supabase
-        .from("ratings")
-        .select(`
+    supabase
+      .from("ratings")
+      .select(`
           id,
           rating,
           comment,
@@ -353,27 +364,32 @@ async function getPeekrData(tmdbId: number, mediaType: string) {
             avatar_url
           )
         `)
-        .eq("tmdb_id", tmdbId)
-        .not("comment", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(10),
-    ]);
+      .eq("tmdb_id", tmdbId)
+      .not("comment", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(10),
+  ]);
 
   const ratingRow =
-    ((ratingRpcRes.data as { avg_rating: number | null; ratings_count: number }[] | null) ?? [])[0] ??
-    null;
+    ((ratingRpcRes.data as
+      | { avg_rating: number | null; ratings_count: number }[]
+      | null) ?? [])[0] ?? null;
 
   const avgRating =
-    ratingRow?.avg_rating != null ? Number(ratingRow.avg_rating).toFixed(1) : null;
+    ratingRow?.avg_rating != null
+      ? Number(ratingRow.avg_rating).toFixed(1)
+      : null;
 
   const watchedCount =
-    (activityStatsRes.data as { watched_count?: number } | null)?.watched_count ?? 0;
+    (activityStatsRes.data as { watched_count?: number } | null)
+      ?.watched_count ?? 0;
 
   const viewsCount =
     (titleStatsRes.data as { views_count?: number } | null)?.views_count ?? 0;
 
   const rawWatchers =
-    ((watchersRes.data as any[] | null) ?? []).filter((w) => !!w?.user_id) ?? [];
+    ((watchersRes.data as any[] | null) ?? []).filter((w) => !!w?.user_id) ??
+    [];
 
   const seenUsers = new Set<string>();
   const watchers: PeekrWatcher[] = [];
@@ -396,8 +412,8 @@ async function getPeekrData(tmdbId: number, mediaType: string) {
       avatar_url: row.profiles?.avatar_url ?? null,
       content: row.comment ?? null,
       rating: typeof row.rating === "number" ? row.rating : null,
-    })
-  ));
+    }))
+  );
 
   return {
     stats: {
@@ -432,50 +448,29 @@ export async function generateMetadata({ params }: PageProps) {
     return {
       title: "Peekr",
       description: "The social network for movies and series",
+      alternates: {
+        canonical: `${SITE}`,
+      },
     };
   }
-
-  const lang = await getLangFromCookie();
-  const data = await getTitle(type, numericId, tmdbLanguage(lang));
-
-  if (!data) {
-    return {
-      title: "Peekr",
-      description: "The social network for movies and series",
-    };
-  }
-
-  const title = data.title || data.name || "Title";
-  const year = (data.release_date || data.first_air_date || "").slice(0, 4);
-  const slug = slugify(title);
-  const canonicalPath = `/title/${type}/${numericId}-${slug}`;
-  const description =
-    data.overview?.slice(0, 155) || "Discover and discuss movies and series on Peekr.";
 
   return {
-    title: `${title}${year ? ` (${year})` : ""} | Peekr`,
-    description,
+    title: "Peekr",
+    description: "Discover and discuss movies and series on Peekr.",
     alternates: {
-      canonical: `${SITE}${canonicalPath}`,
+      canonical: `${SITE}/title/${type}/${id}`,
     },
     openGraph: {
-      title: `${title}${year ? ` (${year})` : ""} | Peekr`,
-      description,
-      url: `${SITE}${canonicalPath}`,
+      title: "Peekr",
+      description: "Discover and discuss movies and series on Peekr.",
+      url: `${SITE}/title/${type}/${id}`,
       siteName: "Peekr",
       type: "website",
-      images: data.backdrop_path
-        ? [
-            {
-              url: `${IMG}${data.backdrop_path}`,
-            },
-          ]
-        : [],
     },
     twitter: {
-      card: "summary_large_image",
-      title: `${title}${year ? ` (${year})` : ""} | Peekr`,
-      description,
+      card: "summary",
+      title: "Peekr",
+      description: "Discover and discuss movies and series on Peekr.",
     },
   };
 }
@@ -515,8 +510,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
   const poster = data.poster_path;
   const cast = data.credits?.cast?.slice(0, 18) || [];
   const crew = pickImportantCrew(data.credits?.crew || []);
-  const director =
-    data.credits?.crew?.find((c) => c.job === "Director") || null;
+  const director = data.credits?.crew?.find((c) => c.job === "Director") || null;
   const creator = data.created_by?.[0] || null;
   const providers = pickProviders(data["watch/providers"], lang);
   const trailer =
@@ -527,9 +521,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
     null;
 
   const runtime =
-    type === "movie"
-      ? data.runtime
-      : data.episode_run_time?.[0] || null;
+    type === "movie" ? data.runtime : data.episode_run_time?.[0] || null;
 
   const availableTabs: TabKey[] = [
     "overview",
@@ -541,7 +533,9 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
   ];
 
   const requestedTab = normalizeTab(resolvedSearchParams?.tab);
-  const activeTab = availableTabs.includes(requestedTab) ? requestedTab : "overview";
+  const activeTab = availableTabs.includes(requestedTab)
+    ? requestedTab
+    : "overview";
 
   return (
     <>
@@ -1010,10 +1004,18 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
           </div>
 
           <div className="hero-stats">
-            <div className="hero-stat">⭐ {stats.avgRating ?? "-"} · {t.peekrRating}</div>
-            <div className="hero-stat">👁 {stats.watchedCount ?? 0} {t.watched}</div>
-            <div className="hero-stat">💬 {stats.commentsCount ?? 0} {t.commentsCount}</div>
-            <div className="hero-stat">👀 {stats.viewsCount ?? 0} {t.views}</div>
+            <div className="hero-stat">
+              ⭐ {stats.avgRating ?? "-"} · {t.peekrRating}
+            </div>
+            <div className="hero-stat">
+              👁 {stats.watchedCount ?? 0} {t.watched}
+            </div>
+            <div className="hero-stat">
+              💬 {stats.commentsCount ?? 0} {t.commentsCount}
+            </div>
+            <div className="hero-stat">
+              👀 {stats.viewsCount ?? 0} {t.views}
+            </div>
           </div>
 
           <div className="bubble-tabs">
@@ -1115,7 +1117,9 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                         ) : (
                           <div className="watcher-fallback" />
                         )}
-                        <div className="watcher-name">{w.username || "user"}</div>
+                        <div className="watcher-name">
+                          {w.username || "user"}
+                        </div>
                       </Link>
                     ))}
                   </div>
