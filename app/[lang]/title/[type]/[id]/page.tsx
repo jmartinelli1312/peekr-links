@@ -1,8 +1,7 @@
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 import Image from "next/image";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -25,7 +24,7 @@ type TabKey =
   | "comments";
 
 type PageProps = {
-  params: Promise<{ type: string; id: string }>;
+  params: Promise<{ lang: string; type: string; id: string }>;
   searchParams?: Promise<{ tab?: string }>;
 };
 
@@ -118,10 +117,10 @@ type PeekrComment = {
 };
 
 function normalizeLang(value?: string | null): Lang {
-  const raw = (value || "en").toLowerCase();
-  if (raw.startsWith("es")) return "es";
+  const raw = (value || "es").toLowerCase();
+  if (raw.startsWith("en")) return "en";
   if (raw.startsWith("pt")) return "pt";
-  return "en";
+  return "es";
 }
 
 function tmdbLanguage(lang: Lang) {
@@ -152,12 +151,12 @@ function slugify(text: string) {
     .slice(0, 80);
 }
 
-function personHref(id: number, name: string) {
-  return `/actor/${id}-${slugify(name)}`;
+function personHref(id: number, name: string, lang: Lang) {
+  return `/${lang}/actor/${id}-${slugify(name)}`;
 }
 
-function userHref(username?: string | null) {
-  return username ? `/user/${username}` : "#";
+function userHref(username: string | null | undefined, lang: Lang) {
+  return username ? `/${lang}/user/${username}` : "#";
 }
 
 function pickImportantCrew(crew: TmdbCrew[]) {
@@ -194,11 +193,6 @@ function pickImportantCrew(crew: TmdbCrew[]) {
   return out;
 }
 
-async function getLangFromCookie() {
-  const cookieStore = await cookies();
-  return normalizeLang(cookieStore.get("lang")?.value);
-}
-
 function getStrings(lang: Lang) {
   return {
     en: {
@@ -226,6 +220,8 @@ function getStrings(lang: Lang) {
       tabsPlatforms: "Platforms",
       tabsAwards: "Awards",
       tabsComments: "Comments",
+      defaultDescription:
+        "Discover and discuss movies and series on Peekr.",
     },
     es: {
       directedBy: "Dirigida por",
@@ -252,6 +248,8 @@ function getStrings(lang: Lang) {
       tabsPlatforms: "Plataformas",
       tabsAwards: "Premios",
       tabsComments: "Comentarios",
+      defaultDescription:
+        "Descubre y comenta películas y series en Peekr.",
     },
     pt: {
       directedBy: "Dirigido por",
@@ -278,6 +276,8 @@ function getStrings(lang: Lang) {
       tabsPlatforms: "Plataformas",
       tabsAwards: "Prêmios",
       tabsComments: "Comentários",
+      defaultDescription:
+        "Descubra e comente filmes e séries no Peekr.",
     },
   }[lang];
 }
@@ -288,7 +288,7 @@ async function tmdbFetch<T>(path: string, lang?: string) {
   if (lang) url.searchParams.set("language", lang);
 
   const res = await fetch(url.toString(), {
-    next: { revalidate: 3600 },
+    next: { revalidate: 86400 },
   });
 
   if (!res.ok) return null;
@@ -424,6 +424,7 @@ async function getPeekrStats(
       (titleStatsRes.data as { views_count?: number } | null)?.views_count ?? 0,
   };
 }
+
 async function getPeekrWatchers(tmdbId: number, mediaType: string) {
   const watchersRes = await supabase
     .from("user_title_activities")
@@ -505,30 +506,87 @@ function tabHref(tab: TabKey) {
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const { type, id } = await params;
+  const { lang: rawLang, type, id } = await params;
+  const lang = normalizeLang(rawLang);
+  const t = getStrings(lang);
   const numericId = parseIdSlug(id);
 
   if (!numericId || (type !== "movie" && type !== "tv")) {
     return {
       title: "Peekr",
-      description: "The social network for movies and series",
+      description: t.defaultDescription,
       alternates: {
-        canonical: SITE,
+        canonical: `${SITE}/${lang}`,
       },
     };
   }
 
+  const tmdbLang = tmdbLanguage(lang);
+  const base = await getBaseTitle(type, numericId, tmdbLang);
+
+  if (!base) {
+    return {
+      title: "Peekr",
+      description: t.defaultDescription,
+      alternates: {
+        canonical: `${SITE}/${lang}`,
+      },
+    };
+  }
+
+  const title = base.title || base.name || "Title";
+  const slug = slugify(title);
+  const canonicalPath = `/${lang}/title/${type}/${numericId}-${slug}`;
+
+  const fallbackDescription =
+    lang === "es"
+      ? `${title} en Peekr. ${t.defaultDescription}`
+      : lang === "pt"
+        ? `${title} no Peekr. ${t.defaultDescription}`
+        : `${title} on Peekr. ${t.defaultDescription}`;
+
+  const description = base.overview?.slice(0, 155) || fallbackDescription;
+
   return {
-    title: "Peekr",
-    description: "Discover and discuss movies and series on Peekr.",
+    title: `${title} | Peekr`,
+    description,
     alternates: {
-      canonical: `${SITE}/title/${type}/${id}`,
+      canonical: `${SITE}${canonicalPath}`,
+      languages: {
+        es: `${SITE}/es/title/${type}/${numericId}-${slug}`,
+        en: `${SITE}/en/title/${type}/${numericId}-${slug}`,
+        pt: `${SITE}/pt/title/${type}/${numericId}-${slug}`,
+        "x-default": `${SITE}/es/title/${type}/${numericId}-${slug}`,
+      },
+    },
+    openGraph: {
+      title: `${title} | Peekr`,
+      description,
+      url: `${SITE}${canonicalPath}`,
+      siteName: "Peekr",
+      type: type === "movie" ? "video.movie" : "video.tv_show",
+      images: base.backdrop_path
+        ? [{ url: `${IMG}${base.backdrop_path}` }]
+        : base.poster_path
+          ? [{ url: `${POSTER}${base.poster_path}` }]
+          : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${title} | Peekr`,
+      description,
+      images: base.backdrop_path
+        ? [`${IMG}${base.backdrop_path}`]
+        : base.poster_path
+          ? [`${POSTER}${base.poster_path}`]
+          : [],
     },
   };
 }
 
 export default async function TitlePage({ params, searchParams }: PageProps) {
-  const { type, id } = await params;
+  const { lang: rawLang, type, id } = await params;
+  const lang = normalizeLang(rawLang);
 
   if (type !== "movie" && type !== "tv") {
     notFound();
@@ -542,7 +600,6 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const requestedTab = normalizeTab(resolvedSearchParams?.tab);
 
-  const lang = await getLangFromCookie();
   const t = getStrings(lang);
   const tmdbLang = tmdbLanguage(lang);
 
@@ -556,31 +613,32 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
   const canonicalIdSlug = `${numericId}-${slugify(title)}`;
 
   if (id !== canonicalIdSlug) {
-    redirect(`/title/${type}/${canonicalIdSlug}`);
+    redirect(`/${lang}/title/${type}/${canonicalIdSlug}`);
   }
 
   const needCredits =
-  requestedTab === "overview" ||
-  requestedTab === "cast" ||
-  requestedTab === "crew";
+    requestedTab === "overview" ||
+    requestedTab === "cast" ||
+    requestedTab === "crew";
 
-const needVideos = requestedTab === "overview";
-const needProviders =
-  requestedTab === "overview" || requestedTab === "platforms";
-const needWatchers = requestedTab === "overview";
-const needComments = requestedTab === "comments";
-const needFullStats = requestedTab === "overview" || requestedTab === "comments";
+  const needVideos = requestedTab === "overview";
+  const needProviders =
+    requestedTab === "overview" || requestedTab === "platforms";
+  const needWatchers = requestedTab === "overview";
+  const needComments = requestedTab === "comments";
+  const needFullStats =
+    requestedTab === "overview" || requestedTab === "comments";
 
-const [stats, credits, videos, watchProviders, watchers, comments] =
-  await Promise.all([
-    getPeekrStats(numericId, type, needFullStats),
-    needCredits ? getCredits(type, numericId, tmdbLang) : Promise.resolve(null),
-    needVideos ? getVideos(type, numericId, tmdbLang) : Promise.resolve(null),
-    needProviders ? getWatchProviders(type, numericId) : Promise.resolve(null),
-    needWatchers ? getPeekrWatchers(numericId, type) : Promise.resolve([]),
-    needComments ? getPeekrComments(numericId, type) : Promise.resolve([]),
-  ]);
-  
+  const [stats, credits, videos, watchProviders, watchers, comments] =
+    await Promise.all([
+      getPeekrStats(numericId, type, needFullStats),
+      needCredits ? getCredits(type, numericId, tmdbLang) : Promise.resolve(null),
+      needVideos ? getVideos(type, numericId, tmdbLang) : Promise.resolve(null),
+      needProviders ? getWatchProviders(type, numericId) : Promise.resolve(null),
+      needWatchers ? getPeekrWatchers(numericId, type) : Promise.resolve([]),
+      needComments ? getPeekrComments(numericId, type) : Promise.resolve([]),
+    ]);
+
   const backdrop = base.backdrop_path;
   const poster = base.poster_path;
 
@@ -600,18 +658,12 @@ const [stats, credits, videos, watchProviders, watchers, comments] =
   const runtime =
     type === "movie" ? base.runtime : base.episode_run_time?.[0] || null;
 
-  const availableTabs: TabKey[] = [
-    "overview",
-    "cast",
-    "crew",
-    "awards",
-    ...(providers.length > 0 ? (["platforms"] as TabKey[]) : []),
-    ...(stats.commentsCount > 0 ? (["comments"] as TabKey[]) : []),
-  ];
-
-  const activeTab = availableTabs.includes(requestedTab)
-    ? requestedTab
-    : "overview";
+  const activeTab =
+    requestedTab === "platforms" && providers.length === 0
+      ? "overview"
+      : requestedTab === "comments" && stats.commentsCount === 0
+        ? "overview"
+        : requestedTab;
 
   return (
     <>
@@ -1032,7 +1084,7 @@ const [stats, credits, videos, watchProviders, watchers, comments] =
                   <div>
                     {t.directedBy}{" "}
                     <Link
-                      href={personHref(director.id, director.name)}
+                      href={personHref(director.id, director.name, lang)}
                       className="inline-link"
                     >
                       {director.name}
@@ -1044,7 +1096,7 @@ const [stats, credits, videos, watchProviders, watchers, comments] =
                   <div>
                     {t.createdBy}{" "}
                     <Link
-                      href={personHref(creator.id, creator.name)}
+                      href={personHref(creator.id, creator.name, lang)}
                       className="inline-link"
                     >
                       {creator.name}
@@ -1178,7 +1230,7 @@ const [stats, credits, videos, watchProviders, watchers, comments] =
                     {watchers.map((w) => (
                       <Link
                         key={w.user_id}
-                        href={userHref(w.username)}
+                        href={userHref(w.username, lang)}
                         className="watcher-link"
                       >
                         {w.avatar_url ? (
@@ -1211,7 +1263,7 @@ const [stats, credits, videos, watchProviders, watchers, comments] =
                 {cast.map((c) => (
                   <Link
                     key={c.id}
-                    href={personHref(c.id, c.name)}
+                    href={personHref(c.id, c.name, lang)}
                     className="person-card"
                   >
                     {c.profile_path ? (
@@ -1244,7 +1296,7 @@ const [stats, credits, videos, watchProviders, watchers, comments] =
                 {crew.map((c) => (
                   <Link
                     key={`${c.id}-${c.job || ""}`}
-                    href={personHref(c.id, c.name)}
+                    href={personHref(c.id, c.name, lang)}
                     className="person-card"
                   >
                     {c.profile_path ? (
