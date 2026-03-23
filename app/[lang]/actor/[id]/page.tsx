@@ -1,8 +1,7 @@
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 import Image from "next/image";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 const TMDB = "https://api.themoviedb.org/3";
@@ -11,12 +10,12 @@ const SITE = "https://www.peekr.app";
 const PROFILE = "https://image.tmdb.org/t/p/w500";
 const POSTER = "https://image.tmdb.org/t/p/w342";
 const BACKDROP = "https://image.tmdb.org/t/p/w1280";
-const BRAND = "#FA0082";
 
 type Lang = "en" | "es" | "pt";
 
 type PageProps = {
   params: Promise<{
+    lang: string;
     id: string;
   }>;
 };
@@ -66,10 +65,10 @@ type GenreListResponse = {
 };
 
 function normalizeLang(value?: string | null): Lang {
-  const raw = (value || "en").toLowerCase();
-  if (raw.startsWith("es")) return "es";
+  const raw = (value || "es").toLowerCase();
+  if (raw.startsWith("en")) return "en";
   if (raw.startsWith("pt")) return "pt";
-  return "en";
+  return "es";
 }
 
 function tmdbLanguage(lang: Lang) {
@@ -94,10 +93,10 @@ function parseIdSlug(idValue: string) {
   return Number(match[1]);
 }
 
-function titleHref(item: PersonCredit) {
+function titleHref(item: PersonCredit, lang: Lang) {
   const type = item.media_type === "tv" ? "tv" : "movie";
   const title = item.title || item.name || "title";
-  return `/title/${type}/${item.id}-${slugify(title)}`;
+  return `/${lang}/title/${type}/${item.id}-${slugify(title)}`;
 }
 
 function getYear(item: PersonCredit) {
@@ -162,7 +161,8 @@ function pickKnownFor(
 ) {
   const merged = dedupeCredits([...cast, ...crew]).filter((credit) => {
     if (credit.media_type === "movie") return true;
-    if (credit.media_type === "tv") return isRealSeriesCredit(credit, tvGenreMap);
+    if (credit.media_type === "tv")
+      return isRealSeriesCredit(credit, tvGenreMap);
     return false;
   });
 
@@ -206,7 +206,7 @@ async function getActor(id: number, lang: Lang) {
     `${TMDB}/person/${id}?api_key=${TMDB_KEY}&language=${tmdbLanguage(
       lang
     )}&append_to_response=combined_credits,images`,
-    { next: { revalidate: 3600 } }
+    { next: { revalidate: 86400 } }
   );
 
   if (!res.ok) return null;
@@ -216,7 +216,7 @@ async function getActor(id: number, lang: Lang) {
 async function getTVGenres() {
   const res = await fetch(
     `${TMDB}/genre/tv/list?api_key=${TMDB_KEY}&language=en-US`,
-    { next: { revalidate: 3600 } }
+    { next: { revalidate: 86400 } }
   );
 
   if (!res.ok) return new Map<number, string>();
@@ -240,6 +240,8 @@ function getStrings(lang: Lang) {
       aka: "Also known as",
       noBiography: "No biography available.",
       appearances: "Talk shows & appearances",
+      defaultDescription:
+        "Explore biography, movies, TV series and credits on Peekr.",
     },
     es: {
       actorNotFound: "Persona no encontrada",
@@ -254,6 +256,8 @@ function getStrings(lang: Lang) {
       aka: "También conocido como",
       noBiography: "No hay biografía disponible.",
       appearances: "Talk shows y apariciones",
+      defaultDescription:
+        "Explora biografía, películas, series y créditos en Peekr.",
     },
     pt: {
       actorNotFound: "Pessoa não encontrada",
@@ -268,18 +272,17 @@ function getStrings(lang: Lang) {
       aka: "Também conhecido como",
       noBiography: "Sem biografia disponível.",
       appearances: "Talk shows e aparições",
+      defaultDescription:
+        "Explore biografia, filmes, séries e créditos no Peekr.",
     },
   }[lang];
 }
 
-async function getLangFromCookie() {
-  const cookieStore = await cookies();
-  return normalizeLang(cookieStore.get("lang")?.value);
-}
-
 export async function generateMetadata({ params }: PageProps) {
-  const { id } = await params;
+  const { lang: rawLang, id } = await params;
+  const lang = normalizeLang(rawLang);
   const numericId = parseIdSlug(id);
+  const t = getStrings(lang);
 
   if (!numericId) {
     return {
@@ -288,7 +291,6 @@ export async function generateMetadata({ params }: PageProps) {
     };
   }
 
-  const lang = await getLangFromCookie();
   const actor = await getActor(numericId, lang);
 
   if (!actor) {
@@ -299,16 +301,22 @@ export async function generateMetadata({ params }: PageProps) {
   }
 
   const slug = slugify(actor.name);
-  const canonicalPath = `/actor/${numericId}-${slug}`;
+  const canonicalPath = `/${lang}/actor/${numericId}-${slug}`;
   const description =
     actor.biography?.slice(0, 155) ||
-    `${actor.name} on Peekr. Explore biography, movies, TV series and credits.`;
+    `${actor.name} on Peekr. ${t.defaultDescription}`;
 
   return {
     title: `${actor.name} | Peekr`,
     description,
     alternates: {
       canonical: `${SITE}${canonicalPath}`,
+      languages: {
+        es: `${SITE}/es/actor/${numericId}-${slug}`,
+        en: `${SITE}/en/actor/${numericId}-${slug}`,
+        pt: `${SITE}/pt/actor/${numericId}-${slug}`,
+        "x-default": `${SITE}/es/actor/${numericId}-${slug}`,
+      },
     },
     openGraph: {
       title: `${actor.name} | Peekr`,
@@ -328,17 +336,18 @@ export async function generateMetadata({ params }: PageProps) {
       card: "summary_large_image",
       title: `${actor.name} | Peekr`,
       description,
+      images: actor.profile_path ? [`${PROFILE}${actor.profile_path}`] : [],
     },
   };
 }
 
 export default async function ActorPage({ params }: PageProps) {
-  const { id } = await params;
+  const { lang: rawLang, id } = await params;
+  const lang = normalizeLang(rawLang);
   const numericId = parseIdSlug(id);
 
   if (!numericId) notFound();
 
-  const lang = await getLangFromCookie();
   const t = getStrings(lang);
 
   const [actor, tvGenreMap] = await Promise.all([
@@ -352,7 +361,7 @@ export default async function ActorPage({ params }: PageProps) {
 
   const canonicalIdSlug = `${numericId}-${slugify(actor.name)}`;
   if (id !== canonicalIdSlug) {
-    redirect(`/actor/${canonicalIdSlug}`);
+    redirect(`/${lang}/actor/${canonicalIdSlug}`);
   }
 
   const cast = actor.combined_credits?.cast || [];
@@ -670,7 +679,11 @@ export default async function ActorPage({ params }: PageProps) {
                 {knownFor.map((item) => {
                   const title = item.title || item.name || "Untitled";
                   return (
-                    <Link key={`${item.media_type}-${item.id}`} href={titleHref(item)} className="credit-card">
+                    <Link
+                      key={`${item.media_type}-${item.id}`}
+                      href={titleHref(item, lang)}
+                      className="credit-card"
+                    >
                       {item.poster_path ? (
                         <Image
                           src={`${POSTER}${item.poster_path}`}
@@ -688,7 +701,11 @@ export default async function ActorPage({ params }: PageProps) {
                         <div className="credit-title">{title}</div>
                         <div className="credit-sub">
                           {getYear(item)}
-                          {item.character ? ` · ${item.character}` : item.job ? ` · ${item.job}` : ""}
+                          {item.character
+                            ? ` · ${item.character}`
+                            : item.job
+                              ? ` · ${item.job}`
+                              : ""}
                         </div>
                       </div>
                     </Link>
@@ -705,7 +722,11 @@ export default async function ActorPage({ params }: PageProps) {
                 {movies.map((item) => {
                   const title = item.title || item.name || "Untitled";
                   return (
-                    <Link key={`movie-${item.id}`} href={titleHref(item)} className="credit-card">
+                    <Link
+                      key={`movie-${item.id}`}
+                      href={titleHref(item, lang)}
+                      className="credit-card"
+                    >
                       {item.poster_path ? (
                         <Image
                           src={`${POSTER}${item.poster_path}`}
@@ -723,7 +744,11 @@ export default async function ActorPage({ params }: PageProps) {
                         <div className="credit-title">{title}</div>
                         <div className="credit-sub">
                           {getYear(item)}
-                          {item.character ? ` · ${item.character}` : item.job ? ` · ${item.job}` : ""}
+                          {item.character
+                            ? ` · ${item.character}`
+                            : item.job
+                              ? ` · ${item.job}`
+                              : ""}
                         </div>
                       </div>
                     </Link>
@@ -740,7 +765,11 @@ export default async function ActorPage({ params }: PageProps) {
                 {tv.map((item) => {
                   const title = item.title || item.name || "Untitled";
                   return (
-                    <Link key={`tv-${item.id}`} href={titleHref(item)} className="credit-card">
+                    <Link
+                      key={`tv-${item.id}`}
+                      href={titleHref(item, lang)}
+                      className="credit-card"
+                    >
                       {item.poster_path ? (
                         <Image
                           src={`${POSTER}${item.poster_path}`}
@@ -758,7 +787,11 @@ export default async function ActorPage({ params }: PageProps) {
                         <div className="credit-title">{title}</div>
                         <div className="credit-sub">
                           {getYear(item)}
-                          {item.character ? ` · ${item.character}` : item.job ? ` · ${item.job}` : ""}
+                          {item.character
+                            ? ` · ${item.character}`
+                            : item.job
+                              ? ` · ${item.job}`
+                              : ""}
                         </div>
                       </div>
                     </Link>
@@ -775,7 +808,11 @@ export default async function ActorPage({ params }: PageProps) {
                 {appearances.map((item) => {
                   const title = item.title || item.name || "Untitled";
                   return (
-                    <Link key={`appearance-${item.id}`} href={titleHref(item)} className="credit-card">
+                    <Link
+                      key={`appearance-${item.id}`}
+                      href={titleHref(item, lang)}
+                      className="credit-card"
+                    >
                       {item.poster_path ? (
                         <Image
                           src={`${POSTER}${item.poster_path}`}
@@ -793,7 +830,11 @@ export default async function ActorPage({ params }: PageProps) {
                         <div className="credit-title">{title}</div>
                         <div className="credit-sub">
                           {getYear(item)}
-                          {item.character ? ` · ${item.character}` : item.job ? ` · ${item.job}` : ""}
+                          {item.character
+                            ? ` · ${item.character}`
+                            : item.job
+                              ? ` · ${item.job}`
+                              : ""}
                         </div>
                       </div>
                     </Link>
