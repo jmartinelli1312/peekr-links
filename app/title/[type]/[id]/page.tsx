@@ -543,6 +543,7 @@ const needProviders =
   requestedTab === "overview" || requestedTab === "platforms";
 const needWatchers = requestedTab === "overview";
 const needComments = requestedTab === "comments";
+const needFullStats = requestedTab === "overview" || requestedTab === "comments";
 
 const [stats, credits, videos, watchProviders, watchers, comments] =
   await Promise.all([
