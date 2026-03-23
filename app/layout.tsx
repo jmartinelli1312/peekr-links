@@ -1,5 +1,5 @@
 import "./globals.css";
-import { cookies } from "next/headers";
+import Link from "next/link";
 import { Analytics } from "@vercel/analytics/next";
 import SiteHeader from "./components/site-header";
 
@@ -11,19 +11,25 @@ export const metadata = {
 type Lang = "en" | "es" | "pt";
 
 function normalizeLang(value?: string | null): Lang {
-  const raw = (value || "en").toLowerCase();
-  if (raw.startsWith("es")) return "es";
+  const raw = (value || "es").toLowerCase();
+  if (raw.startsWith("en")) return "en";
   if (raw.startsWith("pt")) return "pt";
-  return "en";
+  return "es";
 }
+
+type LayoutProps = {
+  children: React.ReactNode;
+  params: Promise<{
+    lang: string;
+  }>;
+};
 
 export default async function RootLayout({
   children,
-}: {
-  children: React.ReactNode;
-}) {
-  const cookieStore = await cookies();
-  const lang = normalizeLang(cookieStore.get("lang")?.value);
+  params,
+}: LayoutProps) {
+  const { lang: rawLang } = await params;
+  const lang = normalizeLang(rawLang);
 
   const t = {
     en: {
@@ -129,18 +135,18 @@ export default async function RootLayout({
             <div className="peekr-footer-owned">{t.ownedBy}</div>
 
             <div className="peekr-footer-links">
-              <a href="/about" className="peekr-footer-link">
+              <Link href={`/${lang}/about`} className="peekr-footer-link">
                 {t.about}
-              </a>
-              <a href="/privacy" className="peekr-footer-link">
+              </Link>
+              <Link href={`/${lang}/privacy`} className="peekr-footer-link">
                 {t.privacy}
-              </a>
-              <a href="/terms" className="peekr-footer-link">
+              </Link>
+              <Link href={`/${lang}/terms`} className="peekr-footer-link">
                 {t.terms}
-              </a>
-              <a href="/contact" className="peekr-footer-link">
+              </Link>
+              <Link href={`/${lang}/contact`} className="peekr-footer-link">
                 {t.contact}
-              </a>
+              </Link>
             </div>
 
             <div className="peekr-footer-social">
