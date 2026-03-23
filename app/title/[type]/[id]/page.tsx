@@ -343,7 +343,7 @@ async function getPeekrStats(
   tmdbId: number,
   mediaType: string,
   full = true
-) {
+): Promise<PeekrStats> {
   const [ratingRpcRes, activityStatsRes, titleStatsRes, ratingsCountRes] =
     await Promise.all([
       supabase.rpc("get_title_peekr_rating", {
@@ -395,58 +395,7 @@ async function getPeekrStats(
     commentsCount: ratingsCountRes.count ?? 0,
     viewsCount:
       (titleStatsRes.data as { views_count?: number } | null)?.views_count ?? 0,
-  } as PeekrStats;
-}
-  const [ratingRpcRes, activityStatsRes, titleStatsRes, ratingsCountRes] =
-    await Promise.all([
-      ...baseQueries,
-      supabase
-        .from("ratings")
-        .select("id", { count: "exact", head: true })
-        .eq("tmdb_id", tmdbId)
-        .eq("media_type", mediaType)
-        .not("comment", "is", null),
-    ]);
-
-  const ratingRow =
-    ((ratingRpcRes.data as
-      | { avg_rating: number | null; ratings_count: number }[]
-      | null) ?? [])[0] ?? null;
-
-  const avgRating =
-    ratingRow?.avg_rating != null
-      ? Number(ratingRow.avg_rating).toFixed(1)
-      : null;
-
-  return {
-    avgRating,
-    watchedCount:
-      (activityStatsRes.data as { watched_count?: number } | null)
-        ?.watched_count ?? 0,
-    commentsCount: ratingsCountRes.count ?? 0,
-    viewsCount:
-      (titleStatsRes.data as { views_count?: number } | null)?.views_count ?? 0,
-  } as PeekrStats;
-}
-  const ratingRow =
-    ((ratingRpcRes.data as
-      | { avg_rating: number | null; ratings_count: number }[]
-      | null) ?? [])[0] ?? null;
-
-  const avgRating =
-    ratingRow?.avg_rating != null
-      ? Number(ratingRow.avg_rating).toFixed(1)
-      : null;
-
-  return {
-    avgRating,
-    watchedCount:
-      (activityStatsRes.data as { watched_count?: number } | null)
-        ?.watched_count ?? 0,
-    commentsCount: ratingsCountRes.count ?? 0,
-    viewsCount:
-      (titleStatsRes.data as { views_count?: number } | null)?.views_count ?? 0,
-  } as PeekrStats;
+  };
 }
 
 async function getPeekrWatchers(tmdbId: number, mediaType: string) {
