@@ -285,29 +285,33 @@ export async function generateMetadata({ params }: PageProps) {
   const t = getStrings(lang);
 
   if (!numericId) {
-  return {
-    title: "Peekr",
-    description: t.defaultDescription,
-  };
-}
+    return {
+      title: "Peekr",
+      description: t.defaultDescription,
+    };
+  }
 
-if (!actor) {
-  return {
-    title: "Peekr",
-    description: t.defaultDescription,
-  };
-}
+  const actor = await getActor(numericId, lang);
+
+  if (!actor) {
+    return {
+      title: "Peekr",
+      description: t.defaultDescription,
+    };
+  }
 
   const slug = slugify(actor.name);
   const canonicalPath = `/${lang}/actor/${numericId}-${slug}`;
-  const fallbackDescription =
-  lang === "es"
-    ? `${actor.name} en Peekr. ${t.defaultDescription}`
-    : lang === "pt"
-      ? `${actor.name} no Peekr. ${t.defaultDescription}`
-      : `${actor.name} on Peekr. ${t.defaultDescription}`;
 
-const description = actor.biography?.slice(0, 155) || fallbackDescription;
+  const fallbackDescription =
+    lang === "es"
+      ? `${actor.name} en Peekr. ${t.defaultDescription}`
+      : lang === "pt"
+        ? `${actor.name} no Peekr. ${t.defaultDescription}`
+        : `${actor.name} on Peekr. ${t.defaultDescription}`;
+
+  const description = actor.biography?.slice(0, 155) || fallbackDescription;
+
   return {
     title: `${actor.name} | Peekr`,
     description,
