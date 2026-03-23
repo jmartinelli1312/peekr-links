@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+export const revalidate = 21600; // 6 horas
 
 import Link from "next/link";
 import { cookies } from "next/headers";
