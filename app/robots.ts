@@ -29,16 +29,9 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: "*",
-        allow: [
-          "/",
-          "/title/",
-          "/actor/",
-          "/lists/",
-          "/buzz/",
-        ],
+        allow: ["/", "/title/", "/actor/", "/lists/", "/buzz/"],
         disallow: [
           "/api/",
-          "/_next/",
           "/login",
           "/signup",
           "/forgot-password",
@@ -46,8 +39,6 @@ export default function robots(): MetadataRoute.Robots {
           "/settings",
           "/notifications",
           "/messages",
-          "/activity",
-          "/search",
         ],
       },
     ],
