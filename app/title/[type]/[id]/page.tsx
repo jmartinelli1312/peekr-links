@@ -344,35 +344,62 @@ async function getPeekrStats(
   mediaType: string,
   full = true
 ): Promise<PeekrStats> {
+  const ratingPromise = supabase.rpc("get_title_peekr_rating", {
+    p_tmdb_id: tmdbId,
+    p_media_type: mediaType,
+  });
+
+  const watchedPromise = supabase
+    .from("title_activity_stats")
+    .select("watched_count")
+    .eq("tmdb_id", tmdbId)
+    .eq("media_type", mediaType)
+    .maybeSingle();
+
+  if (!full) {
+    const [ratingRpcRes, activityStatsRes] = await Promise.all([
+      ratingPromise,
+      watchedPromise,
+    ]);
+
+    const ratingRow =
+      (
+        (ratingRpcRes.data as
+          | { avg_rating: number | null; ratings_count: number }[]
+          | null) ?? []
+      )[0] ?? null;
+
+    const avgRating =
+      ratingRow?.avg_rating != null
+        ? Number(ratingRow.avg_rating).toFixed(1)
+        : null;
+
+    return {
+      avgRating,
+      watchedCount:
+        (activityStatsRes.data as { watched_count?: number } | null)
+          ?.watched_count ?? 0,
+      commentsCount: 0,
+      viewsCount: 0,
+    };
+  }
+
   const [ratingRpcRes, activityStatsRes, titleStatsRes, ratingsCountRes] =
     await Promise.all([
-      supabase.rpc("get_title_peekr_rating", {
-        p_tmdb_id: tmdbId,
-        p_media_type: mediaType,
-      }),
-
-      supabase
-        .from("title_activity_stats")
-        .select("watched_count")
-        .eq("tmdb_id", tmdbId)
-        .eq("media_type", mediaType)
-        .maybeSingle(),
-
+      ratingPromise,
+      watchedPromise,
       supabase
         .from("title_stats")
         .select("views_count")
         .eq("tmdb_id", tmdbId)
         .eq("media_type", mediaType)
         .maybeSingle(),
-
-      full
-        ? supabase
-            .from("ratings")
-            .select("id", { count: "exact", head: true })
-            .eq("tmdb_id", tmdbId)
-            .eq("media_type", mediaType)
-            .not("comment", "is", null)
-        : Promise.resolve({ count: 0 }),
+      supabase
+        .from("ratings")
+        .select("id", { count: "exact", head: true })
+        .eq("tmdb_id", tmdbId)
+        .eq("media_type", mediaType)
+        .not("comment", "is", null),
     ]);
 
   const ratingRow =
@@ -397,7 +424,6 @@ async function getPeekrStats(
       (titleStatsRes.data as { views_count?: number } | null)?.views_count ?? 0,
   };
 }
-
 async function getPeekrWatchers(tmdbId: number, mediaType: string) {
   const watchersRes = await supabase
     .from("user_title_activities")
