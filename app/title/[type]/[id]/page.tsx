@@ -344,51 +344,59 @@ async function getPeekrStats(
   mediaType: string,
   full = true
 ) {
-  const baseQueries = [
-    supabase.rpc("get_title_peekr_rating", {
-      p_tmdb_id: tmdbId,
-      p_media_type: mediaType,
-    }),
+  const [ratingRpcRes, activityStatsRes, titleStatsRes, ratingsCountRes] =
+    await Promise.all([
+      supabase.rpc("get_title_peekr_rating", {
+        p_tmdb_id: tmdbId,
+        p_media_type: mediaType,
+      }),
 
-    supabase
-      .from("title_activity_stats")
-      .select("watched_count")
-      .eq("tmdb_id", tmdbId)
-      .eq("media_type", mediaType)
-      .maybeSingle(),
+      supabase
+        .from("title_activity_stats")
+        .select("watched_count")
+        .eq("tmdb_id", tmdbId)
+        .eq("media_type", mediaType)
+        .maybeSingle(),
 
-    supabase
-      .from("title_stats")
-      .select("views_count")
-      .eq("tmdb_id", tmdbId)
-      .eq("media_type", mediaType)
-      .maybeSingle(),
-  ] as const;
+      supabase
+        .from("title_stats")
+        .select("views_count")
+        .eq("tmdb_id", tmdbId)
+        .eq("media_type", mediaType)
+        .maybeSingle(),
 
-  if (!full) {
-    const [ratingRpcRes, activityStatsRes, titleStatsRes] = await Promise.all(baseQueries);
+      full
+        ? supabase
+            .from("ratings")
+            .select("id", { count: "exact", head: true })
+            .eq("tmdb_id", tmdbId)
+            .eq("media_type", mediaType)
+            .not("comment", "is", null)
+        : Promise.resolve({ count: 0 }),
+    ]);
 
-    const ratingRow =
-      ((ratingRpcRes.data as
+  const ratingRow =
+    (
+      (ratingRpcRes.data as
         | { avg_rating: number | null; ratings_count: number }[]
-        | null) ?? [])[0] ?? null;
+        | null) ?? []
+    )[0] ?? null;
 
-    const avgRating =
-      ratingRow?.avg_rating != null
-        ? Number(ratingRow.avg_rating).toFixed(1)
-        : null;
+  const avgRating =
+    ratingRow?.avg_rating != null
+      ? Number(ratingRow.avg_rating).toFixed(1)
+      : null;
 
-    return {
-      avgRating,
-      watchedCount:
-        (activityStatsRes.data as { watched_count?: number } | null)
-          ?.watched_count ?? 0,
-      commentsCount: 0,
-      viewsCount:
-        (titleStatsRes.data as { views_count?: number } | null)?.views_count ?? 0,
-    } as PeekrStats;
-  }
-
+  return {
+    avgRating,
+    watchedCount:
+      (activityStatsRes.data as { watched_count?: number } | null)
+        ?.watched_count ?? 0,
+    commentsCount: ratingsCountRes.count ?? 0,
+    viewsCount:
+      (titleStatsRes.data as { views_count?: number } | null)?.views_count ?? 0,
+  } as PeekrStats;
+}
   const [ratingRpcRes, activityStatsRes, titleStatsRes, ratingsCountRes] =
     await Promise.all([
       ...baseQueries,
