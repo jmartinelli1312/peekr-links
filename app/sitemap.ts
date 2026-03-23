@@ -33,25 +33,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
 
     {
-      url: `${SITE}/es/buzz`,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 0.85,
-    },
-    {
-      url: `${SITE}/en/buzz`,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 0.85,
-    },
-    {
-      url: `${SITE}/pt/buzz`,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 0.85,
-    },
-
-    {
       url: `${SITE}/es/lists`,
       lastModified: now,
       changeFrequency: "daily",
@@ -68,6 +49,25 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: "daily",
       priority: 0.9,
+    },
+
+    {
+      url: `${SITE}/es/buzz`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.85,
+    },
+    {
+      url: `${SITE}/en/buzz`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.85,
+    },
+    {
+      url: `${SITE}/pt/buzz`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.85,
     },
   ];
 }
