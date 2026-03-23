@@ -339,28 +339,59 @@ function pickProviders(
   return [];
 }
 
-async function getPeekrStats(tmdbId: number, mediaType: string) {
+async function getPeekrStats(
+  tmdbId: number,
+  mediaType: string,
+  full = true
+) {
+  const baseQueries = [
+    supabase.rpc("get_title_peekr_rating", {
+      p_tmdb_id: tmdbId,
+      p_media_type: mediaType,
+    }),
+
+    supabase
+      .from("title_activity_stats")
+      .select("watched_count")
+      .eq("tmdb_id", tmdbId)
+      .eq("media_type", mediaType)
+      .maybeSingle(),
+
+    supabase
+      .from("title_stats")
+      .select("views_count")
+      .eq("tmdb_id", tmdbId)
+      .eq("media_type", mediaType)
+      .maybeSingle(),
+  ] as const;
+
+  if (!full) {
+    const [ratingRpcRes, activityStatsRes, titleStatsRes] = await Promise.all(baseQueries);
+
+    const ratingRow =
+      ((ratingRpcRes.data as
+        | { avg_rating: number | null; ratings_count: number }[]
+        | null) ?? [])[0] ?? null;
+
+    const avgRating =
+      ratingRow?.avg_rating != null
+        ? Number(ratingRow.avg_rating).toFixed(1)
+        : null;
+
+    return {
+      avgRating,
+      watchedCount:
+        (activityStatsRes.data as { watched_count?: number } | null)
+          ?.watched_count ?? 0,
+      commentsCount: 0,
+      viewsCount:
+        (titleStatsRes.data as { views_count?: number } | null)?.views_count ?? 0,
+    } as PeekrStats;
+  }
+
   const [ratingRpcRes, activityStatsRes, titleStatsRes, ratingsCountRes] =
     await Promise.all([
-      supabase.rpc("get_title_peekr_rating", {
-        p_tmdb_id: tmdbId,
-        p_media_type: mediaType,
-      }),
-
-      supabase
-        .from("title_activity_stats")
-        .select("watched_count")
-        .eq("tmdb_id", tmdbId)
-        .eq("media_type", mediaType)
-        .maybeSingle(),
-
-      supabase
-        .from("title_stats")
-        .select("views_count")
-        .eq("tmdb_id", tmdbId)
-        .eq("media_type", mediaType)
-        .maybeSingle(),
-
+      ...baseQueries,
       supabase
         .from("ratings")
         .select("id", { count: "exact", head: true })
@@ -369,6 +400,26 @@ async function getPeekrStats(tmdbId: number, mediaType: string) {
         .not("comment", "is", null),
     ]);
 
+  const ratingRow =
+    ((ratingRpcRes.data as
+      | { avg_rating: number | null; ratings_count: number }[]
+      | null) ?? [])[0] ?? null;
+
+  const avgRating =
+    ratingRow?.avg_rating != null
+      ? Number(ratingRow.avg_rating).toFixed(1)
+      : null;
+
+  return {
+    avgRating,
+    watchedCount:
+      (activityStatsRes.data as { watched_count?: number } | null)
+        ?.watched_count ?? 0,
+    commentsCount: ratingsCountRes.count ?? 0,
+    viewsCount:
+      (titleStatsRes.data as { views_count?: number } | null)?.views_count ?? 0,
+  } as PeekrStats;
+}
   const ratingRow =
     ((ratingRpcRes.data as
       | { avg_rating: number | null; ratings_count: number }[]
@@ -525,22 +576,27 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
     redirect(`/title/${type}/${canonicalIdSlug}`);
   }
 
-  const needCredits = true;
-  const needVideos = requestedTab === "overview";
-  const needProviders = requestedTab === "overview" || requestedTab === "platforms";
-  const needWatchers = requestedTab === "overview";
-  const needComments = requestedTab === "comments";
+  const needCredits =
+  requestedTab === "overview" ||
+  requestedTab === "cast" ||
+  requestedTab === "crew";
 
-  const [stats, credits, videos, watchProviders, watchers, comments] =
-    await Promise.all([
-      getPeekrStats(numericId, type),
-      needCredits ? getCredits(type, numericId, tmdbLang) : Promise.resolve(null),
-      needVideos ? getVideos(type, numericId, tmdbLang) : Promise.resolve(null),
-      needProviders ? getWatchProviders(type, numericId) : Promise.resolve(null),
-      needWatchers ? getPeekrWatchers(numericId, type) : Promise.resolve([]),
-      needComments ? getPeekrComments(numericId, type) : Promise.resolve([]),
-    ]);
+const needVideos = requestedTab === "overview";
+const needProviders =
+  requestedTab === "overview" || requestedTab === "platforms";
+const needWatchers = requestedTab === "overview";
+const needComments = requestedTab === "comments";
 
+const [stats, credits, videos, watchProviders, watchers, comments] =
+  await Promise.all([
+    getPeekrStats(numericId, type, needFullStats),
+    needCredits ? getCredits(type, numericId, tmdbLang) : Promise.resolve(null),
+    needVideos ? getVideos(type, numericId, tmdbLang) : Promise.resolve(null),
+    needProviders ? getWatchProviders(type, numericId) : Promise.resolve(null),
+    needWatchers ? getPeekrWatchers(numericId, type) : Promise.resolve([]),
+    needComments ? getPeekrComments(numericId, type) : Promise.resolve([]),
+  ]);
+  
   const backdrop = base.backdrop_path;
   const poster = base.poster_path;
 
