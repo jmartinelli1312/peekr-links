@@ -29,10 +29,25 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: "*",
-        allow: ["/"],
-        disallow: [
+        allow: [
+          "/",
           "/title/",
           "/actor/",
+          "/lists/",
+          "/buzz/",
+        ],
+        disallow: [
+          "/api/",
+          "/_next/",
+          "/login",
+          "/signup",
+          "/forgot-password",
+          "/reset-password",
+          "/settings",
+          "/notifications",
+          "/messages",
+          "/activity",
+          "/search",
         ],
       },
     ],
