@@ -1,4 +1,4 @@
-export const revalidate = 3600;
+export const revalidate = 21600;
 
 import Link from "next/link";
 import { cookies } from "next/headers";
