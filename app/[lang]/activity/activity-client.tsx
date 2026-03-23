@@ -49,16 +49,34 @@ function slugify(text: string) {
 }
 
 function titleHref({
+  lang,
   tmdbId,
   mediaType,
   title,
 }: {
+  lang: Lang;
   tmdbId: number;
   mediaType: string;
   title: string;
 }) {
   const type = mediaType === "tv" ? "tv" : "movie";
-  return `/title/${type}/${tmdbId}-${slugify(title || "title")}`;
+  return `/${lang}/title/${type}/${tmdbId}-${slugify(title || "title")}`;
+}
+
+function userHref(lang: Lang, username: string) {
+  return `/${lang}/user/${username}`;
+}
+
+function peeklistHref(lang: Lang, peeklistId: string) {
+  return `/${lang}/peeklist/${peeklistId}`;
+}
+
+function signupHref(lang: Lang) {
+  return `/${lang}/signup`;
+}
+
+function loginHref(lang: Lang) {
+  return `/${lang}/login`;
 }
 
 function formatRelativeTime(dateString: string, lang: Lang) {
@@ -228,7 +246,7 @@ export default function ActivityClient({
     return (
       <div key={activityKey} className="activity-card">
         <div className="activity-top">
-          <Link href={`/user/${username}`} className="avatar-link">
+          <Link href={userHref(lang, username)} className="avatar-link">
             {avatar ? (
               <img src={avatar} alt={username} className="avatar" />
             ) : (
@@ -237,12 +255,18 @@ export default function ActivityClient({
           </Link>
 
           <div className="activity-main">
-            <Link href={`/user/${username}`} className="activity-headline">
+            <Link
+              href={userHref(lang, username)}
+              className="activity-headline"
+            >
               @{username} {t.seen} {titles.length}{" "}
               {titles.length === 1 ? t.titleSingle : t.titlePlural}
             </Link>
+
             {time ? (
-              <div className="activity-time">{formatRelativeTime(time, lang)}</div>
+              <div className="activity-time">
+                {formatRelativeTime(time, lang)}
+              </div>
             ) : null}
           </div>
         </div>
@@ -269,6 +293,7 @@ export default function ActivityClient({
                 <Link
                   key={`${tmdbId}-${i}`}
                   href={titleHref({
+                    lang,
                     tmdbId,
                     mediaType,
                     title,
@@ -288,7 +313,9 @@ export default function ActivityClient({
                   <div className="expanded-title">{title}</div>
 
                   {rating != null ? (
-                    <div className="expanded-rating">★{normalizeRating(rating)}</div>
+                    <div className="expanded-rating">
+                      ★{normalizeRating(rating)}
+                    </div>
                   ) : null}
                 </Link>
               );
@@ -309,7 +336,7 @@ export default function ActivityClient({
     return (
       <div key={`${peeklistId}-${index}`} className="activity-card">
         <div className="activity-top">
-          <Link href={`/user/${username}`} className="avatar-link">
+          <Link href={userHref(lang, username)} className="avatar-link">
             {avatar ? (
               <img src={avatar} alt={username} className="avatar" />
             ) : (
@@ -319,18 +346,23 @@ export default function ActivityClient({
 
           <div className="activity-main">
             <div className="activity-headline">
-              <Link href={`/user/${username}`} className="inline-user">
+              <Link href={userHref(lang, username)} className="inline-user">
                 @{username}
               </Link>{" "}
               {t.createdPeeklist}
             </div>
 
-            <Link href={`/peeklist/${peeklistId}`} className="peeklist-link">
+            <Link
+              href={peeklistHref(lang, peeklistId)}
+              className="peeklist-link"
+            >
               {peeklistTitle}
             </Link>
 
             {time ? (
-              <div className="activity-time">{formatRelativeTime(time, lang)}</div>
+              <div className="activity-time">
+                {formatRelativeTime(time, lang)}
+              </div>
             ) : null}
           </div>
         </div>
@@ -576,10 +608,10 @@ export default function ActivityClient({
             <p>{t.noSessionText}</p>
 
             <div className="empty-actions">
-              <Link href="/signup" className="btn-primary">
+              <Link href={signupHref(lang)} className="btn-primary">
                 {t.createAccount}
               </Link>
-              <Link href="/login" className="btn-secondary">
+              <Link href={loginHref(lang)} className="btn-secondary">
                 {t.signIn}
               </Link>
             </div>
