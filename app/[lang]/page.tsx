@@ -819,17 +819,14 @@ export default async function HomePage({ params }: PageProps) {
           <p>{t.heroText}</p>
 
           <div className="hero-actions">
-            <Link href={`/${lang}/signup`} className="btn-primary">
-              {t.createAccount}
-            </Link>
-
-            <a
-              href="mailto:info@peekr.app?subject=Peekr%20App"
-              className="btn-secondary"
-            >
-              {t.downloadApp}
-            </a>
-          </div>
+          <Link href="/signup" className="btn-primary">
+            {t.createAccount}
+          </Link>
+        
+          <Link href={`/${lang}/download-app`} className="btn-secondary">
+            {t.downloadApp}
+          </Link>
+        </div>
         </section>
 
         <section>
@@ -880,17 +877,14 @@ export default async function HomePage({ params }: PageProps) {
           <p>{t.ctaText}</p>
 
           <div className="cta-actions">
-            <Link href={`/${lang}/signup`} className="btn-primary">
-              {t.createAccount}
-            </Link>
-
-            <a
-              href="mailto:info@peekr.app?subject=Peekr%20App"
-              className="btn-secondary"
-            >
-              {t.downloadApp}
-            </a>
-          </div>
+          <Link href="/signup" className="btn-primary">
+            {t.createAccount}
+          </Link>
+        
+          <Link href={`/${lang}/download-app`} className="btn-secondary">
+            {t.downloadApp}
+          </Link>
+        </div>
         </section>
       </div>
     </>
