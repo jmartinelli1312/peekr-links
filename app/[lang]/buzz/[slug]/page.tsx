@@ -28,7 +28,6 @@ type BuzzArticle = {
   published_at?: string | null;
   category?: string | null;
   is_published: boolean;
-  content?: string | null;
 };
 
 function normalizeLang(value?: string | null): Lang {
@@ -56,7 +55,9 @@ function decodeHtmlEntities(input?: string | null) {
 
 function stripHtml(html?: string | null) {
   if (!html) return "";
-  return decodeHtmlEntities(html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
+  return decodeHtmlEntities(
+    html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+  );
 }
 
 function formatDate(value?: string | null, lang: Lang = "en") {
@@ -142,19 +143,22 @@ function getStrings(lang: Lang) {
 }
 
 async function getBuzzArticle(slug: string) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("peekrbuzz_articles")
     .select(
-      "id,slug,title,summary,source_name,source_url,image_url,published_at,category,is_published,content"
+      "id,slug,title,summary,source_name,source_url,image_url,published_at,category,is_published"
     )
     .eq("slug", slug)
     .eq("is_published", true)
     .maybeSingle();
 
+  if (error) return null;
   return (data as BuzzArticle | null) ?? null;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
   const { lang: rawLang, slug } = await params;
   const lang = normalizeLang(rawLang);
   const t = getStrings(lang);
@@ -170,9 +174,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const cleanTitle = decodeHtmlEntities(article.title);
   const cleanSummary =
-    stripHtml(article.summary) ||
-    stripHtml(article.content).slice(0, 155) ||
-    t.defaultDescription;
+    stripHtml(article.summary).slice(0, 155) || t.defaultDescription;
 
   return {
     title: `${cleanTitle} | PeekrBuzz`,
@@ -214,18 +216,12 @@ export default async function BuzzArticlePage({ params }: PageProps) {
 
   const cleanTitle = decodeHtmlEntities(article.title);
   const cleanSummary = decodeHtmlEntities(article.summary);
-  const cleanContent = article.content
-    ? decodeHtmlEntities(article.content)
-    : "";
 
   const articleJsonLd = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
     headline: cleanTitle,
-    description:
-      stripHtml(article.summary) ||
-      stripHtml(article.content).slice(0, 155) ||
-      t.defaultDescription,
+    description: stripHtml(article.summary).slice(0, 155) || t.defaultDescription,
     datePublished: article.published_at || undefined,
     dateModified: article.published_at || undefined,
     image: article.image_url ? [article.image_url] : undefined,
@@ -435,15 +431,7 @@ export default async function BuzzArticlePage({ params }: PageProps) {
         </section>
 
         <section className="content-wrap">
-          {cleanContent ? (
-            cleanContent
-              .split(/\n{2,}/)
-              .map((paragraph, index) =>
-                paragraph.trim() ? <p key={index}>{paragraph.trim()}</p> : null
-              )
-          ) : cleanSummary ? (
-            <p>{cleanSummary}</p>
-          ) : null}
+          {cleanSummary ? <p>{cleanSummary}</p> : null}
         </section>
       </div>
     </>
