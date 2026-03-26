@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 
 const SUPPORTED_LANGS = new Set(["es", "en", "pt"]);
 const DEFAULT_LANG = "es";
+const CANONICAL_HOST = "www.peekr.app";
 
 function hasLangPrefix(pathname: string) {
   const segments = pathname.split("/").filter(Boolean);
@@ -10,34 +11,54 @@ function hasLangPrefix(pathname: string) {
 }
 
 function getPreferredLang(request: NextRequest) {
-  const acceptLanguage = request.headers.get("accept-language")?.toLowerCase() || "";
+  const acceptLanguage =
+    request.headers.get("accept-language")?.toLowerCase() || "";
 
   if (acceptLanguage.includes("pt")) return "pt";
   if (acceptLanguage.includes("en")) return "en";
   return "es";
 }
 
-export function middleware(request: NextRequest) {
-  const { pathname, search } = request.nextUrl;
-
-  // No tocar archivos internos, APIs o assets
-  if (
+function isBypassedPath(pathname: string) {
+  return (
     pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon.ico") ||
     pathname.startsWith("/sitemap.xml") ||
     pathname.startsWith("/robots.txt") ||
-    pathname.match(/\.(png|jpg|jpeg|webp|gif|svg|ico|css|js|map|txt|xml)$/)
-  ) {
+    /\.(png|jpg|jpeg|webp|gif|svg|ico|css|js|map|txt|xml)$/i.test(pathname)
+  );
+}
+
+export function middleware(request: NextRequest) {
+  const { pathname, searchParams } = request.nextUrl;
+  const host = request.headers.get("host") || "";
+
+  if (isBypassedPath(pathname)) {
     return NextResponse.next();
   }
 
-  // Si ya viene con idioma, dejar pasar
+  // 1) Forzar dominio canónico: https://www.peekr.app
+  if (host !== CANONICAL_HOST) {
+    const url = request.nextUrl.clone();
+    url.protocol = "https:";
+    url.host = CANONICAL_HOST;
+    return NextResponse.redirect(url, 308);
+  }
+
+  // 2) Normalizar /index.html -> /
+  if (pathname === "/index.html") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url, 308);
+  }
+
+  // 3) Si ya viene con idioma, dejar pasar
   if (hasLangPrefix(pathname)) {
     return NextResponse.next();
   }
 
-  // Rutas públicas que quieres internacionalizar ya mismo
+  // 4) Solo redirigir a idioma en rutas públicas definidas
   const shouldRedirect =
     pathname === "/" ||
     pathname.startsWith("/actor/") ||
@@ -52,14 +73,17 @@ export function middleware(request: NextRequest) {
   const lang = getPreferredLang(request) || DEFAULT_LANG;
   const url = request.nextUrl.clone();
   url.pathname = `/${lang}${pathname}`;
-  url.search = search;
 
-  return NextResponse.redirect(url);
+  const query = searchParams.toString();
+  url.search = query ? `?${query}` : "";
+
+  return NextResponse.redirect(url, 307);
 }
 
 export const config = {
   matcher: [
     "/",
+    "/index.html",
     "/actor/:path*",
     "/title/:path*",
     "/lists/:path*",
