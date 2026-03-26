@@ -49,30 +49,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   const staticUrls: MetadataRoute.Sitemap = [
-    {
-      url: `${SITE}/`,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 1,
-    },
-
     ...LANGS.flatMap((lang) => [
       {
         url: `${SITE}/${lang}`,
         lastModified: now,
-        changeFrequency: "daily" as const,
+        changeFrequency: "daily",
         priority: 0.95,
       },
       {
         url: `${SITE}/${lang}/lists`,
         lastModified: now,
-        changeFrequency: "daily" as const,
+        changeFrequency: "daily",
         priority: 0.9,
       },
       {
         url: `${SITE}/${lang}/buzz`,
         lastModified: now,
-        changeFrequency: "daily" as const,
+        changeFrequency: "daily",
         priority: 0.85,
       },
     ]),
