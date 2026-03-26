@@ -48,28 +48,28 @@ function safeDate(value?: string | null) {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
-  const staticUrls: MetadataRoute.Sitemap = [
-    ...LANGS.flatMap((lang) => [
-      {
-        url: `${SITE}/${lang}`,
-        lastModified: now,
-        changeFrequency: "daily",
-        priority: 0.95,
-      },
-      {
-        url: `${SITE}/${lang}/lists`,
-        lastModified: now,
-        changeFrequency: "daily",
-        priority: 0.9,
-      },
-      {
-        url: `${SITE}/${lang}/buzz`,
-        lastModified: now,
-        changeFrequency: "daily",
-        priority: 0.85,
-      },
-    ]),
-  ];
+ const staticUrls: MetadataRoute.Sitemap = [
+  ...LANGS.flatMap((lang) => [
+    {
+      url: `${SITE}/${lang}`,
+      lastModified: now,
+      changeFrequency: "daily" as const,
+      priority: 0.95,
+    },
+    {
+      url: `${SITE}/${lang}/lists`,
+      lastModified: now,
+      changeFrequency: "daily" as const,
+      priority: 0.9,
+    },
+    {
+      url: `${SITE}/${lang}/buzz`,
+      lastModified: now,
+      changeFrequency: "daily" as const,
+      priority: 0.85,
+    },
+  ]),
+];
 
   const [
     editorialCollectionsRes,
