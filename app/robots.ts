@@ -45,12 +45,7 @@ export default function robots(): MetadataRoute.Robots {
           "/messages",
           "/activity",
           "/activity/",
-          "/es/actor/",
-          "/en/actor/",
-          "/pt/actor/",
-          "/es/title/",
-          "/en/title/",
-          "/pt/title/",
+        
         ],
       },
     ],
