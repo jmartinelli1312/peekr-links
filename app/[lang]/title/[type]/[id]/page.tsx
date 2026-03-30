@@ -2,7 +2,8 @@ export const revalidate = 86400;
 
 import Image from "next/image";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
+import { cache } from "react";
 import { supabase } from "@/lib/supabase";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
@@ -295,9 +296,13 @@ async function tmdbFetch<T>(path: string, lang?: string) {
   return (await res.json()) as T;
 }
 
-async function getBaseTitle(type: string, id: number, lang: string) {
+const getBaseTitle = cache(async function getBaseTitleCached(
+  type: string,
+  id: number,
+  lang: string
+) {
   return tmdbFetch<TmdbBaseTitleResponse>(`/${type}/${id}`, lang);
-}
+});
 
 async function getCredits(type: string, id: number, lang: string) {
   return tmdbFetch<TmdbCreditsResponse>(`/${type}/${id}/credits`, lang);
@@ -611,10 +616,6 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
   const title = base.title || base.name || "Title";
   const year = (base.release_date || base.first_air_date || "").slice(0, 4);
   const canonicalIdSlug = `${numericId}-${slugify(title)}`;
-
-  if (id !== canonicalIdSlug) {
-    redirect(`/${lang}/title/${type}/${canonicalIdSlug}`);
-  }
 
   const needCredits =
     requestedTab === "overview" ||
