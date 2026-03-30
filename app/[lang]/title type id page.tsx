@@ -1,4 +1,4 @@
-export const revalidate = 21600; // 6 horas
+export const revalidate = 259200; // 72 horas
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
