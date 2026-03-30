@@ -4,6 +4,12 @@ import { supabase } from "@/lib/supabase";
 const SITE = "https://www.peekr.app";
 const LANGS = ["es", "en", "pt"] as const;
 
+// Curado SEO / crawl budget
+const MAX_EDITORIAL_COLLECTIONS = 500;
+const MAX_BUZZ_ARTICLES = 500;
+const MAX_TITLE_URLS = 300;
+const MAX_ACTOR_URLS = 200;
+
 type EditorialCollectionRow = {
   slug: string;
   updated_at?: string | null;
@@ -45,31 +51,38 @@ function safeDate(value?: string | null) {
   return value ? new Date(value) : new Date();
 }
 
+function isUsefulSlug(value?: string | null) {
+  const slug = slugify(value || "");
+  return slug.length >= 2;
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
- const staticUrls: MetadataRoute.Sitemap = [
-  ...LANGS.flatMap((lang) => [
-    {
-      url: `${SITE}/${lang}`,
-      lastModified: now,
-      changeFrequency: "daily" as const,
-      priority: 0.95,
-    },
-    {
-      url: `${SITE}/${lang}/lists`,
-      lastModified: now,
-      changeFrequency: "daily" as const,
-      priority: 0.9,
-    },
-    {
-      url: `${SITE}/${lang}/buzz`,
-      lastModified: now,
-      changeFrequency: "daily" as const,
-      priority: 0.85,
-    },
-  ]),
-];
+  const staticUrls: MetadataRoute.Sitemap = [];
+
+  for (const lang of LANGS) {
+    staticUrls.push(
+      {
+        url: `${SITE}/${lang}`,
+        lastModified: now,
+        changeFrequency: "daily",
+        priority: 0.95,
+      },
+      {
+        url: `${SITE}/${lang}/lists`,
+        lastModified: now,
+        changeFrequency: "daily",
+        priority: 0.9,
+      },
+      {
+        url: `${SITE}/${lang}/buzz`,
+        lastModified: now,
+        changeFrequency: "daily",
+        priority: 0.85,
+      }
+    );
+  }
 
   const [
     editorialCollectionsRes,
@@ -82,25 +95,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .select("slug,updated_at,is_published,item_count")
       .eq("is_published", true)
       .gt("item_count", 0)
-      .limit(5000),
+      .order("updated_at", { ascending: false })
+      .limit(MAX_EDITORIAL_COLLECTIONS),
 
     supabase
       .from("peekrbuzz_articles")
       .select("slug,published_at,updated_at,is_published")
       .eq("is_published", true)
-      .limit(5000),
+      .order("published_at", { ascending: false })
+      .limit(MAX_BUZZ_ARTICLES),
 
     supabase
       .from("titles_cache")
       .select("tmdb_id,media_type,title,updated_at")
       .not("tmdb_id", "is", null)
-      .limit(5000),
+      .not("title", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(MAX_TITLE_URLS),
 
     supabase
       .from("people_cache")
       .select("person_id,name,updated_at")
       .not("person_id", "is", null)
-      .limit(5000),
+      .not("name", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(MAX_ACTOR_URLS),
   ]);
 
   const editorialCollections =
@@ -112,26 +131,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const actors =
     (actorsRes.data as ActorRow[] | null) ?? [];
 
-  const listUrls: MetadataRoute.Sitemap = editorialCollections.flatMap((item) =>
-    LANGS.map((lang) => ({
-      url: `${SITE}/${lang}/lists/${item.slug}`,
-      lastModified: safeDate(item.updated_at),
-      changeFrequency: "weekly" as const,
-      priority: 0.8,
-    }))
-  );
+  const listUrls: MetadataRoute.Sitemap = editorialCollections
+    .filter((item) => item.slug && item.slug.trim().length > 0)
+    .flatMap((item) =>
+      LANGS.map((lang) => ({
+        url: `${SITE}/${lang}/lists/${item.slug}`,
+        lastModified: safeDate(item.updated_at),
+        changeFrequency: "weekly" as const,
+        priority: 0.8,
+      }))
+    );
 
-  const buzzUrls: MetadataRoute.Sitemap = buzzArticles.flatMap((item) =>
-    LANGS.map((lang) => ({
-      url: `${SITE}/${lang}/buzz/${item.slug}`,
-      lastModified: safeDate(item.updated_at || item.published_at),
-      changeFrequency: "weekly" as const,
-      priority: 0.75,
-    }))
-  );
+  const buzzUrls: MetadataRoute.Sitemap = buzzArticles
+    .filter((item) => item.slug && item.slug.trim().length > 0)
+    .flatMap((item) =>
+      LANGS.map((lang) => ({
+        url: `${SITE}/${lang}/buzz/${item.slug}`,
+        lastModified: safeDate(item.updated_at || item.published_at),
+        changeFrequency: "weekly" as const,
+        priority: 0.75,
+      }))
+    );
 
   const titleUrls: MetadataRoute.Sitemap = titles
-    .filter((item) => item.tmdb_id && item.title)
+    .filter((item) => item.tmdb_id && isUsefulSlug(item.title))
     .flatMap((item) => {
       const type = item.media_type === "tv" ? "tv" : "movie";
       const slug = slugify(item.title || "title");
@@ -140,20 +163,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         url: `${SITE}/${lang}/title/${type}/${item.tmdb_id}-${slug}`,
         lastModified: safeDate(item.updated_at),
         changeFrequency: "weekly" as const,
-        priority: 0.8,
+        priority: 0.7,
       }));
     });
 
   const actorUrls: MetadataRoute.Sitemap = actors
-    .filter((item) => item.person_id && item.name)
+    .filter((item) => item.person_id && isUsefulSlug(item.name))
     .flatMap((item) => {
       const slug = slugify(item.name || "person");
 
       return LANGS.map((lang) => ({
         url: `${SITE}/${lang}/actor/${item.person_id}-${slug}`,
         lastModified: safeDate(item.updated_at),
-        changeFrequency: "weekly" as const,
-        priority: 0.75,
+        changeFrequency: "monthly" as const,
+        priority: 0.6,
       }));
     });
 
