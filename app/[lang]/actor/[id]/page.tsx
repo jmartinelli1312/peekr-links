@@ -2,8 +2,8 @@ export const revalidate = 604800; //7 dias
 
 import Image from "next/image";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-
+import { notFound } from "next/navigation";
+import { cache } from "react";
 const TMDB = "https://api.themoviedb.org/3";
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const SITE = "https://www.peekr.app";
@@ -201,29 +201,29 @@ function pickAppearances(
   ).slice(0, 18);
 }
 
-async function getActor(id: number, lang: Lang) {
+const getActor = cache(async function getActorCached(id: number, lang: Lang) {
   const res = await fetch(
     `${TMDB}/person/${id}?api_key=${TMDB_KEY}&language=${tmdbLanguage(
       lang
     )}&append_to_response=combined_credits,images`,
-    { next: { revalidate: 86400 } }
+    { next: { revalidate: 604800 } }
   );
 
   if (!res.ok) return null;
   return (await res.json()) as PersonResponse;
-}
+});
 
-async function getTVGenres() {
+const getTVGenres = cache(async function getTVGenresCached() {
   const res = await fetch(
     `${TMDB}/genre/tv/list?api_key=${TMDB_KEY}&language=en-US`,
-    { next: { revalidate: 86400 } }
+    { next: { revalidate: 604800 } }
   );
 
   if (!res.ok) return new Map<number, string>();
 
   const json = (await res.json()) as GenreListResponse;
   return buildGenreMap(json.genres);
-}
+});
 
 function getStrings(lang: Lang) {
   return {
@@ -363,11 +363,6 @@ export default async function ActorPage({ params }: PageProps) {
 
   if (!actor) {
     notFound();
-  }
-
-  const canonicalIdSlug = `${numericId}-${slugify(actor.name)}`;
-  if (id !== canonicalIdSlug) {
-    redirect(`/${lang}/actor/${canonicalIdSlug}`);
   }
 
   const cast = actor.combined_credits?.cast || [];
