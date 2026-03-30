@@ -1,4 +1,4 @@
-export const revalidate = 86400;
+export const revalidate = 604800; //7 dias
 
 import Image from "next/image";
 import Link from "next/link";
