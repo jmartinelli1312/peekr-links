@@ -4,6 +4,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 
 const BRAND = "#FA0082";
+const APP_STORE_URL = "https://apps.apple.com/app/id6756285989";
+const PLAY_STORE_URL = "#";
 
 type Lang = "en" | "es" | "pt";
 
@@ -183,22 +185,26 @@ export default async function DownloadAppPage() {
 
           <div className="download-actions">
             <a
-              href="#"
+              href={APP_STORE_URL}
               className="btn-primary"
               aria-label={t.appStore}
+              target="_blank"
+              rel="noopener noreferrer"
             >
               {t.appStore}
             </a>
 
             <a
-              href="#"
+              href={PLAY_STORE_URL}
               className="btn-secondary"
               aria-label={t.googlePlay}
+              aria-disabled="true"
+              onClick={(e) => e.preventDefault()}
             >
               {t.googlePlay}
             </a>
 
-            <Link href="/explore" className="btn-tertiary">
+            <Link href={`/${lang}`} className="btn-tertiary">
               {t.continueWeb}
             </Link>
           </div>
@@ -206,9 +212,9 @@ export default async function DownloadAppPage() {
           <div className="download-note">{t.note}</div>
 
           <div className="download-helper">
-            <div>iOS: {t.iosComingSoon}</div>
-            <div>Android: {t.androidComingSoon}</div>
-          </div>
+          <div>iOS: {APP_STORE_URL}</div>
+          <div>Android: {t.androidComingSoon}</div>
+        </div>
         </section>
       </div>
     </>
