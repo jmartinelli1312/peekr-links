@@ -56,8 +56,7 @@ export default async function DownloadAppPage() {
     },
   }[lang];
 
-  const hasPlayStore = PLAY_STORE_URL.trim().isNotEmpty;
-
+ const hasPlayStore = PLAY_STORE_URL.trim().length > 0;
   return (
     <>
       <style>{`
