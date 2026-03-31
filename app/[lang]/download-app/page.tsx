@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 
 const BRAND = "#FA0082";
 const APP_STORE_URL = "https://apps.apple.com/app/id6756285989";
-const PLAY_STORE_URL = "#";
+const PLAY_STORE_URL = "";
 
 type Lang = "en" | "es" | "pt";
 
@@ -30,8 +30,7 @@ export default async function DownloadAppPage() {
       googlePlay: "Get it on Google Play",
       continueWeb: "Continue exploring on web",
       note: "You can keep browsing on web, but social actions and tracking are built for the app.",
-      iosComingSoon: "Add your real App Store link here",
-      androidComingSoon: "Add your real Google Play link here",
+      androidComingSoon: "Google Play coming soon",
     },
     es: {
       eyebrow: "Peekr",
@@ -42,8 +41,7 @@ export default async function DownloadAppPage() {
       googlePlay: "Descargar en Google Play",
       continueWeb: "Seguir explorando en web",
       note: "Puedes seguir navegando en web, pero las acciones sociales y el tracking están pensados para la app.",
-      iosComingSoon: "Agrega aquí tu link real de App Store",
-      androidComingSoon: "Agrega aquí tu link real de Google Play",
+      androidComingSoon: "Google Play próximamente",
     },
     pt: {
       eyebrow: "Peekr",
@@ -54,10 +52,11 @@ export default async function DownloadAppPage() {
       googlePlay: "Baixar no Google Play",
       continueWeb: "Continuar explorando na web",
       note: "Você pode continuar navegando na web, mas as ações sociais e o tracking foram pensados para o app.",
-      iosComingSoon: "Adicione aqui seu link real da App Store",
-      androidComingSoon: "Adicione aqui seu link real do Google Play",
+      androidComingSoon: "Google Play em breve",
     },
   }[lang];
+
+  const hasPlayStore = PLAY_STORE_URL.trim().isNotEmpty;
 
   return (
     <>
@@ -116,7 +115,8 @@ export default async function DownloadAppPage() {
 
         .btn-primary,
         .btn-secondary,
-        .btn-tertiary {
+        .btn-tertiary,
+        .btn-disabled {
           text-decoration: none;
           border-radius: 18px;
           padding: 16px 18px;
@@ -143,6 +143,13 @@ export default async function DownloadAppPage() {
           background: transparent;
           border: 1px solid rgba(255,255,255,0.10);
           color: rgba(255,255,255,0.88);
+        }
+
+        .btn-disabled {
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          color: rgba(255,255,255,0.42);
+          cursor: default;
         }
 
         .download-note {
@@ -194,15 +201,21 @@ export default async function DownloadAppPage() {
               {t.appStore}
             </a>
 
-            <a
-              href={PLAY_STORE_URL}
-              className="btn-secondary"
-              aria-label={t.googlePlay}
-              aria-disabled="true"
-              onClick={(e) => e.preventDefault()}
-            >
-              {t.googlePlay}
-            </a>
+            {hasPlayStore ? (
+              <a
+                href={PLAY_STORE_URL}
+                className="btn-secondary"
+                aria-label={t.googlePlay}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t.googlePlay}
+              </a>
+            ) : (
+              <span className="btn-disabled" aria-disabled="true">
+                {t.androidComingSoon}
+              </span>
+            )}
 
             <Link href={`/${lang}`} className="btn-tertiary">
               {t.continueWeb}
@@ -212,9 +225,11 @@ export default async function DownloadAppPage() {
           <div className="download-note">{t.note}</div>
 
           <div className="download-helper">
-          <div>iOS: {APP_STORE_URL}</div>
-          <div>Android: {t.androidComingSoon}</div>
-        </div>
+            <div>iOS: {APP_STORE_URL}</div>
+            <div>
+              Android: {hasPlayStore ? PLAY_STORE_URL : t.androidComingSoon}
+            </div>
+          </div>
         </section>
       </div>
     </>
