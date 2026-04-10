@@ -1,11 +1,12 @@
 {
   "applinks": {
-    "apps": [],
     "details": [
       {
-        "appID": "KSQLRUQFXB.com.peekr.app",
-        "paths": [
-          "/title/*"
+        "appIDs": ["KSQLRUQFXB.com.peekr.app"],
+        "components": [
+          { "/": "/title/*" },
+          { "/": "/u/*" },
+          { "/": "/profile/peeklists/*" }
         ]
       }
     ]
