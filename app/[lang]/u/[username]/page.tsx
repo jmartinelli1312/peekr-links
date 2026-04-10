@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import UserProfileClient from "./user-profile-client";
 
 type Lang = "en" | "es" | "pt";
@@ -13,11 +12,10 @@ function normalizeLang(value?: string | null): Lang {
 export default async function UserProfilePage({
   params,
 }: {
-  params: Promise<{ username: string }>;
+  params: Promise<{ lang: string; username: string }>;
 }) {
-  const { username } = await params;
-  const cookieStore = await cookies();
-  const lang = normalizeLang(cookieStore.get("lang")?.value);
+  const { lang: rawLang, username } = await params;
+  const lang = normalizeLang(rawLang);
 
   const t = {
     en: {
