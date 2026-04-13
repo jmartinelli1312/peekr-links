@@ -97,6 +97,8 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
 
   function localizedHref(path: string) {
     const clean = path.startsWith("/") ? path : `/${path}`;
+    // login and signup live at root level, not under [lang]
+    if (clean === "/login" || clean === "/signup") return clean;
     return `/${currentLang}${clean === "/" ? "" : clean}`;
   }
 
