@@ -12,7 +12,7 @@ const RESERVED_SEGMENTS = new Set([
   "support", "terms", "test", "test-supabase", "lists", "buzz",
   "contact", "download-app", "explore", "title", "actor",
   "activity", "peeklist", "user", "u", "api", "sitemap.xml",
-  "robots.txt", "apple-app-site-association", ".well-known",
+  "robots.txt", "apple-app-site-association", ".well-known", "sneak-peek",
 ]);
 
 function hasLangPrefix(pathname: string) {
