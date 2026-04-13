@@ -603,9 +603,12 @@ export default function UserProfileClient({
               </Link>
             )}
 
-            <Link href="/download-app" className="btn-secondary">
+            <a
+              href={`/go?u=${encodeURIComponent(profile.username ?? username)}`}
+              className="btn-secondary"
+            >
               {t.openInApp}
-            </Link>
+            </a>
           </div>
 
           <div className="stats-row">

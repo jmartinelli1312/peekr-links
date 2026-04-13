@@ -82,13 +82,17 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // 5) Solo redirigir a idioma en rutas públicas definidas
+  // 5) Rutas que viven dentro de [lang] y necesitan prefijo de idioma
   const shouldRedirect =
     pathname === "/" ||
     pathname.startsWith("/actor/") ||
     pathname.startsWith("/title/") ||
     pathname.startsWith("/lists/") ||
-    pathname.startsWith("/buzz/");
+    pathname.startsWith("/buzz/") ||
+    pathname.startsWith("/explore") ||
+    pathname.startsWith("/activity") ||
+    pathname.startsWith("/download-app") ||
+    pathname.startsWith("/peeklist/");
 
   if (!shouldRedirect) {
     return NextResponse.next();
