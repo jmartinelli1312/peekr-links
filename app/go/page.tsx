@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
 // /go?u=username        → opens peekr://u/username  → fallback: /u/username
@@ -25,25 +25,22 @@ function buildDeepLink(params: URLSearchParams): { scheme: string; web: string }
   };
 }
 
-export default function GoPage() {
+function GoRedirect() {
   const params = useSearchParams();
 
   useEffect(() => {
     const { scheme, web } = buildDeepLink(params);
-
-    // Attempt to open the app via custom scheme.
-    // Works from email client WebViews on iOS + Android.
     window.location.href = scheme;
-
-    // Fallback: if the app isn't installed (or scheme didn't fire),
-    // redirect to the web version after 800 ms.
     const fallback = setTimeout(() => {
       window.location.replace(web);
     }, 800);
-
     return () => clearTimeout(fallback);
   }, [params]);
 
+  return null;
+}
+
+export default function GoPage() {
   return (
     <>
       <style>{`
@@ -90,6 +87,9 @@ export default function GoPage() {
           <p className="go-text">Opening Peekr…</p>
         </div>
       </div>
+      <Suspense>
+        <GoRedirect />
+      </Suspense>
     </>
   );
 }
