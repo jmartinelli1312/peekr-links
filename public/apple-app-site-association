@@ -5,7 +5,9 @@
         "appIDs": ["KSQLRUQFXB.com.peekr.app"],
         "components": [
           { "/": "/title/*" },
+          { "/": "/*/title/*" },
           { "/": "/u/*" },
+          { "/": "/*/u/*" },
           { "/": "/profile/peeklists/*" }
         ]
       }

@@ -5,6 +5,16 @@ const SUPPORTED_LANGS = new Set(["es", "en", "pt"]);
 const DEFAULT_LANG = "es";
 const CANONICAL_HOST = "www.peekr.app";
 
+// Paths that must NOT be treated as usernames
+const RESERVED_SEGMENTS = new Set([
+  "es", "en", "pt",
+  "about", "admin", "go", "lang", "login", "privacy", "signup",
+  "support", "terms", "test", "test-supabase", "lists", "buzz",
+  "contact", "download-app", "explore", "title", "actor",
+  "activity", "peeklist", "user", "u", "api", "sitemap.xml",
+  "robots.txt", "apple-app-site-association", ".well-known",
+]);
+
 function hasLangPrefix(pathname: string) {
   const segments = pathname.split("/").filter(Boolean);
   return segments.length > 0 && SUPPORTED_LANGS.has(segments[0]);
@@ -58,7 +68,21 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 4) Solo redirigir a idioma en rutas públicas definidas
+  // 4) Clean username URLs: /jmartinelli → serve /es/u/jmartinelli internally
+  //    (browser keeps peekr.app/jmartinelli in the address bar)
+  const segments = pathname.split("/").filter(Boolean);
+  if (
+    segments.length === 1 &&
+    !RESERVED_SEGMENTS.has(segments[0]) &&
+    /^[a-zA-Z0-9_.-]+$/.test(segments[0])
+  ) {
+    const lang = getPreferredLang(request) || DEFAULT_LANG;
+    const url = request.nextUrl.clone();
+    url.pathname = `/${lang}/u/${segments[0]}`;
+    return NextResponse.rewrite(url);
+  }
+
+  // 5) Solo redirigir a idioma en rutas públicas definidas
   const shouldRedirect =
     pathname === "/" ||
     pathname.startsWith("/actor/") ||
