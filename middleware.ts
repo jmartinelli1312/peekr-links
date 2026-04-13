@@ -33,6 +33,7 @@ function isBypassedPath(pathname: string) {
   return (
     pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
+    pathname.startsWith("/.well-known") ||
     pathname.startsWith("/favicon.ico") ||
     pathname.startsWith("/sitemap.xml") ||
     pathname.startsWith("/robots.txt") ||

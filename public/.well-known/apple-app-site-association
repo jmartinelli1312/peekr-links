@@ -4,9 +4,25 @@
       {
         "appIDs": ["KSQLRUQFXB.com.peekr.app"],
         "components": [
+          { "/": "/go*",           "exclude": true },
+          { "/": "/login*",        "exclude": true },
+          { "/": "/signup*",       "exclude": true },
+          { "/": "/about*",        "exclude": true },
+          { "/": "/privacy*",      "exclude": true },
+          { "/": "/terms*",        "exclude": true },
+          { "/": "/support*",      "exclude": true },
+          { "/": "/contact*",      "exclude": true },
+          { "/": "/download-app*", "exclude": true },
+          { "/": "/api/*",         "exclude": true },
+          { "/": "/_next/*",       "exclude": true },
+          { "/": "/sitemap.xml",   "exclude": true },
+          { "/": "/robots.txt",    "exclude": true },
           { "/": "/title/*" },
+          { "/": "/*/title/*" },
           { "/": "/u/*" },
-          { "/": "/profile/peeklists/*" }
+          { "/": "/*/u/*" },
+          { "/": "/profile/peeklists/*" },
+          { "/": "/*" }
         ]
       }
     ]

@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.peekr.peekr",
+    "sha256_cert_fingerprints": [
+      "4A:C8:FF:2B:23:40:85:BE:82:E6:78:4D:2F:53:1A:E4:A6:09:AD:10:FF:4F:E6:52:9D:30:C9:A4:7C:0D:B8:63"
+    ]
+  }
+}]
