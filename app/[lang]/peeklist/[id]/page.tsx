@@ -1,7 +1,6 @@
 export const revalidate = 3600;
 
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -14,7 +13,7 @@ const SITE = "https://www.peekr.app";
 type Lang = "en" | "es" | "pt";
 
 type PageProps = {
-  params: Promise<{ id: string }>;
+  params: Promise<{ lang: string; id: string }>;
 };
 
 type PeeklistRow = {
@@ -192,9 +191,8 @@ function getStrings(lang: Lang) {
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const { id } = await params;
-  const cookieStore = await cookies();
-  const lang = normalizeLang(cookieStore.get("lang")?.value);
+  const { lang: rawLang, id } = await params;
+  const lang = normalizeLang(rawLang);
   const t = getStrings(lang);
 
   const peeklist = await getPeeklist(id);
@@ -203,6 +201,9 @@ export async function generateMetadata({ params }: PageProps) {
     return {
       title: "Peeklist | Peekr",
       description: "Discover curated lists on Peekr.",
+      alternates: {
+        canonical: `${SITE}/${lang}/peeklist/${id}`,
+      },
     };
   }
 
@@ -213,12 +214,18 @@ export async function generateMetadata({ params }: PageProps) {
     title: `${title} | Peekr`,
     description,
     alternates: {
-      canonical: `${SITE}/peeklist/${id}`,
+      canonical: `${SITE}/${lang}/peeklist/${id}`,
+      languages: {
+        es: `${SITE}/es/peeklist/${id}`,
+        en: `${SITE}/en/peeklist/${id}`,
+        pt: `${SITE}/pt/peeklist/${id}`,
+        "x-default": `${SITE}/es/peeklist/${id}`,
+      },
     },
     openGraph: {
       title: `${title} | Peekr`,
       description,
-      url: `${SITE}/peeklist/${id}`,
+      url: `${SITE}/${lang}/peeklist/${id}`,
       siteName: "Peekr",
       type: "website",
       images: peeklist.cover_url ? [{ url: peeklist.cover_url }] : [],
@@ -232,9 +239,8 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function PeeklistDetailPage({ params }: PageProps) {
-  const { id } = await params;
-  const cookieStore = await cookies();
-  const lang = normalizeLang(cookieStore.get("lang")?.value);
+  const { lang: rawLang, id } = await params;
+  const lang = normalizeLang(rawLang);
   const t = getStrings(lang);
 
   const peeklist = await getPeeklist(id);

@@ -119,7 +119,7 @@ export function middleware(request: NextRequest) {
   const query = searchParams.toString();
   url.search = query ? `?${query}` : "";
 
-  return NextResponse.redirect(url, 307);
+  return NextResponse.redirect(url, 301);
 }
 
 export const config = {

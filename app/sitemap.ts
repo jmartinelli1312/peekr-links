@@ -9,6 +9,8 @@ const MAX_EDITORIAL_COLLECTIONS = 500;
 const MAX_BUZZ_ARTICLES = 500;
 const MAX_TITLE_URLS = 300;
 const MAX_ACTOR_URLS = 200;
+const MAX_PEEKLISTS = 500;
+const MAX_PROFILES = 300;
 
 type EditorialCollectionRow = {
   slug: string;
@@ -34,6 +36,16 @@ type TitleRow = {
 type ActorRow = {
   person_id: number;
   name?: string | null;
+  updated_at?: string | null;
+};
+
+type PeeklistRow = {
+  id: string;
+  updated_at?: string | null;
+};
+
+type ProfileRow = {
+  username: string;
   updated_at?: string | null;
 };
 
@@ -89,6 +101,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     buzzArticlesRes,
     titlesRes,
     actorsRes,
+    peeklistsRes,
+    profilesRes,
   ] = await Promise.all([
     supabase
       .from("editorial_collections")
@@ -120,6 +134,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .not("name", "is", null)
       .order("updated_at", { ascending: false })
       .limit(MAX_ACTOR_URLS),
+
+    supabase
+      .from("peeklists")
+      .select("id,updated_at")
+      .eq("visibility", "public")
+      .order("updated_at", { ascending: false })
+      .limit(MAX_PEEKLISTS),
+
+    supabase
+      .from("profiles")
+      .select("username,updated_at")
+      .not("username", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(MAX_PROFILES),
   ]);
 
   const editorialCollections =
@@ -130,6 +158,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     (titlesRes.data as TitleRow[] | null) ?? [];
   const actors =
     (actorsRes.data as ActorRow[] | null) ?? [];
+  const peeklists =
+    (peeklistsRes.data as PeeklistRow[] | null) ?? [];
+  const profiles =
+    (profilesRes.data as ProfileRow[] | null) ?? [];
 
   const listUrls: MetadataRoute.Sitemap = editorialCollections
     .filter((item) => item.slug && item.slug.trim().length > 0)
@@ -180,11 +212,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }));
     });
 
+  const peeklistUrls: MetadataRoute.Sitemap = peeklists
+    .filter((item) => item.id)
+    .flatMap((item) =>
+      LANGS.map((lang) => ({
+        url: `${SITE}/${lang}/peeklist/${item.id}`,
+        lastModified: safeDate(item.updated_at),
+        changeFrequency: "weekly" as const,
+        priority: 0.65,
+      }))
+    );
+
+  const profileUrls: MetadataRoute.Sitemap = profiles
+    .filter((item) => item.username && item.username.trim().length > 0)
+    .flatMap((item) =>
+      LANGS.map((lang) => ({
+        url: `${SITE}/${lang}/u/${item.username}`,
+        lastModified: safeDate(item.updated_at),
+        changeFrequency: "weekly" as const,
+        priority: 0.5,
+      }))
+    );
+
   return [
     ...staticUrls,
     ...listUrls,
     ...buzzUrls,
     ...titleUrls,
     ...actorUrls,
+    ...peeklistUrls,
+    ...profileUrls,
   ];
 }

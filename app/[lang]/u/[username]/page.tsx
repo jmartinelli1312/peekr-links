@@ -1,4 +1,10 @@
+import { Metadata } from "next";
+import { supabase } from "@/lib/supabase";
 import UserProfileClient from "./user-profile-client";
+
+export const revalidate = 86400;
+
+const SITE = "https://www.peekr.app";
 
 type Lang = "en" | "es" | "pt";
 
@@ -7,6 +13,51 @@ function normalizeLang(value?: string | null): Lang {
   if (raw.startsWith("es")) return "es";
   if (raw.startsWith("pt")) return "pt";
   return "en";
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string; username: string }>;
+}): Promise<Metadata> {
+  const { lang: rawLang, username } = await params;
+  const lang = normalizeLang(rawLang);
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name,bio,avatar_url")
+    .eq("username", username)
+    .maybeSingle();
+
+  const displayName = profile?.display_name || `@${username}`;
+  const description = profile?.bio || `${displayName} on Peekr`;
+
+  return {
+    title: `${displayName} | Peekr`,
+    description,
+    alternates: {
+      canonical: `${SITE}/${lang}/u/${username}`,
+      languages: {
+        es: `${SITE}/es/u/${username}`,
+        en: `${SITE}/en/u/${username}`,
+        pt: `${SITE}/pt/u/${username}`,
+        "x-default": `${SITE}/es/u/${username}`,
+      },
+    },
+    openGraph: {
+      title: `${displayName} | Peekr`,
+      description,
+      url: `${SITE}/${lang}/u/${username}`,
+      siteName: "Peekr",
+      type: "profile",
+      images: profile?.avatar_url ? [{ url: profile.avatar_url }] : [],
+    },
+    twitter: {
+      card: "summary",
+      title: `${displayName} | Peekr`,
+      description,
+    },
+  };
 }
 
 export default async function UserProfilePage({
