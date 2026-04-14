@@ -66,11 +66,17 @@ export function middleware(request: NextRequest) {
 
   // 3) Si ya viene con idioma, dejar pasar
   //    Excepción: /xx/login y /xx/signup viven en la raíz, redirigir
+  //    Excepción: /xx/user/username → redirect to /xx/u/username (old route)
   if (hasLangPrefix(pathname)) {
     const segments = pathname.split("/").filter(Boolean);
     if (segments.length === 2 && (segments[1] === "login" || segments[1] === "signup")) {
       const url = request.nextUrl.clone();
       url.pathname = `/${segments[1]}`;
+      return NextResponse.redirect(url, 308);
+    }
+    if (segments.length === 3 && segments[1] === "user") {
+      const url = request.nextUrl.clone();
+      url.pathname = `/${segments[0]}/u/${segments[2]}`;
       return NextResponse.redirect(url, 308);
     }
     return NextResponse.next();

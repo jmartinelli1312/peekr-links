@@ -505,7 +505,7 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
 
                 <div className="creator-text">
                   {t.creator}:{" "}
-                  <Link href={`/user/${creator.username}`}>
+                  <Link href={`/u/${creator.username}`}>
                     {creator.display_name || `@${creator.username}`}
                   </Link>
                 </div>

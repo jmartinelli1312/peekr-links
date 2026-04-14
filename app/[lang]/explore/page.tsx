@@ -109,7 +109,7 @@ function actorHref(lang: Lang, person: PersonItem) {
 }
 
 function userHref(lang: Lang, username?: string | null) {
-  return username ? `/${lang}/user/${username}` : "#";
+  return username ? `/${lang}/u/${username}` : "#";
 }
 
 function peeklistHref(lang: Lang, id: string | number) {

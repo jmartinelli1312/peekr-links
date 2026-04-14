@@ -157,7 +157,7 @@ function personHref(id: number, name: string, lang: Lang) {
 }
 
 function userHref(username: string | null | undefined, lang: Lang) {
-  return username ? `/${lang}/user/${username}` : "#";
+  return username ? `/${lang}/u/${username}` : "#";
 }
 
 function pickImportantCrew(crew: TmdbCrew[]) {

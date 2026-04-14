@@ -204,7 +204,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
 
   const profileHref =
     profile?.username && profile.username.length > 0
-      ? localizedHref(`/user/${profile.username}`)
+      ? localizedHref(`/u/${profile.username}`)
       : localizedHref("/download-app");
 
   return (

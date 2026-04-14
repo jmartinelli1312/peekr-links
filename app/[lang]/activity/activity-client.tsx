@@ -64,7 +64,7 @@ function titleHref({
 }
 
 function userHref(lang: Lang, username: string) {
-  return `/${lang}/user/${username}`;
+  return `/${lang}/u/${username}`;
 }
 
 function peeklistHref(lang: Lang, peeklistId: string) {
