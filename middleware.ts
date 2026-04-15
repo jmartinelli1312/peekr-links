@@ -97,22 +97,35 @@ export function middleware(request: NextRequest) {
   }
 
   // 5) Rutas que viven dentro de [lang] y necesitan prefijo de idioma
+  // Paths that should rewrite (keep original URL for OG/social crawlers)
+  const shouldRewrite =
+    pathname.startsWith("/title/") ||
+    pathname.startsWith("/actor/") ||
+    pathname.startsWith("/peeklist/");
+
+  // Paths that should redirect
   const shouldRedirect =
     pathname === "/" ||
-    pathname.startsWith("/actor/") ||
-    pathname.startsWith("/title/") ||
     pathname.startsWith("/lists/") ||
     pathname.startsWith("/buzz/") ||
     pathname.startsWith("/explore") ||
     pathname.startsWith("/activity") ||
-    pathname.startsWith("/download-app") ||
-    pathname.startsWith("/peeklist/");
+    pathname.startsWith("/download-app");
+
+  const lang = getPreferredLang(request) || DEFAULT_LANG;
+
+  if (shouldRewrite) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/${lang}${pathname}`;
+    const query = searchParams.toString();
+    url.search = query ? `?${query}` : "";
+    return NextResponse.rewrite(url);
+  }
 
   if (!shouldRedirect) {
     return NextResponse.next();
   }
 
-  const lang = getPreferredLang(request) || DEFAULT_LANG;
   const url = request.nextUrl.clone();
   url.pathname = `/${lang}${pathname}`;
 
