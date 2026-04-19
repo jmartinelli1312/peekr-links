@@ -1,3 +1,5 @@
+export const revalidate = 3600;
+
 import type { MetadataRoute } from "next";
 import { supabase } from "@/lib/supabase";
 

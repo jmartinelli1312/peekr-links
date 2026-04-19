@@ -8,7 +8,7 @@ const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const BRAND = "#FA0082";
 const POSTER = "https://image.tmdb.org/t/p/w342";
-const BACKDROP = "https://image.tmdb.org/t/p/w1280";
+const BACKDROP = "https://image.tmdb.org/t/p/w780";
 const SITE = "https://www.peekr.app";
 
 type Lang = "en" | "es" | "pt";
@@ -58,6 +58,7 @@ type HydratedItem = {
   position: number;
   title: string;
   poster_path: string | null;
+  backdrop_path: string | null;
 };
 
 function normalizeLang(value?: string | null): Lang {
@@ -225,6 +226,7 @@ async function getEditorialCollectionItems(id: string, lang: Lang) {
           position: item.position ?? index + 1,
           title: detail?.title || detail?.name || "Untitled",
           poster_path: detail?.poster_path || null,
+          backdrop_path: detail?.backdrop_path || null,
         } satisfies HydratedItem;
       })
     );
@@ -311,10 +313,12 @@ export default async function EditorialListDetailPage({ params }: PageProps) {
     redirect(`/${lang}/lists/${collection.slug}`);
   }
 
-  const [items, fallbackBackdrop] = await Promise.all([
-    getEditorialCollectionItems(collection.slug, lang),
-    collection.cover_url ? Promise.resolve(null) : getBackdropFromFirstItem(collection.slug, lang),
-  ]);
+  const items = await getEditorialCollectionItems(collection.slug, lang);
+
+  // Derive backdrop from first item — no extra fetch needed since items are already hydrated
+  const fallbackBackdrop = !collection.cover_url && items[0]?.backdrop_path
+    ? `${BACKDROP}${items[0].backdrop_path}`
+    : null;
 
   const title = localizedTitle(collection, lang) || t.untitled;
   const description = localizedDescription(collection, lang) || t.noDescription;

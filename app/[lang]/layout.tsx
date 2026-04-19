@@ -1,4 +1,3 @@
-import { Analytics } from "@vercel/analytics/next";
 import SiteHeader from "../components/site-header";
 
 type Lang = "en" | "es" | "pt";
@@ -157,7 +156,6 @@ export default async function LangLayout({
         </div>
       </footer>
 
-      <Analytics />
     </>
   );
 }

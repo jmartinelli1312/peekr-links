@@ -201,96 +201,47 @@ async function getPopularPeople(lang: Lang) {
 
   const all = trending?.results ?? [];
 
-  const actorCandidates = all.filter(
-    (person) => (person.known_for_department ?? "").toLowerCase() === "acting"
-  );
+  // Use known_for_department from TMDB trending API instead of N+1 credits queries
+  const actors = all
+    .filter((p) => (p.known_for_department ?? "").toLowerCase() === "acting")
+    .slice(0, 20);
 
-  const actors = actorCandidates.slice(0, 20);
+  const directorMatches = all
+    .filter((p) => (p.known_for_department ?? "").toLowerCase() === "directing")
+    .slice(0, 20);
 
-  const directorMatches: TmdbPerson[] = [];
-
-  for (const person of all) {
-    try {
-      const credits = await fetchTMDB<{
-        crew?: Array<{
-          job?: string | null;
-          department?: string | null;
-          media_type?: string | null;
-        }>;
-      }>(
-        `${TMDB_BASE}/person/${person.id}/combined_credits?api_key=${TMDB_KEY}&language=${apiLang}`
-      );
-
-      const isDirector = (credits?.crew ?? []).some((item) => {
-        const job = (item.job ?? "").toLowerCase();
-        const dept = (item.department ?? "").toLowerCase();
-        const media = item.media_type ?? "";
-        return (
-          (media === "movie" || media === "tv") &&
-          (job === "director" || dept === "directing")
-        );
-      });
-
-      if (isDirector) {
-        directorMatches.push(person);
-      }
-    } catch {
-      // ignore
-    }
-
-    if (directorMatches.length >= 20) break;
-  }
-
-  const fallbackDirectors: TmdbPerson[] = [
-    { id: 525, name: "Christopher Nolan" },
-    { id: 488, name: "Steven Spielberg" },
-    { id: 137427, name: "Denis Villeneuve" },
-    { id: 1032, name: "Martin Scorsese" },
-    { id: 138, name: "Quentin Tarantino" },
-    { id: 65540, name: "Pedro Almodóvar" },
-    { id: 819, name: "David Fincher" },
-    { id: 5655, name: "Guillermo del Toro" },
-    { id: 2740, name: "Alfonso Cuarón" },
-    { id: 6384, name: "Alejandro González Iñárritu" },
-    { id: 2939, name: "J. A. Bayona" },
-    { id: 4292, name: "Wes Anderson" },
-    { id: 11431, name: "Damián Szifron" },
-    { id: 11432, name: "Juan José Campanella" },
-    { id: 8462, name: "Pablo Trapero" },
-    { id: 18124, name: "Lucrecia Martel" },
-    { id: 14784, name: "James Cameron" },
+  // If not enough directors from trending, batch-fetch from fallback list
+  const FALLBACK_DIRECTOR_IDS = [
+    525, 488, 137427, 1032, 138, 65540, 819, 5655,
+    2740, 6384, 2939, 4292, 11431, 11432, 8462, 18124, 14784,
   ];
 
-  const seen = new Set<number>();
-  const directors: TmdbPerson[] = [];
-
-  for (const person of directorMatches) {
-    if (seen.has(person.id)) continue;
-    seen.add(person.id);
-    directors.push(person);
-    if (directors.length >= 20) break;
-  }
+  const seen = new Set(directorMatches.map((d) => d.id));
+  const directors = [...directorMatches];
 
   if (directors.length < 20) {
-    for (const fallback of fallbackDirectors) {
-      if (seen.has(fallback.id)) continue;
+    const needed = 20 - directors.length;
+    const idsToFetch = FALLBACK_DIRECTOR_IDS
+      .filter((id) => !seen.has(id))
+      .slice(0, needed);
 
-      const searched = await fetchTMDB<{ results: TmdbPerson[] }>(
-        `${TMDB_BASE}/search/person?api_key=${TMDB_KEY}&language=${apiLang}&query=${encodeURIComponent(
-          fallback.name
-        )}`
-      );
+    const extras = await Promise.all(
+      idsToFetch.map((id) =>
+        fetchTMDB<TmdbPerson>(
+          `${TMDB_BASE}/person/${id}?api_key=${TMDB_KEY}&language=${apiLang}`
+        )
+      )
+    );
 
-      const match = searched?.results?.[0];
-      if (!match || seen.has(match.id)) continue;
-
-      seen.add(match.id);
-      directors.push(match);
-      if (directors.length >= 20) break;
+    for (const p of extras) {
+      if (p && !seen.has(p.id)) {
+        seen.add(p.id);
+        directors.push(p);
+      }
     }
   }
 
-  return { actors, directors };
+  return { actors, directors: directors.slice(0, 20) };
 }
 
 function getStrings(lang: Lang) {

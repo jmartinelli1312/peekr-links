@@ -8,6 +8,23 @@ const nextConfig: NextConfig = {
         destination: "/",
         permanent: true,
       },
+      // Legacy /xx/login and /xx/signup → root (these pages live outside [lang])
+      {
+        source: "/:lang(es|en|pt)/login",
+        destination: "/login",
+        permanent: true,
+      },
+      {
+        source: "/:lang(es|en|pt)/signup",
+        destination: "/signup",
+        permanent: true,
+      },
+      // Legacy /xx/user/username → /xx/u/username
+      {
+        source: "/:lang(es|en|pt)/user/:username",
+        destination: "/:lang/u/:username",
+        permanent: true,
+      },
     ];
   },
 

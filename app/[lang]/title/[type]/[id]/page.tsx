@@ -5,11 +5,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
+import TitleTabs from "./title-tabs";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB = "https://api.themoviedb.org/3";
 const SITE = "https://www.peekr.app";
-const IMG = "https://image.tmdb.org/t/p/w1280";
+const IMG = "https://image.tmdb.org/t/p/w780";
 const POSTER = "https://image.tmdb.org/t/p/w342";
 const PERSON = "https://image.tmdb.org/t/p/w185";
 const PROVIDER = "https://image.tmdb.org/t/p/w92";
@@ -26,7 +27,6 @@ type TabKey =
 
 type PageProps = {
   params: Promise<{ lang: string; type: string; id: string }>;
-  searchParams?: Promise<{ tab?: string }>;
 };
 
 type TmdbGenre = {
@@ -497,19 +497,6 @@ async function getPeekrComments(tmdbId: number, mediaType: string) {
   return comments;
 }
 
-function normalizeTab(value?: string): TabKey {
-  if (value === "cast") return "cast";
-  if (value === "crew") return "crew";
-  if (value === "platforms") return "platforms";
-  if (value === "awards") return "awards";
-  if (value === "comments") return "comments";
-  return "overview";
-}
-
-function tabHref(tab: TabKey) {
-  return `?tab=${tab}`;
-}
-
 export async function generateMetadata({ params }: PageProps) {
   const { lang: rawLang, type, id } = await params;
   const lang = normalizeLang(rawLang);
@@ -589,7 +576,7 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-export default async function TitlePage({ params, searchParams }: PageProps) {
+export default async function TitlePage({ params }: PageProps) {
   const { lang: rawLang, type, id } = await params;
   const lang = normalizeLang(rawLang);
 
@@ -601,9 +588,6 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
   if (!numericId) {
     notFound();
   }
-
-  const resolvedSearchParams = searchParams ? await searchParams : {};
-  const requestedTab = normalizeTab(resolvedSearchParams?.tab);
 
   const t = getStrings(lang);
   const tmdbLang = tmdbLanguage(lang);
@@ -617,27 +601,15 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
   const year = (base.release_date || base.first_air_date || "").slice(0, 4);
   const canonicalIdSlug = `${numericId}-${slugify(title)}`;
 
-  const needCredits =
-    requestedTab === "overview" ||
-    requestedTab === "cast" ||
-    requestedTab === "crew";
-
-  const needVideos = requestedTab === "overview";
-  const needProviders =
-    requestedTab === "overview" || requestedTab === "platforms";
-  const needWatchers = requestedTab === "overview";
-  const needComments = requestedTab === "comments";
-  const needFullStats =
-    requestedTab === "overview" || requestedTab === "comments";
-
+  // Always fetch ALL data — ISR caches once, client switches tabs
   const [stats, credits, videos, watchProviders, watchers, comments] =
     await Promise.all([
-      getPeekrStats(numericId, type, needFullStats),
-      needCredits ? getCredits(type, numericId, tmdbLang) : Promise.resolve(null),
-      needVideos ? getVideos(type, numericId, tmdbLang) : Promise.resolve(null),
-      needProviders ? getWatchProviders(type, numericId) : Promise.resolve(null),
-      needWatchers ? getPeekrWatchers(numericId, type) : Promise.resolve([]),
-      needComments ? getPeekrComments(numericId, type) : Promise.resolve([]),
+      getPeekrStats(numericId, type, true),
+      getCredits(type, numericId, tmdbLang),
+      getVideos(type, numericId, tmdbLang),
+      getWatchProviders(type, numericId),
+      getPeekrWatchers(numericId, type),
+      getPeekrComments(numericId, type),
     ]);
 
   const backdrop = base.backdrop_path;
@@ -658,13 +630,6 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
 
   const runtime =
     type === "movie" ? base.runtime : base.episode_run_time?.[0] || null;
-
-  const activeTab =
-    requestedTab === "platforms" && providers.length === 0
-      ? "overview"
-      : requestedTab === "comments" && stats.commentsCount === 0
-        ? "overview"
-        : requestedTab;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -1223,57 +1188,18 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
             </div>
           </div>
 
-          <div className="bubble-tabs">
-            <Link
-              href={tabHref("overview")}
-              scroll={false}
-              className={`tab-pill ${activeTab === "overview" ? "active" : ""}`}
-            >
-              {t.tabsOverview}
-            </Link>
-            <Link
-              href={tabHref("cast")}
-              scroll={false}
-              className={`tab-pill ${activeTab === "cast" ? "active" : ""}`}
-            >
-              {t.tabsCast}
-            </Link>
-            <Link
-              href={tabHref("crew")}
-              scroll={false}
-              className={`tab-pill ${activeTab === "crew" ? "active" : ""}`}
-            >
-              {t.tabsCrew}
-            </Link>
-            <Link
-              href={tabHref("awards")}
-              scroll={false}
-              className={`tab-pill ${activeTab === "awards" ? "active" : ""}`}
-            >
-              {t.tabsAwards}
-            </Link>
-            {providers.length > 0 ? (
-              <Link
-                href={tabHref("platforms")}
-                scroll={false}
-                className={`tab-pill ${activeTab === "platforms" ? "active" : ""}`}
-              >
-                {t.tabsPlatforms}
-              </Link>
-            ) : null}
-            {stats.commentsCount > 0 ? (
-              <Link
-                href={tabHref("comments")}
-                scroll={false}
-                className={`tab-pill ${activeTab === "comments" ? "active" : ""}`}
-              >
-                {t.tabsComments}
-              </Link>
-            ) : null}
-          </div>
-
-          {activeTab === "overview" ? (
-            <>
+          <TitleTabs
+            tabs={[
+              { key: "overview", label: t.tabsOverview, available: true },
+              { key: "cast", label: t.tabsCast, available: true },
+              { key: "crew", label: t.tabsCrew, available: true },
+              { key: "awards", label: t.tabsAwards, available: true },
+              { key: "platforms", label: t.tabsPlatforms, available: providers.length > 0 },
+              { key: "comments", label: t.tabsComments, available: stats.commentsCount > 0 },
+            ]}
+          >
+            {/* Overview tab */}
+            <div>
               <section className="section-block">
                 <h2 className="section-title">{t.overview}</h2>
                 <p className="overview-text">{base.overview || t.noOverview}</p>
@@ -1330,10 +1256,9 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                   </div>
                 </section>
               ) : null}
-            </>
-          ) : null}
+            </div>
 
-          {activeTab === "cast" ? (
+            {/* Cast tab */}
             <section className="section-block">
               <h2 className="section-title">{t.cast}</h2>
               <div className="cards-grid">
@@ -1364,9 +1289,8 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                 ))}
               </div>
             </section>
-          ) : null}
 
-          {activeTab === "crew" ? (
+            {/* Crew tab */}
             <section className="section-block">
               <h2 className="section-title">{t.crew}</h2>
               <div className="cards-grid">
@@ -1397,68 +1321,69 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                 ))}
               </div>
             </section>
-          ) : null}
 
-          {activeTab === "platforms" && providers.length > 0 ? (
-            <section className="section-block">
-              <h2 className="section-title">{t.whereToWatch}</h2>
-              <div className="providers-row">
-                {providers.map((p) => (
-                  <div key={p.provider_id} className="watcher-link">
-                    <Image
-                      src={`${PROVIDER}${p.logo_path}`}
-                      alt={p.provider_name}
-                      width={50}
-                      height={50}
-                      className="provider-logo"
-                      unoptimized
-                    />
-                    <div className="watcher-name">{p.provider_name}</div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {activeTab === "awards" ? (
+            {/* Awards tab */}
             <section className="section-block">
               <h2 className="section-title">{t.awards}</h2>
               <p className="overview-text">{t.noAwards}</p>
             </section>
-          ) : null}
 
-          {activeTab === "comments" && comments.length > 0 ? (
-            <section className="section-block">
-              <h2 className="section-title">{t.comments}</h2>
-
-              <div className="comment-list">
-                {comments.map((c) => (
-                  <div key={c.id} className="comment-card">
-                    {c.avatar_url ? (
+            {/* Platforms tab */}
+            {providers.length > 0 ? (
+              <section className="section-block">
+                <h2 className="section-title">{t.whereToWatch}</h2>
+                <div className="providers-row">
+                  {providers.map((p) => (
+                    <div key={p.provider_id} className="watcher-link">
                       <Image
-                        src={c.avatar_url}
-                        alt={c.username || ""}
-                        width={42}
-                        height={42}
-                        className="comment-avatar"
+                        src={`${PROVIDER}${p.logo_path}`}
+                        alt={p.provider_name}
+                        width={50}
+                        height={50}
+                        className="provider-logo"
                         unoptimized
                       />
-                    ) : (
-                      <div className="comment-avatar-fallback" />
-                    )}
-
-                    <div>
-                      <div className="comment-user">{c.username || "user"}</div>
-                      {typeof c.rating === "number" ? (
-                        <div className="comment-rating">⭐ {(c.rating / 2).toFixed(1)}/5</div>
-                      ) : null}
-                      <div className="comment-content">{c.content || ""}</div>
+                      <div className="watcher-name">{p.provider_name}</div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
+                  ))}
+                </div>
+              </section>
+            ) : <div />}
+
+            {/* Comments tab */}
+            {comments.length > 0 ? (
+              <section className="section-block">
+                <h2 className="section-title">{t.comments}</h2>
+
+                <div className="comment-list">
+                  {comments.map((c) => (
+                    <div key={c.id} className="comment-card">
+                      {c.avatar_url ? (
+                        <Image
+                          src={c.avatar_url}
+                          alt={c.username || ""}
+                          width={42}
+                          height={42}
+                          className="comment-avatar"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="comment-avatar-fallback" />
+                      )}
+
+                      <div>
+                        <div className="comment-user">{c.username || "user"}</div>
+                        {typeof c.rating === "number" ? (
+                          <div className="comment-rating">⭐ {(c.rating / 2).toFixed(1)}/5</div>
+                        ) : null}
+                        <div className="comment-content">{c.content || ""}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : <div />}
+          </TitleTabs>
         </div>
       </div>
     </>

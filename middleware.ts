@@ -66,20 +66,8 @@ export function middleware(request: NextRequest) {
   }
 
   // 3) Si ya viene con idioma, dejar pasar
-  //    Excepción: /xx/login y /xx/signup viven en la raíz, redirigir
-  //    Excepción: /xx/user/username → redirect to /xx/u/username (old route)
+  //    (las excepciones /xx/login, /xx/signup y /xx/user/ se manejan en next.config.ts redirects)
   if (hasLangPrefix(pathname)) {
-    const segments = pathname.split("/").filter(Boolean);
-    if (segments.length === 2 && (segments[1] === "login" || segments[1] === "signup")) {
-      const url = request.nextUrl.clone();
-      url.pathname = `/${segments[1]}`;
-      return NextResponse.redirect(url, 308);
-    }
-    if (segments.length === 3 && segments[1] === "user") {
-      const url = request.nextUrl.clone();
-      url.pathname = `/${segments[0]}/u/${segments[2]}`;
-      return NextResponse.redirect(url, 308);
-    }
     return NextResponse.next();
   }
 
@@ -138,12 +126,13 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/",
-    "/index.html",
-    "/actor/:path*",
-    "/title/:path*",
-    "/lists/:path*",
-    "/buzz/:path*",
-    "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|sitemap/).*)",
+    /*
+     * Only match routes that actually need middleware processing:
+     * - / and /index.html (root redirect)
+     * - Unprefixed content routes (need lang injection)
+     * - Vanity usernames (single segment, no lang prefix)
+     * Skip: _next, api, static files, AND already-prefixed /es/, /en/, /pt/ routes
+     */
+    "/((?!api|_next|favicon\\.ico|robots\\.txt|sitemap\\.xml|sitemap/|\\.|es/|en/|pt/).*)",
   ],
 };

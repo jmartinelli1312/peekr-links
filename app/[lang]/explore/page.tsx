@@ -3,6 +3,7 @@ export const revalidate = 3600;
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import ExploreSearch from "./explore-search";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -13,16 +14,10 @@ const SITE = "https://www.peekr.app";
 
 type Lang = "en" | "es" | "pt";
 
-type SearchParams = {
-  q?: string;
-  tab?: string;
-};
-
 type ExplorePageProps = {
   params: Promise<{
     lang: string;
   }>;
-  searchParams: Promise<SearchParams>;
 };
 
 type TmdbItem = {
@@ -178,42 +173,6 @@ async function getPeeklists(): Promise<PeeklistItem[]> {
   return (data as PeeklistItem[] | null) ?? [];
 }
 
-async function searchTitles(q: string, lang: Lang): Promise<TmdbItem[]> {
-  const apiLang = tmdbLanguage(lang);
-
-  const data = await fetchTMDB<{ results: TmdbItem[] }>(
-    `${TMDB_BASE}/search/multi?api_key=${TMDB_KEY}&language=${apiLang}&query=${encodeURIComponent(
-      q
-    )}`
-  );
-
-  return (data?.results ?? []).filter(
-    (i) => i.media_type === "movie" || i.media_type === "tv"
-  );
-}
-
-async function searchPeople(q: string, lang: Lang): Promise<PersonItem[]> {
-  const apiLang = tmdbLanguage(lang);
-
-  const data = await fetchTMDB<{ results: PersonItem[] }>(
-    `${TMDB_BASE}/search/person?api_key=${TMDB_KEY}&language=${apiLang}&query=${encodeURIComponent(
-      q
-    )}`
-  );
-
-  return data?.results ?? [];
-}
-
-async function searchUsers(q: string): Promise<ProfileItem[]> {
-  const { data } = await supabase
-    .from("profiles")
-    .select("id,username,display_name,avatar_url")
-    .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
-    .limit(12);
-
-  return (data as ProfileItem[] | null) ?? [];
-}
-
 function getStrings(lang: Lang) {
   return {
     en: {
@@ -350,26 +309,6 @@ function SectionHeader({
   );
 }
 
-function Bubble({
-  label,
-  active,
-  href,
-}: {
-  label: string;
-  active: boolean;
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`bubble ${active ? "active" : ""}`}
-      scroll={false}
-    >
-      {label}
-    </Link>
-  );
-}
-
 function PosterRow({
   items,
   type,
@@ -491,117 +430,6 @@ function PeopleRow({
   );
 }
 
-function TitleGrid({
-  items,
-  lang,
-}: {
-  items: TmdbItem[];
-  lang: Lang;
-}) {
-  return (
-    <div className="search-grid">
-      {items.map((item) => {
-        const title = item.title || item.name || "Untitled";
-        const type = item.media_type === "tv" ? "tv" : "movie";
-
-        return (
-          <Link
-            key={`${type}-${item.id}`}
-            href={titleHref(lang, {
-              id: item.id,
-              media_type: type,
-              title: item.title,
-              name: item.name,
-            })}
-            className="poster-card search-card"
-          >
-            {item.poster_path ? (
-              <img
-                src={`${POSTER}${item.poster_path}`}
-                alt={title}
-                className="poster-image"
-              />
-            ) : (
-              <div className="poster-fallback" />
-            )}
-
-            <div className="poster-meta">
-              <div className="poster-title">{title}</div>
-              <div className="poster-year">{getYear(item)}</div>
-            </div>
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
-function PeopleGrid({
-  items,
-  lang,
-}: {
-  items: PersonItem[];
-  lang: Lang;
-}) {
-  return (
-    <div className="search-grid people-grid">
-      {items.map((p) => (
-        <Link
-          key={p.id}
-          href={actorHref(lang, p)}
-          className="people-search-card"
-        >
-          {p.profile_path ? (
-            <img
-              src={`${PERSON}${p.profile_path}`}
-              alt={p.name}
-              className="people-search-image"
-            />
-          ) : (
-            <div className="people-search-fallback" />
-          )}
-
-          <div className="people-search-name">{p.name}</div>
-          {p.known_for_department ? (
-            <div className="people-search-sub">{p.known_for_department}</div>
-          ) : null}
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-function UsersGrid({
-  items,
-  lang,
-}: {
-  items: ProfileItem[];
-  lang: Lang;
-}) {
-  return (
-    <div className="users-grid">
-      {items.map((u) => (
-        <Link
-          key={u.id}
-          href={userHref(lang, u.username)}
-          className="user-card"
-        >
-          {u.avatar_url ? (
-            <img src={u.avatar_url} alt={u.username} className="user-avatar" />
-          ) : (
-            <div className="user-avatar-fallback" />
-          )}
-
-          <div>
-            <div className="user-name">{u.display_name || u.username}</div>
-            <div className="user-username">@{u.username}</div>
-          </div>
-        </Link>
-      ))}
-    </div>
-  );
-}
-
 function PeeklistsRow({
   items,
   lang,
@@ -636,7 +464,6 @@ function PeeklistsRow({
 
 export default async function ExplorePage({
   params,
-  searchParams,
 }: ExplorePageProps) {
   const { lang: rawLang } = await params;
   const lang = normalizeLang(rawLang);
@@ -647,25 +474,12 @@ export default async function ExplorePage({
 
   const t = getStrings(lang);
 
-  const { q = "", tab = "titles" } = await searchParams;
-  const query = q.trim();
-
   const [{ trendingMovies, trendingTV, popularPeople }, trendingOnPeekr, peeklists] =
     await Promise.all([
       getExploreData(lang),
       getTrendingOnPeekr(),
       getPeeklists(),
     ]);
-
-  let titleResults: TmdbItem[] = [];
-  let peopleResults: PersonItem[] = [];
-  let userResults: ProfileItem[] = [];
-
-  if (query) {
-    if (tab === "people") peopleResults = await searchPeople(query, lang);
-    else if (tab === "users") userResults = await searchUsers(query);
-    else titleResults = await searchTitles(query, lang);
-  }
 
   const peekrMovies = trendingOnPeekr.filter((i) => i.media_type === "movie");
   const peekrTV = trendingOnPeekr.filter((i) => i.media_type === "tv");
@@ -1016,78 +830,22 @@ export default async function ExplorePage({
         <section className="hero">
           <h1>{t.title}</h1>
 
-          <form action={`/${lang}/explore`} method="GET" className="search-form">
-            <input
-              type="text"
-              name="q"
-              defaultValue={query}
-              placeholder={t.searchPlaceholder}
-              className="search-input"
-            />
-
-            <input type="hidden" name="tab" value={tab} />
-
-            {query ? (
-              <Link href={`/${lang}/explore`} className="btn-secondary">
-                {t.clear}
-              </Link>
-            ) : null}
-
-            <button type="submit" className="btn-primary">
-              {t.search}
-            </button>
-          </form>
-
-          {query ? (
-            <div className="bubble-row">
-              <Bubble
-                label={t.titles}
-                active={tab === "titles"}
-                href={`/${lang}/explore?q=${encodeURIComponent(query)}&tab=titles`}
-              />
-              <Bubble
-                label={t.people}
-                active={tab === "people"}
-                href={`/${lang}/explore?q=${encodeURIComponent(query)}&tab=people`}
-              />
-              <Bubble
-                label={t.users}
-                active={tab === "users"}
-                href={`/${lang}/explore?q=${encodeURIComponent(query)}&tab=users`}
-              />
-            </div>
-          ) : null}
+          <ExploreSearch
+            lang={lang}
+            t={{
+              searchPlaceholder: t.searchPlaceholder,
+              clear: t.clear,
+              search: t.search,
+              titles: t.titles,
+              people: t.people,
+              users: t.users,
+              searchResults: t.searchResults,
+              noResults: t.noResults,
+            }}
+          />
         </section>
 
-        {query ? (
-          <section>
-            <SectionHeader title={`${t.searchResults} "${query}"`} />
-            {tab === "titles" ? (
-              titleResults.length > 0 ? (
-                <TitleGrid items={titleResults} lang={lang} />
-              ) : (
-                <div className="empty-state">{t.noResults}</div>
-              )
-            ) : null}
-
-            {tab === "people" ? (
-              peopleResults.length > 0 ? (
-                <PeopleGrid items={peopleResults} lang={lang} />
-              ) : (
-                <div className="empty-state">{t.noResults}</div>
-              )
-            ) : null}
-
-            {tab === "users" ? (
-              userResults.length > 0 ? (
-                <UsersGrid items={userResults} lang={lang} />
-              ) : (
-                <div className="empty-state">{t.noResults}</div>
-              )
-            ) : null}
-          </section>
-        ) : (
-          <>
+        <>
             <section>
               <SectionHeader title={t.peeklists} text={t.peeklistsText} />
               <PeeklistsRow items={peeklists} lang={lang} />
@@ -1133,7 +891,6 @@ export default async function ExplorePage({
               <PeopleRow items={popularPeople} lang={lang} />
             </section>
           </>
-        )}
       </div>
     </>
   );
