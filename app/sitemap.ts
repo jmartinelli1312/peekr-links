@@ -67,25 +67,18 @@ function isUsefulSlug(value?: string | null) {
   return slug.length >= 2;
 }
 
-// Sitemap index: Next.js generates /sitemap/0.xml, /sitemap/1.xml, etc.
-// 0 = static + editorial + buzz
-// 1 = titles (movies & TV)
-// 2 = actors
-// 3 = peeklists + profiles
-export async function generateSitemaps() {
-  return [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }];
-}
-
-export default async function sitemap({
-  id,
-}: {
-  id: number;
-}): Promise<MetadataRoute.Sitemap> {
-  if (id === 0) return buildStaticAndEditorialSitemap();
-  if (id === 1) return buildTitlesSitemap();
-  if (id === 2) return buildActorsSitemap();
-  if (id === 3) return buildUserContentSitemap();
-  return [];
+// Single sitemap at /sitemap.xml that contains ALL URLs. Next.js 15
+// has trouble exposing both a root /sitemap.xml index AND children via
+// generateSitemaps() in combination with our [lang] catch-all middleware.
+// A single flat sitemap is under the 50k URL cap so this is safe.
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const [staticAndEditorial, titles, actors, userContent] = await Promise.all([
+    buildStaticAndEditorialSitemap(),
+    buildTitlesSitemap(),
+    buildActorsSitemap(),
+    buildUserContentSitemap(),
+  ]);
+  return [...staticAndEditorial, ...titles, ...actors, ...userContent];
 }
 
 async function buildStaticAndEditorialSitemap(): Promise<MetadataRoute.Sitemap> {
