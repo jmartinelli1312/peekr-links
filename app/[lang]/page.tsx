@@ -532,7 +532,7 @@ function PeekrRow({
             <div className="poster-meta">
               <div className="poster-title">{title}</div>
               <div className="poster-year">
-                {showRating && item.rating != null ? `⭐ ${item.rating}/10` : ""}
+                {showRating && item.rating != null ? `⭐ ${(item.rating / 2).toFixed(1)}/5` : ""}
               </div>
             </div>
           </Link>

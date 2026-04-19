@@ -4,11 +4,10 @@ import { supabase } from "@/lib/supabase";
 const SITE = "https://www.peekr.app";
 const LANGS = ["es", "en", "pt"] as const;
 
-// Curado SEO / crawl budget
 const MAX_EDITORIAL_COLLECTIONS = 500;
 const MAX_BUZZ_ARTICLES = 500;
-const MAX_TITLE_URLS = 300;
-const MAX_ACTOR_URLS = 200;
+const MAX_TITLE_URLS = 2000;
+const MAX_ACTOR_URLS = 1000;
 const MAX_PEEKLISTS = 500;
 const MAX_PROFILES = 300;
 
@@ -68,11 +67,31 @@ function isUsefulSlug(value?: string | null) {
   return slug.length >= 2;
 }
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+// Sitemap index: Next.js generates /sitemap/0.xml, /sitemap/1.xml, etc.
+// 0 = static + editorial + buzz
+// 1 = titles (movies & TV)
+// 2 = actors
+// 3 = peeklists + profiles
+export async function generateSitemaps() {
+  return [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }];
+}
+
+export default async function sitemap({
+  id,
+}: {
+  id: number;
+}): Promise<MetadataRoute.Sitemap> {
+  if (id === 0) return buildStaticAndEditorialSitemap();
+  if (id === 1) return buildTitlesSitemap();
+  if (id === 2) return buildActorsSitemap();
+  if (id === 3) return buildUserContentSitemap();
+  return [];
+}
+
+async function buildStaticAndEditorialSitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   const staticUrls: MetadataRoute.Sitemap = [];
-
   for (const lang of LANGS) {
     staticUrls.push(
       {
@@ -92,18 +111,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: now,
         changeFrequency: "daily",
         priority: 0.85,
+      },
+      {
+        url: `${SITE}/${lang}/explore`,
+        lastModified: now,
+        changeFrequency: "daily",
+        priority: 0.8,
       }
     );
   }
 
-  const [
-    editorialCollectionsRes,
-    buzzArticlesRes,
-    titlesRes,
-    actorsRes,
-    peeklistsRes,
-    profilesRes,
-  ] = await Promise.all([
+  const [editorialRes, buzzRes] = await Promise.all([
     supabase
       .from("editorial_collections")
       .select("slug,updated_at,is_published,item_count")
@@ -118,50 +136,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .eq("is_published", true)
       .order("published_at", { ascending: false })
       .limit(MAX_BUZZ_ARTICLES),
-
-    supabase
-      .from("titles_cache")
-      .select("tmdb_id,media_type,title,updated_at")
-      .not("tmdb_id", "is", null)
-      .not("title", "is", null)
-      .order("updated_at", { ascending: false })
-      .limit(MAX_TITLE_URLS),
-
-    supabase
-      .from("people_cache")
-      .select("person_id,name,updated_at")
-      .not("person_id", "is", null)
-      .not("name", "is", null)
-      .order("updated_at", { ascending: false })
-      .limit(MAX_ACTOR_URLS),
-
-    supabase
-      .from("peeklists")
-      .select("id,updated_at")
-      .eq("visibility", "public")
-      .order("updated_at", { ascending: false })
-      .limit(MAX_PEEKLISTS),
-
-    supabase
-      .from("profiles")
-      .select("username,updated_at")
-      .not("username", "is", null)
-      .order("updated_at", { ascending: false })
-      .limit(MAX_PROFILES),
   ]);
 
   const editorialCollections =
-    (editorialCollectionsRes.data as EditorialCollectionRow[] | null) ?? [];
-  const buzzArticles =
-    (buzzArticlesRes.data as BuzzArticleRow[] | null) ?? [];
-  const titles =
-    (titlesRes.data as TitleRow[] | null) ?? [];
-  const actors =
-    (actorsRes.data as ActorRow[] | null) ?? [];
-  const peeklists =
-    (peeklistsRes.data as PeeklistRow[] | null) ?? [];
-  const profiles =
-    (profilesRes.data as ProfileRow[] | null) ?? [];
+    (editorialRes.data as EditorialCollectionRow[] | null) ?? [];
+  const buzzArticles = (buzzRes.data as BuzzArticleRow[] | null) ?? [];
 
   const listUrls: MetadataRoute.Sitemap = editorialCollections
     .filter((item) => item.slug && item.slug.trim().length > 0)
@@ -185,7 +164,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }))
     );
 
-  const titleUrls: MetadataRoute.Sitemap = titles
+  return [...staticUrls, ...listUrls, ...buzzUrls];
+}
+
+async function buildTitlesSitemap(): Promise<MetadataRoute.Sitemap> {
+  const titlesRes = await supabase
+    .from("titles_cache")
+    .select("tmdb_id,media_type,title,updated_at")
+    .not("tmdb_id", "is", null)
+    .not("title", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(MAX_TITLE_URLS);
+
+  const titles = (titlesRes.data as TitleRow[] | null) ?? [];
+
+  return titles
     .filter((item) => item.tmdb_id && isUsefulSlug(item.title))
     .flatMap((item) => {
       const type = item.media_type === "tv" ? "tv" : "movie";
@@ -198,8 +191,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       }));
     });
+}
 
-  const actorUrls: MetadataRoute.Sitemap = actors
+async function buildActorsSitemap(): Promise<MetadataRoute.Sitemap> {
+  const actorsRes = await supabase
+    .from("people_cache")
+    .select("person_id,name,updated_at")
+    .not("person_id", "is", null)
+    .not("name", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(MAX_ACTOR_URLS);
+
+  const actors = (actorsRes.data as ActorRow[] | null) ?? [];
+
+  return actors
     .filter((item) => item.person_id && isUsefulSlug(item.name))
     .flatMap((item) => {
       const slug = slugify(item.name || "person");
@@ -211,6 +216,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.6,
       }));
     });
+}
+
+async function buildUserContentSitemap(): Promise<MetadataRoute.Sitemap> {
+  const [peeklistsRes, profilesRes] = await Promise.all([
+    supabase
+      .from("peeklists")
+      .select("id,updated_at")
+      .eq("visibility", "public")
+      .order("updated_at", { ascending: false })
+      .limit(MAX_PEEKLISTS),
+
+    supabase
+      .from("profiles")
+      .select("username,updated_at")
+      .not("username", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(MAX_PROFILES),
+  ]);
+
+  const peeklists = (peeklistsRes.data as PeeklistRow[] | null) ?? [];
+  const profiles = (profilesRes.data as ProfileRow[] | null) ?? [];
 
   const peeklistUrls: MetadataRoute.Sitemap = peeklists
     .filter((item) => item.id)
@@ -234,13 +260,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }))
     );
 
-  return [
-    ...staticUrls,
-    ...listUrls,
-    ...buzzUrls,
-    ...titleUrls,
-    ...actorUrls,
-    ...peeklistUrls,
-    ...profileUrls,
-  ];
+  return [...peeklistUrls, ...profileUrls];
 }

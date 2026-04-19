@@ -237,11 +237,40 @@ export default async function BuzzArticlePage({ params }: PageProps) {
     },
   };
 
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Peekr",
+        item: `${SITE}/${lang}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Buzz",
+        item: `${SITE}/${lang}/buzz`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: cleanTitle,
+        item: `${SITE}/${lang}/buzz/${article.slug}`,
+      },
+    ],
+  };
+
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
       <style>{`

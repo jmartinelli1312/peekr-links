@@ -376,7 +376,7 @@ async function getPeekrStats(
 
     const avgRating =
       ratingRow?.avg_rating != null
-        ? Number(ratingRow.avg_rating).toFixed(1)
+        ? (Number(ratingRow.avg_rating) / 2).toFixed(1)
         : null;
 
     return {
@@ -416,7 +416,7 @@ async function getPeekrStats(
 
   const avgRating =
     ratingRow?.avg_rating != null
-      ? Number(ratingRow.avg_rating).toFixed(1)
+      ? (Number(ratingRow.avg_rating) / 2).toFixed(1)
       : null;
 
   return {
@@ -666,8 +666,84 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
         ? "overview"
         : requestedTab;
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": type === "movie" ? "Movie" : "TVSeries",
+    name: title,
+    url: `${SITE}/${lang}/title/${type}/${canonicalIdSlug}`,
+    image: poster ? `${POSTER}${poster}` : undefined,
+    description: base.overview || undefined,
+    datePublished: base.release_date || base.first_air_date || undefined,
+    genre: (base.genres || []).map((g) => g.name),
+    duration: type === "movie" && runtime ? `PT${runtime}M` : undefined,
+    aggregateRating:
+      stats.avgRating
+        ? {
+            "@type": "AggregateRating",
+            ratingValue: stats.avgRating,
+            bestRating: 5,
+            worstRating: 0.5,
+            ratingCount: stats.watchedCount || 1,
+          }
+        : undefined,
+    director:
+      director
+        ? {
+            "@type": "Person",
+            name: director.name,
+            url: `${SITE}${personHref(director.id, director.name, lang)}`,
+          }
+        : undefined,
+    actor: cast.slice(0, 5).map((c) => ({
+      "@type": "Person",
+      name: c.name,
+      url: `${SITE}${personHref(c.id, c.name, lang)}`,
+    })),
+    ...(type === "tv" && creator
+      ? {
+          creator: {
+            "@type": "Person",
+            name: creator.name,
+          },
+        }
+      : {}),
+  };
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Peekr",
+        item: `${SITE}/${lang}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: type === "movie" ? "Movies" : "TV Series",
+        item: `${SITE}/${lang}/explore`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: title,
+        item: `${SITE}/${lang}/title/${type}/${canonicalIdSlug}`,
+      },
+    ],
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <style>{`
         .title-page {
           min-height: 100vh;
@@ -1374,7 +1450,7 @@ export default async function TitlePage({ params, searchParams }: PageProps) {
                     <div>
                       <div className="comment-user">{c.username || "user"}</div>
                       {typeof c.rating === "number" ? (
-                        <div className="comment-rating">⭐ {c.rating}/10</div>
+                        <div className="comment-rating">⭐ {(c.rating / 2).toFixed(1)}/5</div>
                       ) : null}
                       <div className="comment-content">{c.content || ""}</div>
                     </div>

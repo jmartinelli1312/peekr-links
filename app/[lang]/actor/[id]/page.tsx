@@ -376,8 +376,66 @@ export default async function ActorPage({ params }: PageProps) {
   const heroImage =
     actor.images?.profiles?.[0]?.file_path || actor.profile_path || null;
 
+  const slug = slugify(actor.name);
+  const canonicalPath = `/${lang}/actor/${numericId}-${slug}`;
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: actor.name,
+    url: `${SITE}${canonicalPath}`,
+    image: actor.profile_path
+      ? `https://image.tmdb.org/t/p/w500${actor.profile_path}`
+      : undefined,
+    description: actor.biography?.slice(0, 300) || undefined,
+    birthDate: actor.birthday || undefined,
+    deathDate: actor.deathday || undefined,
+    birthPlace: actor.place_of_birth || undefined,
+    jobTitle: actor.known_for_department || undefined,
+    alternateName: actor.also_known_as?.length
+      ? actor.also_known_as
+      : undefined,
+    knowsAbout: knownFor.slice(0, 5).map((item) => ({
+      "@type": item.media_type === "tv" ? "TVSeries" : "Movie",
+      name: item.title || item.name,
+    })),
+  };
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Peekr",
+        item: `${SITE}/${lang}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: t.knownFor,
+        item: `${SITE}/${lang}/explore`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: actor.name,
+        item: `${SITE}${canonicalPath}`,
+      },
+    ],
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <style>{`
         .actor-page {
           min-height: 100vh;

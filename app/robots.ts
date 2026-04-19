@@ -22,16 +22,20 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/"],
       },
       {
-        userAgent: "Google-Extended",
-        disallow: ["/"],
-      },
-      {
         userAgent: "meta-externalagent",
         disallow: ["/"],
       },
       {
         userAgent: "*",
-        allow: ["/"],
+        allow: [
+          "/",
+          "/*/title/",
+          "/*/actor/",
+          "/*/lists/",
+          "/*/buzz/",
+          "/*/peeklist/",
+          "/*/u/",
+        ],
         disallow: [
           "/api/",
           "/admin",
@@ -45,7 +49,8 @@ export default function robots(): MetadataRoute.Robots {
           "/messages",
           "/activity",
           "/activity/",
-        
+          "/*/explore?*",
+          "/*?tab=*",
         ],
       },
     ],

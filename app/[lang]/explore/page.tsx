@@ -446,7 +446,7 @@ function PeekrOnlyRow({
             <div className="poster-meta">
               <div className="poster-title">{title}</div>
               <div className="poster-year">
-                {item.rating != null ? `⭐ ${item.rating}/10` : ""}
+                {item.rating != null ? `⭐ ${(item.rating / 2).toFixed(1)}/5` : ""}
               </div>
             </div>
           </Link>
