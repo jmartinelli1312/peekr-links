@@ -35,7 +35,8 @@ function isBypassedPath(pathname: string) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/.well-known") ||
     pathname.startsWith("/favicon.ico") ||
-    pathname.startsWith("/sitemap.xml") ||
+    pathname === "/sitemap.xml" ||
+    pathname.startsWith("/sitemap/") ||
     pathname.startsWith("/robots.txt") ||
     /\.(png|jpg|jpeg|webp|gif|svg|ico|css|js|map|txt|xml)$/i.test(pathname)
   );
@@ -143,6 +144,6 @@ export const config = {
     "/title/:path*",
     "/lists/:path*",
     "/buzz/:path*",
-    "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|sitemap/).*)",
   ],
 };
