@@ -223,6 +223,28 @@ function getStrings(lang: Lang) {
       tabsComments: "Comments",
       defaultDescription:
         "Discover and discuss movies and series on Peekr.",
+      onPeekrHeading: "On Peekr",
+      whatUsersSay: "What Peekr users are saying",
+      noCommentsYet:
+        "No Peekr users have shared their thoughts yet. Be the first to review this title on Peekr.",
+      faqHeading: "Frequently asked questions",
+      faqWhereWatchQ: "Where can I watch",
+      faqWhatIsAboutQ: "What is",
+      faqAbout: "about",
+      faqRatingQ: "What do Peekr users think of",
+      faqReleaseQ: "When was",
+      faqReleased: "released",
+      noStatsSentence:
+        "be among the first to watch, rate, and discuss it with the Peekr community.",
+      availableOn: "Available on",
+      notAvailableYet:
+        "No streaming platforms listed yet. Peekr users will add availability as it becomes known.",
+      ratingSentence: (n: number, avg: string) =>
+        `${n} Peekr ${n === 1 ? "user has" : "users have"} rated this title with an average of ${avg} out of 5 stars.`,
+      watchedSentence: (n: number) =>
+        `${n} Peekr ${n === 1 ? "user has" : "users have"} marked this as watched so far.`,
+      commentsSentence: (n: number) =>
+        `There ${n === 1 ? "is" : "are"} ${n} ${n === 1 ? "review" : "reviews"} from the Peekr community below.`,
     },
     es: {
       directedBy: "Dirigida por",
@@ -251,6 +273,28 @@ function getStrings(lang: Lang) {
       tabsComments: "Comentarios",
       defaultDescription:
         "Descubre y comenta películas y series en Peekr.",
+      onPeekrHeading: "En Peekr",
+      whatUsersSay: "Lo que opinan los usuarios de Peekr",
+      noCommentsYet:
+        "Todavía ningún usuario de Peekr comentó este título. Sé el primero en calificarlo y comentarlo en Peekr.",
+      faqHeading: "Preguntas frecuentes",
+      faqWhereWatchQ: "¿Dónde puedo ver",
+      faqWhatIsAboutQ: "¿De qué trata",
+      faqAbout: "",
+      faqRatingQ: "¿Qué piensan los usuarios de Peekr sobre",
+      faqReleaseQ: "¿Cuándo se estrenó",
+      faqReleased: "",
+      noStatsSentence:
+        "sé de los primeros en verla, calificarla y comentarla con la comunidad de Peekr.",
+      availableOn: "Disponible en",
+      notAvailableYet:
+        "Todavía no hay plataformas de streaming listadas. Los usuarios de Peekr agregarán la disponibilidad a medida que se conozca.",
+      ratingSentence: (n: number, avg: string) =>
+        `${n} ${n === 1 ? "usuario de Peekr ha calificado" : "usuarios de Peekr han calificado"} este título con un promedio de ${avg} sobre 5 estrellas.`,
+      watchedSentence: (n: number) =>
+        `${n} ${n === 1 ? "usuario de Peekr la marcó" : "usuarios de Peekr la marcaron"} como vista hasta ahora.`,
+      commentsSentence: (n: number) =>
+        `${n === 1 ? "Hay" : "Hay"} ${n} ${n === 1 ? "reseña" : "reseñas"} de la comunidad de Peekr más abajo.`,
     },
     pt: {
       directedBy: "Dirigido por",
@@ -279,6 +323,28 @@ function getStrings(lang: Lang) {
       tabsComments: "Comentários",
       defaultDescription:
         "Descubra e comente filmes e séries no Peekr.",
+      onPeekrHeading: "No Peekr",
+      whatUsersSay: "O que os usuários do Peekr estão dizendo",
+      noCommentsYet:
+        "Ainda nenhum usuário do Peekr comentou este título. Seja o primeiro a avaliar e comentar no Peekr.",
+      faqHeading: "Perguntas frequentes",
+      faqWhereWatchQ: "Onde posso assistir",
+      faqWhatIsAboutQ: "Sobre o que é",
+      faqAbout: "",
+      faqRatingQ: "O que os usuários do Peekr acham de",
+      faqReleaseQ: "Quando foi lançado",
+      faqReleased: "",
+      noStatsSentence:
+        "seja um dos primeiros a assistir, avaliar e comentar com a comunidade do Peekr.",
+      availableOn: "Disponível em",
+      notAvailableYet:
+        "Ainda não há plataformas de streaming listadas. Os usuários do Peekr adicionarão a disponibilidade conforme for conhecida.",
+      ratingSentence: (n: number, avg: string) =>
+        `${n} ${n === 1 ? "usuário do Peekr avaliou" : "usuários do Peekr avaliaram"} este título com uma média de ${avg} de 5 estrelas.`,
+      watchedSentence: (n: number) =>
+        `${n} ${n === 1 ? "usuário do Peekr marcou" : "usuários do Peekr marcaram"} como assistido até agora.`,
+      commentsSentence: (n: number) =>
+        `${n === 1 ? "Há" : "Há"} ${n} ${n === 1 ? "resenha" : "resenhas"} da comunidade do Peekr abaixo.`,
     },
   }[lang];
 }
@@ -699,6 +765,62 @@ export default async function TitlePage({ params }: PageProps) {
     ],
   };
 
+  // FAQ schema — unique structured data that Google can surface as rich result
+  const faqEntities: Array<{
+    "@type": "Question";
+    name: string;
+    acceptedAnswer: { "@type": "Answer"; text: string };
+  }> = [];
+
+  faqEntities.push({
+    "@type": "Question",
+    name: `${t.faqWhatIsAboutQ} ${title}${t.faqAbout ? ` ${t.faqAbout}` : ""}?`,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: base.overview || `${title}${year ? ` (${year})` : ""} — ${t.noOverview}`,
+    },
+  });
+
+  if (providers.length > 0) {
+    faqEntities.push({
+      "@type": "Question",
+      name: `${t.faqWhereWatchQ} ${title}?`,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: `${t.availableOn}: ${providers.map((p) => p.provider_name).join(", ")}.`,
+      },
+    });
+  }
+
+  if (stats.avgRating && stats.watchedCount > 0) {
+    faqEntities.push({
+      "@type": "Question",
+      name: `${t.faqRatingQ} ${title}?`,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: t.ratingSentence(stats.watchedCount, stats.avgRating),
+      },
+    });
+  }
+
+  const releaseDate = base.release_date || base.first_air_date;
+  if (releaseDate) {
+    faqEntities.push({
+      "@type": "Question",
+      name: `${t.faqReleaseQ} ${title}${t.faqReleased ? ` ${t.faqReleased}` : ""}?`,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: releaseDate,
+      },
+    });
+  }
+
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqEntities,
+  };
+
   return (
     <>
       <script
@@ -708,6 +830,10 @@ export default async function TitlePage({ params }: PageProps) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
       <style>{`
         .title-page {
@@ -899,6 +1025,93 @@ export default async function TitlePage({ params }: PageProps) {
           line-height: 1.02;
           letter-spacing: -0.03em;
           font-weight: 900;
+        }
+
+        .on-peekr-prose {
+          color: rgba(255,255,255,0.82);
+          font-size: 15px;
+          line-height: 1.65;
+        }
+
+        .on-peekr-prose p {
+          margin: 0 0 12px 0;
+        }
+
+        .on-peekr-prose strong {
+          color: rgba(255,255,255,0.95);
+          font-weight: 700;
+        }
+
+        .user-voices {
+          margin-top: 28px;
+          padding-top: 24px;
+          border-top: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .user-voices-heading,
+        .faq-heading {
+          margin: 0 0 14px 0;
+          font-size: 20px;
+          font-weight: 800;
+          color: rgba(255,255,255,0.95);
+          letter-spacing: -0.02em;
+        }
+
+        .user-voices-list {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .user-voice {
+          margin: 0;
+          padding: 14px 16px;
+          background: rgba(255,255,255,0.04);
+          border-left: 3px solid ${BRAND};
+          border-radius: 12px;
+        }
+
+        .user-voice p {
+          margin: 0 0 8px 0;
+          font-size: 14px;
+          line-height: 1.6;
+          color: rgba(255,255,255,0.88);
+          font-style: italic;
+        }
+
+        .user-voice cite {
+          font-size: 13px;
+          color: rgba(255,255,255,0.58);
+          font-style: normal;
+          font-weight: 600;
+        }
+
+        .faq-block {
+          margin-top: 28px;
+          padding-top: 24px;
+          border-top: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .faq-list {
+          margin: 0;
+        }
+
+        .faq-list dt {
+          margin-top: 14px;
+          font-weight: 700;
+          color: rgba(255,255,255,0.95);
+          font-size: 15px;
+        }
+
+        .faq-list dt:first-child {
+          margin-top: 0;
+        }
+
+        .faq-list dd {
+          margin: 6px 0 0 0;
+          color: rgba(255,255,255,0.75);
+          font-size: 14px;
+          line-height: 1.6;
         }
 
         .overview-text {
@@ -1187,6 +1400,108 @@ export default async function TitlePage({ params }: PageProps) {
               👀 {stats.viewsCount ?? 0} {t.views}
             </div>
           </div>
+
+          {/* ============================================================
+              UNIQUE CONTENT SECTION — SEO differentiation vs TMDB clones.
+              Renders Peekr-specific prose using our own engagement data
+              so this page doesn't look like a generic TMDB copy to Google.
+              ============================================================ */}
+          <section className="section-block on-peekr">
+            <h2 className="section-title">
+              {t.onPeekrHeading}: {title}
+              {year ? ` (${year})` : ""}
+            </h2>
+            <div className="on-peekr-prose">
+              {stats.watchedCount > 0 || stats.commentsCount > 0 ? (
+                <>
+                  {stats.avgRating && stats.watchedCount > 0 ? (
+                    <p>{t.ratingSentence(stats.watchedCount, stats.avgRating)}</p>
+                  ) : null}
+                  {stats.watchedCount > 0 && !stats.avgRating ? (
+                    <p>{t.watchedSentence(stats.watchedCount)}</p>
+                  ) : null}
+                  {stats.commentsCount > 0 ? (
+                    <p>{t.commentsSentence(stats.commentsCount)}</p>
+                  ) : null}
+                </>
+              ) : (
+                <p>
+                  {title}
+                  {year ? ` (${year})` : ""} — {t.noStatsSentence}
+                </p>
+              )}
+
+              {providers.length > 0 ? (
+                <p>
+                  <strong>{t.availableOn}:</strong>{" "}
+                  {providers.map((p) => p.provider_name).join(", ")}.
+                </p>
+              ) : (
+                <p>{t.notAvailableYet}</p>
+              )}
+            </div>
+
+            {/* Inline user comment excerpts — unique UGC content for SEO */}
+            {comments.length > 0 ? (
+              <div className="user-voices">
+                <h3 className="user-voices-heading">{t.whatUsersSay}</h3>
+                <div className="user-voices-list">
+                  {comments.slice(0, 3).map((c) => (
+                    <blockquote key={c.id} className="user-voice">
+                      <p>&ldquo;{c.content || ""}&rdquo;</p>
+                      <cite>
+                        — @{c.username || "user"}
+                        {typeof c.rating === "number"
+                          ? ` · ⭐ ${(c.rating / 2).toFixed(1)}/5`
+                          : ""}
+                      </cite>
+                    </blockquote>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* FAQ block — structured content Google loves, also unique prose */}
+            <div className="faq-block">
+              <h3 className="faq-heading">{t.faqHeading}</h3>
+              <dl className="faq-list">
+                <dt>
+                  {t.faqWhatIsAboutQ} {title}
+                  {t.faqAbout ? ` ${t.faqAbout}` : ""}?
+                </dt>
+                <dd>
+                  {base.overview ||
+                    `${title}${year ? ` (${year})` : ""} — ${t.noOverview}`}
+                </dd>
+                {providers.length > 0 ? (
+                  <>
+                    <dt>
+                      {t.faqWhereWatchQ} {title}?
+                    </dt>
+                    <dd>
+                      {t.availableOn}: {providers.map((p) => p.provider_name).join(", ")}.
+                    </dd>
+                  </>
+                ) : null}
+                {stats.avgRating && stats.watchedCount > 0 ? (
+                  <>
+                    <dt>
+                      {t.faqRatingQ} {title}?
+                    </dt>
+                    <dd>{t.ratingSentence(stats.watchedCount, stats.avgRating)}</dd>
+                  </>
+                ) : null}
+                {(base.release_date || base.first_air_date) ? (
+                  <>
+                    <dt>
+                      {t.faqReleaseQ} {title}{t.faqReleased ? ` ${t.faqReleased}` : ""}?
+                    </dt>
+                    <dd>{base.release_date || base.first_air_date}</dd>
+                  </>
+                ) : null}
+              </dl>
+            </div>
+          </section>
 
           <TitleTabs
             tabs={[

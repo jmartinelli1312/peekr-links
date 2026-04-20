@@ -242,6 +242,12 @@ function getStrings(lang: Lang) {
       appearances: "Talk shows & appearances",
       defaultDescription:
         "Explore biography, movies, TV series and credits on Peekr.",
+      onPeekrHeading: "On Peekr",
+      peekrSummary: (name: string, dept: string, creditsCount: number) =>
+        `${name}${dept ? ` is best known for work in ${dept}.` : "."} The Peekr community tracks ${creditsCount} credits from ${name}, including movies and TV series you can rate, discuss, and add to your own Peeklists.`,
+      mostPopularHeading: "Popular titles from",
+      noCreditsYet:
+        "This person's filmography is not yet available on Peekr.",
     },
     es: {
       actorNotFound: "Persona no encontrada",
@@ -258,6 +264,12 @@ function getStrings(lang: Lang) {
       appearances: "Talk shows y apariciones",
       defaultDescription:
         "Explora biografía, películas, series y créditos en Peekr.",
+      onPeekrHeading: "En Peekr",
+      peekrSummary: (name: string, dept: string, creditsCount: number) =>
+        `${name}${dept ? ` es reconocido/a principalmente por su trabajo como ${dept}.` : "."} En Peekr se registran ${creditsCount} créditos de ${name}, incluyendo películas y series que podés calificar, comentar y agregar a tus propias Peeklists.`,
+      mostPopularHeading: "Títulos destacados de",
+      noCreditsYet:
+        "La filmografía de esta persona todavía no está disponible en Peekr.",
     },
     pt: {
       actorNotFound: "Pessoa não encontrada",
@@ -274,6 +286,12 @@ function getStrings(lang: Lang) {
       appearances: "Talk shows e aparições",
       defaultDescription:
         "Explore biografia, filmes, séries e créditos no Peekr.",
+      onPeekrHeading: "No Peekr",
+      peekrSummary: (name: string, dept: string, creditsCount: number) =>
+        `${name}${dept ? ` é reconhecido/a principalmente pelo trabalho em ${dept}.` : "."} No Peekr estão registrados ${creditsCount} créditos de ${name}, incluindo filmes e séries que você pode avaliar, comentar e adicionar às suas próprias Peeklists.`,
+      mostPopularHeading: "Títulos em destaque de",
+      noCreditsYet:
+        "A filmografia desta pessoa ainda não está disponível no Peekr.",
     },
   }[lang];
 }
@@ -717,6 +735,26 @@ export default async function ActorPage({ params }: PageProps) {
               <p className="section-text">{actor.biography || t.noBiography}</p>
             </section>
           ) : null}
+
+          {/* ============================================================
+              UNIQUE CONTENT — Peekr-specific prose using our own data.
+              Differentiates this page from generic TMDB-based sites so
+              Google has a reason to index it beyond the TMDB biography.
+              ============================================================ */}
+          <section className="section-block">
+            <h2 className="section-title">
+              {t.onPeekrHeading}: {actor.name}
+            </h2>
+            <p className="section-text">
+              {movies.length + tv.length > 0
+                ? t.peekrSummary(
+                    actor.name,
+                    actor.known_for_department || "",
+                    movies.length + tv.length
+                  )
+                : t.noCreditsYet}
+            </p>
+          </section>
 
           {actor.also_known_as && actor.also_known_as.length > 0 ? (
             <section className="section-block">
