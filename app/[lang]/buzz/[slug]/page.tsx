@@ -22,6 +22,7 @@ type BuzzArticle = {
   slug: string;
   title: string;
   summary?: string | null;
+  body_html?: string | null;
   source_name?: string | null;
   source_url?: string | null;
   image_url?: string | null;
@@ -146,7 +147,7 @@ async function getBuzzArticle(slug: string) {
   const { data, error } = await supabase
     .from("peekrbuzz_articles")
     .select(
-      "id,slug,title,summary,source_name,source_url,image_url,published_at,category,is_published"
+      "id,slug,title,summary,body_html,source_name,source_url,image_url,published_at,category,is_published"
     )
     .eq("slug", slug)
     .eq("is_published", true)
@@ -393,6 +394,65 @@ export default async function BuzzArticlePage({ params }: PageProps) {
           line-height: 1.9;
           margin: 0 0 20px 0;
         }
+
+        .article-body {
+          max-width: 860px;
+          margin-top: 12px;
+        }
+
+        .article-body h2 {
+          margin: 40px 0 16px 0;
+          font-size: 28px;
+          line-height: 1.15;
+          letter-spacing: -0.02em;
+          font-weight: 800;
+          color: white;
+        }
+
+        .article-body h3 {
+          margin: 32px 0 12px 0;
+          font-size: 22px;
+          line-height: 1.2;
+          letter-spacing: -0.01em;
+          font-weight: 700;
+          color: white;
+        }
+
+        .article-body p {
+          color: rgba(255,255,255,0.84);
+          font-size: 17px;
+          line-height: 1.9;
+          margin: 0 0 20px 0;
+        }
+
+        .article-body ul,
+        .article-body ol {
+          color: rgba(255,255,255,0.84);
+          font-size: 17px;
+          line-height: 1.9;
+          padding-left: 24px;
+          margin: 0 0 20px 0;
+        }
+
+        .article-body li {
+          margin-bottom: 8px;
+        }
+
+        .article-body a {
+          color: ${BRAND};
+          text-decoration: underline;
+          text-decoration-color: rgba(250,0,130,0.4);
+          text-underline-offset: 3px;
+        }
+
+        .article-body a:hover {
+          text-decoration-color: ${BRAND};
+        }
+
+        .article-body strong {
+          color: white;
+          font-weight: 700;
+        }
       `}</style>
 
       <div className="buzz-article-page">
@@ -461,6 +521,13 @@ export default async function BuzzArticlePage({ params }: PageProps) {
 
         <section className="content-wrap">
           {cleanSummary ? <p>{cleanSummary}</p> : null}
+
+          {article.body_html ? (
+            <div
+              className="article-body"
+              dangerouslySetInnerHTML={{ __html: article.body_html }}
+            />
+          ) : null}
         </section>
       </div>
     </>

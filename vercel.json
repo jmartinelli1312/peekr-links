@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/indexnow-sync",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/generate-buzz",
+      "schedule": "0 8 * * *"
     }
   ]
 }
