@@ -201,6 +201,7 @@ export async function generateMetadata({ params }: PageProps) {
     return {
       title: "Peeklist | Peekr",
       description: "Discover curated lists on Peekr.",
+      robots: { index: false, follow: true },
       alternates: {
         canonical: `${SITE}/${lang}/peeklist/${id}`,
       },
@@ -213,14 +214,12 @@ export async function generateMetadata({ params }: PageProps) {
   return {
     title: `${title} | Peekr`,
     description,
+    // User-generated lists are typically thin content — noindex to avoid
+    // diluting crawl budget and hurting site-wide quality signals.
+    // Still allow link following so Peekr titles/actors inside get discovered.
+    robots: { index: false, follow: true },
     alternates: {
       canonical: `${SITE}/${lang}/peeklist/${id}`,
-      languages: {
-        es: `${SITE}/es/peeklist/${id}`,
-        en: `${SITE}/en/peeklist/${id}`,
-        pt: `${SITE}/pt/peeklist/${id}`,
-        "x-default": `${SITE}/es/peeklist/${id}`,
-      },
     },
     openGraph: {
       title: `${title} | Peekr`,

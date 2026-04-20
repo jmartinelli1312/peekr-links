@@ -35,14 +35,12 @@ export async function generateMetadata({
   return {
     title: `${displayName} | Peekr`,
     description,
+    // User profiles are thin content from an SEO perspective (few words of
+    // unique text). Noindex to focus crawl budget on title/actor/editorial
+    // pages. Still follow links so user's peeklists/activity get discovered.
+    robots: { index: false, follow: true },
     alternates: {
       canonical: `${SITE}/${lang}/u/${username}`,
-      languages: {
-        es: `${SITE}/es/u/${username}`,
-        en: `${SITE}/en/u/${username}`,
-        pt: `${SITE}/pt/u/${username}`,
-        "x-default": `${SITE}/es/u/${username}`,
-      },
     },
     openGraph: {
       title: `${displayName} | Peekr`,
