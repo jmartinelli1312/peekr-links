@@ -11,7 +11,7 @@
  *   renderWhatToWatchAfter(trending, recs, lang)
  */
 
-import { supabase } from "./supabase";
+import { getSupabaseAdmin } from "./supabase-admin";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -106,9 +106,12 @@ function internalTitleUrl(t: TmdbTitle, lang: Lang): string {
  * activity in the window.
  */
 export async function findTrendingTitle(): Promise<TrendingTitle | null> {
+  // Uses the service-role client because user_title_activities has RLS
+  // policies scoped per user and is invisible to the anon key.
+  const admin = getSupabaseAdmin();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-  const { data } = await supabase
+  const { data } = await admin
     .from("user_title_activities")
     .select("tmdb_id, media_type")
     .gte("watched_at", since)
@@ -118,18 +121,18 @@ export async function findTrendingTitle(): Promise<TrendingTitle | null> {
   if (!data || data.length === 0) {
     // Fallback: use the most-recently-updated row in titles_cache so
     // the cron still produces content on cold-start days.
-    const { data: fallback } = await supabase
+    const { data: fallback } = await admin
       .from("titles_cache")
       .select("tmdb_id, media_type")
       .not("tmdb_id", "is", null)
       .order("updated_at", { ascending: false })
       .limit(1);
 
-    const row = fallback?.[0];
+    const row = fallback?.[0] as { tmdb_id: number; media_type: string } | undefined;
     if (!row) return null;
 
     return {
-      tmdb_id: row.tmdb_id as number,
+      tmdb_id: row.tmdb_id,
       media_type: (row.media_type === "tv" ? "tv" : "movie") as "movie" | "tv",
       recent_activity_count: 0,
     };
