@@ -262,7 +262,9 @@ export async function generateDirectorMarathon(
   const articles: GeneratedArticle[] = [];
   for (const lang of LANGS) {
     const { films, person } = await fetchDirectorFilms(director, lang);
-    if (films.length < 4) continue;
+    // Minimum 3 films — covers LATAM directors with smaller but notable
+    // filmographies (Szifron has 3 features, for example).
+    if (films.length < 3) continue;
 
     const slug = slugify(
       `${STRINGS[lang].slugPrefix}-${director.slug}-${stamp}`
