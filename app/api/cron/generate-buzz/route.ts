@@ -1,26 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { submitUrlsToIndexNow } from "@/lib/indexnow";
-import {
-  findTrendingTitle,
-  fetchTmdbDetails,
-  fetchTmdbRecommendations,
-  renderWhatToWatchAfter,
-  type Lang,
-} from "@/lib/buzz-generator";
+import { generateDailyArticles } from "@/lib/buzz-generator";
 
 /**
  * GET /api/cron/generate-buzz
  *
- * Daily programmatic-SEO generator. Produces 3 Peekr Buzz articles
- * (one per ES/EN/PT) from the most-trending title in the last 24h:
- *   - "Qué ver después de [title]"
- *   - "What to watch after [title]"
- *   - "O que assistir depois de [title]"
+ * Daily programmatic-SEO generator. Picks a template based on the UTC
+ * day of week and produces up to 3 Peekr Buzz articles (one per language:
+ * ES/EN/PT) using either Peekr's own engagement data or fresh TMDB data.
  *
- * Each article is 600–800 words with H2/H3 structure and internal
- * links to 6–8 TMDB-recommended similar titles. Upserts by slug so
- * running the same day is safe.
+ * Week schedule:
+ *   Mon   — none (skipped until we add a Peekr-activity-driven recap)
+ *   Tue   — weekly-releases       (TMDB now_playing + on_the_air)
+ *   Wed   — what-to-watch-after   (Peekr trending → TMDB recommendations)
+ *   Thu   — best-of-genre         (TMDB discover, rotating genre)
+ *   Fri   — weekly-trending       (TMDB trending/all/week)
+ *   Sat   — weekend-platform      (TMDB discover, rotating platform)
+ *   Sun   — director-marathon     (TMDB person credits, rotating director)
  *
  * After publishing, pings IndexNow so Bing/Yandex index immediately.
  *
@@ -29,7 +26,6 @@ import {
  */
 
 const SITE = "https://www.peekr.app";
-const LANGS: Lang[] = ["es", "en", "pt"];
 
 function isAuthorized(request: NextRequest): boolean {
   const auth = request.headers.get("authorization") || "";
@@ -50,50 +46,33 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 1) Pick the trending title for this cycle.
-  const trending = await findTrendingTitle();
-  if (!trending) {
+  // Optional `?date=YYYY-MM-DD` override to backfill a specific day or
+  // preview another template. Defaults to today's UTC date.
+  const dateParam = request.nextUrl.searchParams.get("date");
+  const runDate = dateParam ? new Date(`${dateParam}T12:00:00Z`) : new Date();
+  if (isNaN(runDate.getTime())) {
+    return NextResponse.json(
+      { ok: false, message: `Invalid date parameter: ${dateParam}` },
+      { status: 400 }
+    );
+  }
+
+  const batch = await generateDailyArticles(runDate);
+
+  if (batch.articles.length === 0) {
     return NextResponse.json({
       ok: false,
-      message: "No trending title in the last 24h and no fallback available",
+      template: batch.template,
+      topic: batch.topic,
+      message: "Template produced no publishable articles",
     });
   }
 
-  // 2) For each language, fetch localized TMDB data and render an article.
   const admin = getSupabaseAdmin();
-  const created: { lang: Lang; slug: string; url: string }[] = [];
-  const skipped: { lang: Lang; reason: string }[] = [];
+  const created: { lang: string; slug: string; url: string }[] = [];
+  const skipped: { lang: string; reason: string }[] = [];
 
-  for (const lang of LANGS) {
-    const source = await fetchTmdbDetails(
-      trending.tmdb_id,
-      trending.media_type,
-      lang
-    );
-
-    if (!source || !source.title) {
-      skipped.push({ lang, reason: "Could not fetch TMDB details" });
-      continue;
-    }
-
-    const recs = await fetchTmdbRecommendations(
-      trending.tmdb_id,
-      trending.media_type,
-      lang,
-      8
-    );
-
-    if (recs.length < 3) {
-      skipped.push({
-        lang,
-        reason: `Only ${recs.length} recommendations — not enough to publish`,
-      });
-      continue;
-    }
-
-    const article = renderWhatToWatchAfter(source, recs, lang);
-
-    // Upsert on slug so same-day re-runs don't duplicate.
+  for (const article of batch.articles) {
     const { error } = await admin
       .from("peekrbuzz_articles")
       .upsert(
@@ -115,18 +94,18 @@ export async function GET(request: NextRequest) {
       );
 
     if (error) {
-      skipped.push({ lang, reason: `DB error: ${error.message}` });
+      skipped.push({ lang: article.language, reason: `DB error: ${error.message}` });
       continue;
     }
 
     created.push({
-      lang,
+      lang: article.language,
       slug: article.slug,
-      url: `${SITE}/${lang}/buzz/${article.slug}`,
+      url: `${SITE}/${article.language}/buzz/${article.slug}`,
     });
   }
 
-  // 3) Ping IndexNow so Bing/Yandex index the new articles immediately.
+  // Ping IndexNow for immediate Bing/Yandex indexing.
   let indexnowResult = null;
   if (created.length > 0) {
     indexnowResult = await submitUrlsToIndexNow(created.map((c) => c.url));
@@ -134,11 +113,8 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     ok: created.length > 0,
-    trendingTitle: {
-      tmdb_id: trending.tmdb_id,
-      media_type: trending.media_type,
-      recent_activity_count: trending.recent_activity_count,
-    },
+    template: batch.template,
+    topic: batch.topic,
     created,
     skipped,
     indexnowResult,

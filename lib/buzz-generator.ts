@@ -387,3 +387,97 @@ export function renderWhatToWatchAfter(
     topic_key,
   };
 }
+
+// ============================================================
+// DAILY DISPATCHER — rotates templates across the week so the cron
+// produces varied SEO content instead of hammering the same "what to
+// watch after" template daily.
+// ============================================================
+
+import type { DailyArticleBatch } from "./buzz-templates/shared";
+import { generateWeeklyReleases } from "./buzz-templates/weekly-releases";
+import { generateBestOfGenre } from "./buzz-templates/best-of-genre";
+import { generateWeeklyTrending } from "./buzz-templates/weekly-trending";
+import { generateWeekendPlatform } from "./buzz-templates/weekend-platform";
+import { generateDirectorMarathon } from "./buzz-templates/director-marathon";
+
+const DISPATCHER_LANGS: Lang[] = ["es", "en", "pt"];
+
+/**
+ * Wraps the existing "what to watch after trending title" logic into
+ * the common DailyArticleBatch shape so the dispatcher can treat it
+ * like any other day-of-week template.
+ */
+async function generateWhatToWatchAfterBatch(
+  _date: Date
+): Promise<DailyArticleBatch> {
+  const trending = await findTrendingTitle();
+  if (!trending) {
+    return {
+      template: "what-to-watch-after",
+      topic: "no trending title available",
+      articles: [],
+    };
+  }
+
+  const articles: GeneratedArticle[] = [];
+  for (const lang of DISPATCHER_LANGS) {
+    const source = await fetchTmdbDetails(
+      trending.tmdb_id,
+      trending.media_type,
+      lang
+    );
+    if (!source?.title) continue;
+
+    const recs = await fetchTmdbRecommendations(
+      trending.tmdb_id,
+      trending.media_type,
+      lang,
+      8
+    );
+    if (recs.length < 3) continue;
+
+    articles.push(renderWhatToWatchAfter(source, recs, lang));
+  }
+
+  return {
+    template: "what-to-watch-after",
+    topic: `trending tmdb_id=${trending.tmdb_id} (${trending.recent_activity_count} activities)`,
+    articles,
+  };
+}
+
+/**
+ * Picks the right article template for the given UTC day of week.
+ * Mondays have no scheduled template yet — the cron returns an empty
+ * batch on Monday so we don't duplicate another day's content.
+ *
+ * UTC-based on purpose: Vercel Cron fires at UTC so this stays
+ * deterministic across timezones.
+ */
+export async function generateDailyArticles(
+  date: Date = new Date()
+): Promise<DailyArticleBatch> {
+  const dow = date.getUTCDay(); // 0=Sun ... 6=Sat
+  switch (dow) {
+    case 0:
+      return generateDirectorMarathon(date);
+    case 2:
+      return generateWeeklyReleases(date);
+    case 3:
+      return generateWhatToWatchAfterBatch(date);
+    case 4:
+      return generateBestOfGenre(date);
+    case 5:
+      return generateWeeklyTrending(date);
+    case 6:
+      return generateWeekendPlatform(date);
+    case 1:
+    default:
+      return {
+        template: "none",
+        topic: "Monday has no scheduled template",
+        articles: [],
+      };
+  }
+}
