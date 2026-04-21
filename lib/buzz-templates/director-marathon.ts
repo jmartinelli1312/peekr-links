@@ -30,21 +30,22 @@ type Director = {
   slug: string;
 };
 
-// Mixed international + LATAM. Ordered so similar-era directors don't
-// land on consecutive weeks.
+// Mixed international + LATAM. TMDB person IDs verified 2026-04-21.
+// Ordered so similar-era directors don't land on consecutive weeks.
 const DIRECTORS: Director[] = [
   { id: 525, name: "Christopher Nolan", slug: "christopher-nolan" },
   { id: 137427, name: "Denis Villeneuve", slug: "denis-villeneuve" },
-  { id: 5655, name: "Guillermo del Toro", slug: "guillermo-del-toro" },
-  { id: 2740, name: "Alfonso Cuarón", slug: "alfonso-cuaron" },
-  { id: 65540, name: "Pedro Almodóvar", slug: "pedro-almodovar" },
+  { id: 10828, name: "Guillermo del Toro", slug: "guillermo-del-toro" },
+  { id: 11218, name: "Alfonso Cuarón", slug: "alfonso-cuaron" },
+  { id: 309, name: "Pedro Almodóvar", slug: "pedro-almodovar" },
   { id: 1032, name: "Martin Scorsese", slug: "martin-scorsese" },
   { id: 138, name: "Quentin Tarantino", slug: "quentin-tarantino" },
-  { id: 4292, name: "Wes Anderson", slug: "wes-anderson" },
-  { id: 819, name: "David Fincher", slug: "david-fincher" },
+  { id: 5655, name: "Wes Anderson", slug: "wes-anderson" },
+  { id: 7467, name: "David Fincher", slug: "david-fincher" },
   { id: 488, name: "Steven Spielberg", slug: "steven-spielberg" },
   { id: 21684, name: "Bong Joon-ho", slug: "bong-joon-ho" },
-  { id: 11431, name: "Damián Szifron", slug: "damian-szifron" },
+  { id: 1769, name: "Sofia Coppola", slug: "sofia-coppola" },
+  { id: 591600, name: "Damián Szifron", slug: "damian-szifron" },
 ];
 
 function pickDirectorForWeek(date: Date): Director {

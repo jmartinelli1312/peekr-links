@@ -211,9 +211,23 @@ async function getPopularPeople(lang: Lang) {
     .slice(0, 20);
 
   // If not enough directors from trending, batch-fetch from fallback list
+  // TMDB person IDs verified 2026-04-21. Earlier values sourced from a
+  // stale list included writers/actors/producers mislabeled as directors
+  // (e.g. 65540 is Ariel Dorfman, 819 is Edward Norton).
   const FALLBACK_DIRECTOR_IDS = [
-    525, 488, 137427, 1032, 138, 65540, 819, 5655,
-    2740, 6384, 2939, 4292, 11431, 11432, 8462, 18124, 14784,
+    525,    // Christopher Nolan
+    488,    // Steven Spielberg
+    137427, // Denis Villeneuve
+    1032,   // Martin Scorsese
+    138,    // Quentin Tarantino
+    309,    // Pedro Almodóvar
+    7467,   // David Fincher
+    10828,  // Guillermo del Toro
+    11218,  // Alfonso Cuarón
+    5655,   // Wes Anderson
+    21684,  // Bong Joon-ho
+    1769,   // Sofia Coppola
+    591600, // Damián Szifron
   ];
 
   const seen = new Set(directorMatches.map((d) => d.id));
