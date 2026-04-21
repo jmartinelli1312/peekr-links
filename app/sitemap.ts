@@ -23,6 +23,7 @@ type BuzzArticleRow = {
   published_at?: string | null;
   updated_at?: string | null;
   is_published?: boolean | null;
+  language?: string | null;
 };
 
 type TitleRow = {
@@ -114,7 +115,7 @@ async function buildStaticAndEditorialSitemap(): Promise<MetadataRoute.Sitemap> 
 
     supabase
       .from("peekrbuzz_articles")
-      .select("slug,published_at,updated_at,is_published")
+      .select("slug,published_at,updated_at,is_published,language")
       .eq("is_published", true)
       .order("published_at", { ascending: false })
       .limit(MAX_BUZZ_ARTICLES),
@@ -135,16 +136,23 @@ async function buildStaticAndEditorialSitemap(): Promise<MetadataRoute.Sitemap> 
       }))
     );
 
+  // Each buzz article is now language-scoped via the `language` column,
+  // so we emit it at its own language URL only. Legacy articles without
+  // a language default to every LANG (they render the same content at
+  // /es/buzz, /en/buzz, /pt/buzz until migrated).
   const buzzUrls: MetadataRoute.Sitemap = buzzArticles
     .filter((item) => item.slug && item.slug.trim().length > 0)
-    .flatMap((item) =>
-      LANGS.map((lang) => ({
+    .flatMap((item) => {
+      const langs: readonly string[] = item.language
+        ? [item.language]
+        : LANGS;
+      return langs.map((lang) => ({
         url: `${SITE}/${lang}/buzz/${item.slug}`,
         lastModified: safeDate(item.updated_at || item.published_at),
         changeFrequency: "weekly" as const,
         priority: 0.75,
-      }))
-    );
+      }));
+    });
 
   return [...staticUrls, ...listUrls, ...buzzUrls];
 }

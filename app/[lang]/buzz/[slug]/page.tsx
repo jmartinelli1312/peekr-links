@@ -2,7 +2,7 @@ export const revalidate = 172800;
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 const SITE = "https://www.peekr.app";
@@ -29,6 +29,13 @@ type BuzzArticle = {
   published_at?: string | null;
   category?: string | null;
   is_published: boolean;
+  language?: string | null;
+  topic_key?: string | null;
+};
+
+type BuzzSibling = {
+  slug: string;
+  language: string;
 };
 
 function normalizeLang(value?: string | null): Lang {
@@ -147,7 +154,7 @@ async function getBuzzArticle(slug: string) {
   const { data, error } = await supabase
     .from("peekrbuzz_articles")
     .select(
-      "id,slug,title,summary,body_html,source_name,source_url,image_url,published_at,category,is_published"
+      "id,slug,title,summary,body_html,source_name,source_url,image_url,published_at,category,is_published,language,topic_key"
     )
     .eq("slug", slug)
     .eq("is_published", true)
@@ -155,6 +162,47 @@ async function getBuzzArticle(slug: string) {
 
   if (error) return null;
   return (data as BuzzArticle | null) ?? null;
+}
+
+/**
+ * Fetches every published sibling that shares this topic_key, so the
+ * detail page can emit hreflang alternates pointing at the correct
+ * per-language slug instead of assuming the same slug works in every
+ * language (which it doesn't for auto-generated articles).
+ */
+async function getBuzzSiblings(topic_key: string): Promise<BuzzSibling[]> {
+  const { data } = await supabase
+    .from("peekrbuzz_articles")
+    .select("slug,language")
+    .eq("topic_key", topic_key)
+    .eq("is_published", true);
+
+  return (data as BuzzSibling[] | null) ?? [];
+}
+
+/**
+ * Build hreflang alternates from the sibling set. Falls back to the same
+ * slug for every language when no siblings exist (manual/legacy articles
+ * that share one slug across all URLs).
+ */
+function buildLanguageAlternates(
+  article: BuzzArticle,
+  siblings: BuzzSibling[]
+): Record<string, string> {
+  const alternates: Record<string, string> = {};
+  const siblingBySlugLang = new Map(
+    siblings.map((s) => [s.language, s.slug] as const)
+  );
+
+  const articleLang = (article.language || "es").toLowerCase();
+  siblingBySlugLang.set(articleLang, article.slug);
+
+  for (const code of ["es", "en", "pt"] as const) {
+    const slug = siblingBySlugLang.get(code) ?? article.slug;
+    alternates[code] = `${SITE}/${code}/buzz/${slug}`;
+  }
+  alternates["x-default"] = alternates["es"];
+  return alternates;
 }
 
 export async function generateMetadata({
@@ -173,6 +221,12 @@ export async function generateMetadata({
     };
   }
 
+  const siblings = article.topic_key
+    ? await getBuzzSiblings(article.topic_key)
+    : [];
+  const languages = buildLanguageAlternates(article, siblings);
+  const canonicalSlug = languages[lang]?.split("/").pop() || article.slug;
+
   const cleanTitle = decodeHtmlEntities(article.title);
   const cleanSummary =
     stripHtml(article.summary).slice(0, 155) || t.defaultDescription;
@@ -181,18 +235,13 @@ export async function generateMetadata({
     title: `${cleanTitle} | PeekrBuzz`,
     description: cleanSummary,
     alternates: {
-      canonical: `${SITE}/${lang}/buzz/${article.slug}`,
-      languages: {
-        es: `${SITE}/es/buzz/${article.slug}`,
-        en: `${SITE}/en/buzz/${article.slug}`,
-        pt: `${SITE}/pt/buzz/${article.slug}`,
-        "x-default": `${SITE}/es/buzz/${article.slug}`,
-      },
+      canonical: `${SITE}/${lang}/buzz/${canonicalSlug}`,
+      languages,
     },
     openGraph: {
       title: `${cleanTitle} | PeekrBuzz`,
       description: cleanSummary,
-      url: `${SITE}/${lang}/buzz/${article.slug}`,
+      url: `${SITE}/${lang}/buzz/${canonicalSlug}`,
       siteName: "Peekr",
       type: "article",
       images: article.image_url ? [{ url: article.image_url }] : [],
@@ -214,6 +263,21 @@ export default async function BuzzArticlePage({ params }: PageProps) {
   const article = await getBuzzArticle(slug);
 
   if (!article) notFound();
+
+  // Sibling redirect — if the user landed on a slug written in a
+  // different language than the URL claims (e.g. hitting the Spanish
+  // slug under /en/buzz/... from a stale link or IndexNow ping), try
+  // to send them to the matching-language sibling when one exists.
+  const articleLang = (article.language || "es").toLowerCase();
+  if (article.topic_key && articleLang !== lang) {
+    const siblings = await getBuzzSiblings(article.topic_key);
+    const sibling = siblings.find(
+      (s) => (s.language || "").toLowerCase() === lang
+    );
+    if (sibling && sibling.slug !== article.slug) {
+      redirect(`/${lang}/buzz/${sibling.slug}`);
+    }
+  }
 
   const cleanTitle = decodeHtmlEntities(article.title);
   const cleanSummary = decodeHtmlEntities(article.summary);

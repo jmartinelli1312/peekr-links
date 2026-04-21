@@ -45,6 +45,8 @@ export type GeneratedArticle = {
   image_url: string | null;
   category: string;
   source_name: string;
+  language: Lang;
+  topic_key: string;
 };
 
 // ============================================================
@@ -333,6 +335,10 @@ export function renderWhatToWatchAfter(
   const sourceSlug = slugify(source.title);
   const stamp = yearMonth();
   const slug = `${t.slugPrefix}-${sourceSlug}-${stamp}`;
+  // topic_key links the 3 language siblings — intentionally ignores slug
+  // (which is lang-specific) and uses the stable TMDB id + month so any
+  // lang can find its peers.
+  const topic_key = `whattowatch-${source.id}-${stamp}`;
 
   const sourceYear = titleYear(source);
   const headline = `${t.titlePrefix} ${source.title}${sourceYear ? ` (${sourceYear})` : ""}`;
@@ -377,5 +383,7 @@ export function renderWhatToWatchAfter(
     image_url,
     category: "recommendations",
     source_name: "Peekr",
+    language: lang,
+    topic_key,
   };
 }

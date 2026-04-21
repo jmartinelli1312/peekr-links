@@ -139,13 +139,14 @@ function getStrings(lang: Lang) {
   }[lang];
 }
 
-async function getBuzzArticles() {
+async function getBuzzArticles(lang: Lang) {
   const { data } = await supabase
     .from("peekrbuzz_articles")
     .select(
       "id,slug,title,summary,source_name,source_url,image_url,published_at,category,is_published"
     )
     .eq("is_published", true)
+    .eq("language", lang)
     .order("published_at", { ascending: false })
     .limit(60);
 
@@ -306,7 +307,7 @@ export default async function BuzzPage({ params }: PageProps) {
   const lang = normalizeLang(rawLang);
   const t = getStrings(lang);
 
-  const articles = await getBuzzArticles();
+  const articles = await getBuzzArticles(lang);
   const featured = articles[0] ?? null;
   const rest = articles.slice(1);
 

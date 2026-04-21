@@ -106,6 +106,8 @@ export async function GET(request: NextRequest) {
           source_name: article.source_name,
           source_url: null,
           category: article.category,
+          language: article.language,
+          topic_key: article.topic_key,
           is_published: true,
           published_at: new Date().toISOString(),
         },
