@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
+import { PostHogProvider } from "./components/PostHogProvider";
 
 export const metadata = {
   title: "Peekr",
@@ -22,7 +23,9 @@ export default function RootLayout({
             "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif",
         }}
       >
-        {children}
+        <PostHogProvider>
+          {children}
+        </PostHogProvider>
         <Analytics />
       </body>
     </html>
