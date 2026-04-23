@@ -2,7 +2,7 @@ export const revalidate = 86400;
 
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
 import TitleTabs from "./title-tabs";
@@ -666,6 +666,14 @@ export default async function TitlePage({ params }: PageProps) {
   const title = base.title || base.name || "Title";
   const year = (base.release_date || base.first_air_date || "").slice(0, 4);
   const canonicalIdSlug = `${numericId}-${slugify(title)}`;
+
+  // Redirect 308 permanente si el slug en la URL no coincide con el canónico
+  // actual. Esto evita que cuando TMDB actualiza el título (ej. "Mercy" →
+  // "Sin piedad") queden URLs viejas sirviendo contenido en paralelo a las
+  // nuevas, acumulando "Alternate page with proper canonical" en Search Console.
+  if (id !== canonicalIdSlug) {
+    permanentRedirect(`/${lang}/title/${type}/${canonicalIdSlug}`);
+  }
 
   // Always fetch ALL data — ISR caches once, client switches tabs
   const [stats, credits, videos, watchProviders, watchers, comments] =
