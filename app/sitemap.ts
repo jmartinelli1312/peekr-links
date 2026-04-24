@@ -223,18 +223,45 @@ function buildBuzzSitemapEntries(articles: BuzzArticleRow[]): MetadataRoute.Site
 }
 
 async function buildTitlesSitemap(): Promise<MetadataRoute.Sitemap> {
-  const titlesRes = await supabase
-    .from("titles_cache")
-    .select("tmdb_id,media_type,title,updated_at")
-    .not("tmdb_id", "is", null)
-    .not("title", "is", null)
-    .order("updated_at", { ascending: false })
-    .limit(MAX_TITLE_URLS);
+  // Política de indexación: el sitemap solo incluye títulos con al menos
+  // 1 rating real de Peekr. Los que tienen 0 ratings emiten `noindex`
+  // en su metadata (ver app/[lang]/title/[type]/[id]/page.tsx). Esto
+  // evita que Google clasifique el sitio como "thin content" al ver
+  // miles de páginas con datos copiados de TMDB sin engagement propio.
+  // A medida que la comunidad crece, más títulos pasan a ser indexables.
+  const [titlesRes, ratingsRes] = await Promise.all([
+    supabase
+      .from("titles_cache")
+      .select("tmdb_id,media_type,title,updated_at")
+      .not("tmdb_id", "is", null)
+      .not("title", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(MAX_TITLE_URLS),
+
+    // Set de (media_type, tmdb_id) con ratings reales. Con volumen
+    // realista (<50k ratings) el costo es despreciable.
+    supabase
+      .from("ratings")
+      .select("tmdb_id, media_type")
+      .not("tmdb_id", "is", null),
+  ]);
 
   const titles = (titlesRes.data as TitleRow[] | null) ?? [];
+  const ratedPairs =
+    (ratingsRes.data as { tmdb_id: number; media_type: string }[] | null) ?? [];
+
+  const eligible = new Set<string>();
+  for (const r of ratedPairs) {
+    const type = r.media_type === "tv" ? "tv" : "movie";
+    eligible.add(`${type}-${r.tmdb_id}`);
+  }
 
   return titles
-    .filter((item) => item.tmdb_id && isUsefulSlug(item.title))
+    .filter((item) => {
+      if (!item.tmdb_id || !isUsefulSlug(item.title)) return false;
+      const type = item.media_type === "tv" ? "tv" : "movie";
+      return eligible.has(`${type}-${item.tmdb_id}`);
+    })
     .flatMap((item) => {
       const type = item.media_type === "tv" ? "tv" : "movie";
       const slug = slugify(item.title || "title");

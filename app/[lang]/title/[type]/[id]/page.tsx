@@ -50,6 +50,10 @@ type TmdbBaseTitleResponse = {
     id: number;
     name: string;
   }[];
+  // Rating de TMDB: lo usamos como "referencia" transparente en la UI
+  // cuando Peekr todavía no tiene ratings propios.
+  vote_average?: number | null;
+  vote_count?: number | null;
 };
 
 type TmdbCast = {
@@ -101,6 +105,7 @@ type PeekrStats = {
   watchedCount: number;
   commentsCount: number;
   viewsCount: number;
+  ratingsCount: number; // total de ratings reales de Peekr (con o sin comment)
 };
 
 type PeekrWatcher = {
@@ -245,6 +250,10 @@ function getStrings(lang: Lang) {
         `${n} Peekr ${n === 1 ? "user has" : "users have"} marked this as watched so far.`,
       commentsSentence: (n: number) =>
         `There ${n === 1 ? "is" : "are"} ${n} ${n === 1 ? "review" : "reviews"} from the Peekr community below.`,
+      tmdbReference: (avg: string, count: number) =>
+        `TMDB: ${avg}/10 (${count.toLocaleString("en-US")} votes)`,
+      beFirstToRate: "Be the first to rate this title on Peekr.",
+      tmdbRating: "TMDB rating",
     },
     es: {
       directedBy: "Dirigida por",
@@ -295,6 +304,10 @@ function getStrings(lang: Lang) {
         `${n} ${n === 1 ? "usuario de Peekr la marcó" : "usuarios de Peekr la marcaron"} como vista hasta ahora.`,
       commentsSentence: (n: number) =>
         `${n === 1 ? "Hay" : "Hay"} ${n} ${n === 1 ? "reseña" : "reseñas"} de la comunidad de Peekr más abajo.`,
+      tmdbReference: (avg: string, count: number) =>
+        `TMDB: ${avg}/10 (${count.toLocaleString("es-AR")} votos)`,
+      beFirstToRate: "Sé el primero en calificar este título en Peekr.",
+      tmdbRating: "Rating en TMDB",
     },
     pt: {
       directedBy: "Dirigido por",
@@ -345,6 +358,10 @@ function getStrings(lang: Lang) {
         `${n} ${n === 1 ? "usuário do Peekr marcou" : "usuários do Peekr marcaram"} como assistido até agora.`,
       commentsSentence: (n: number) =>
         `${n === 1 ? "Há" : "Há"} ${n} ${n === 1 ? "resenha" : "resenhas"} da comunidade do Peekr abaixo.`,
+      tmdbReference: (avg: string, count: number) =>
+        `TMDB: ${avg}/10 (${count.toLocaleString("pt-BR")} votos)`,
+      beFirstToRate: "Seja o primeiro a avaliar este título no Peekr.",
+      tmdbRating: "Avaliação no TMDB",
     },
   }[lang];
 }
@@ -368,6 +385,22 @@ const getBaseTitle = cache(async function getBaseTitleCached(
   lang: string
 ) {
   return tmdbFetch<TmdbBaseTitleResponse>(`/${type}/${id}`, lang);
+});
+
+// Cuenta cuántos ratings de Peekr tiene el título. Se usa para decidir si
+// la página va `index` o `noindex` (evita que Google marque como thin
+// content páginas sin engagement real). Cacheado para que generateMetadata
+// y TitlePage compartan la misma query dentro del mismo request.
+const getPeekrRatingsCount = cache(async function getPeekrRatingsCountCached(
+  tmdbId: number,
+  mediaType: string
+): Promise<number> {
+  const { count } = await supabase
+    .from("ratings")
+    .select("id", { count: "exact", head: true })
+    .eq("tmdb_id", tmdbId)
+    .eq("media_type", mediaType);
+  return count ?? 0;
 });
 
 async function getCredits(type: string, id: number, lang: string) {
@@ -452,6 +485,7 @@ async function getPeekrStats(
           ?.watched_count ?? 0,
       commentsCount: 0,
       viewsCount: 0,
+      ratingsCount: ratingRow?.ratings_count ?? 0,
     };
   }
 
@@ -493,6 +527,7 @@ async function getPeekrStats(
     commentsCount: ratingsCountRes.count ?? 0,
     viewsCount:
       (titleStatsRes.data as { views_count?: number } | null)?.views_count ?? 0,
+    ratingsCount: ratingRow?.ratings_count ?? 0,
   };
 }
 
@@ -605,9 +640,21 @@ export async function generateMetadata({ params }: PageProps) {
 
   const description = base.overview?.slice(0, 155) || fallbackDescription;
 
+  // Indexing policy: solo permitimos indexar si el título tiene al menos 1
+  // rating de la comunidad Peekr. Sin ratings reales, es contenido que Google
+  // clasifica como "thin" (copia de datos TMDB sin valor agregado). Cuando
+  // alguien califique, la próxima vez que Google crawlee pasa a indexable.
+  const ratingsCount = await getPeekrRatingsCount(numericId, type);
+  const indexable = ratingsCount > 0;
+
   return {
     title: `${title} | Peekr`,
     description,
+    robots: {
+      index: indexable,
+      follow: true, // Siempre seguimos los links internos
+      googleBot: { index: indexable, follow: true },
+    },
     alternates: {
       canonical: `${SITE}${canonicalPath}`,
       languages: {
@@ -715,14 +762,17 @@ export default async function TitlePage({ params }: PageProps) {
     datePublished: base.release_date || base.first_air_date || undefined,
     genre: (base.genres || []).map((g) => g.name),
     duration: type === "movie" && runtime ? `PT${runtime}M` : undefined,
+    // Solo incluimos AggregateRating cuando hay ratings reales de Peekr.
+    // Sin ratings, omitir el schema (no inflar con datos de TMDB — Google
+    // lo detecta y penaliza).
     aggregateRating:
-      stats.avgRating
+      stats.avgRating && stats.ratingsCount > 0
         ? {
             "@type": "AggregateRating",
             ratingValue: stats.avgRating,
             bestRating: 5,
             worstRating: 0.5,
-            ratingCount: stats.watchedCount || 1,
+            ratingCount: stats.ratingsCount,
           }
         : undefined,
     director:
@@ -1394,19 +1444,37 @@ export default async function TitlePage({ params }: PageProps) {
             </div>
           </div>
 
+          {/*
+            Hero stats: mostramos solo las métricas con datos reales (>0).
+            Si Peekr todavía no tiene ratings pero TMDB sí, mostramos el
+            rating de TMDB con label explícito (no inflamos el rating de
+            Peekr). Esto evita el patrón de "thin content" que castiga Google.
+          */}
           <div className="hero-stats">
-            <div className="hero-stat">
-              ⭐ {stats.avgRating ?? "-"} · {t.peekrRating}
-            </div>
-            <div className="hero-stat">
-              👁 {stats.watchedCount ?? 0} {t.watched}
-            </div>
-            <div className="hero-stat">
-              💬 {stats.commentsCount ?? 0} {t.commentsCount}
-            </div>
-            <div className="hero-stat">
-              👀 {stats.viewsCount ?? 0} {t.views}
-            </div>
+            {stats.avgRating ? (
+              <div className="hero-stat">
+                ⭐ {stats.avgRating} · {t.peekrRating}
+              </div>
+            ) : base.vote_average && base.vote_count && base.vote_count > 0 ? (
+              <div className="hero-stat">
+                ⭐ {base.vote_average.toFixed(1)} · {t.tmdbRating}
+              </div>
+            ) : null}
+            {stats.watchedCount > 0 ? (
+              <div className="hero-stat">
+                👁 {stats.watchedCount} {t.watched}
+              </div>
+            ) : null}
+            {stats.commentsCount > 0 ? (
+              <div className="hero-stat">
+                💬 {stats.commentsCount} {t.commentsCount}
+              </div>
+            ) : null}
+            {stats.viewsCount > 0 ? (
+              <div className="hero-stat">
+                👀 {stats.viewsCount} {t.views}
+              </div>
+            ) : null}
           </div>
 
           {/* ============================================================
@@ -1433,10 +1501,20 @@ export default async function TitlePage({ params }: PageProps) {
                   ) : null}
                 </>
               ) : (
-                <p>
-                  {title}
-                  {year ? ` (${year})` : ""} — {t.noStatsSentence}
-                </p>
+                <>
+                  <p>
+                    {title}
+                    {year ? ` (${year})` : ""} — {t.noStatsSentence}
+                  </p>
+                  <p>
+                    <strong>{t.beFirstToRate}</strong>
+                  </p>
+                  {base.vote_average && base.vote_count && base.vote_count > 0 ? (
+                    <p style={{ opacity: 0.72, fontSize: "14px" }}>
+                      {t.tmdbReference(base.vote_average.toFixed(1), base.vote_count)}
+                    </p>
+                  ) : null}
+                </>
               )}
 
               {providers.length > 0 ? (
