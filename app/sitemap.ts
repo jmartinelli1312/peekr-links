@@ -31,7 +31,11 @@ type BuzzArticleRow = {
 type TitleRow = {
   tmdb_id: number;
   media_type?: string | null;
-  title?: string | null;
+  // `titles_cache` guarda los títulos traducidos por idioma. No hay columna
+  // `title` singular — eso era el bug que dejaba el sitemap vacío.
+  title_es?: string | null;
+  title_en?: string | null;
+  title_pt?: string | null;
   updated_at?: string | null;
 };
 
@@ -236,9 +240,8 @@ async function buildTitlesSitemap(): Promise<MetadataRoute.Sitemap> {
   const [titlesRes, ratedTitlesRes] = await Promise.all([
     supabase
       .from("titles_cache")
-      .select("tmdb_id,media_type,title,updated_at")
+      .select("tmdb_id,media_type,title_es,title_en,title_pt,updated_at")
       .not("tmdb_id", "is", null)
-      .not("title", "is", null)
       .order("updated_at", { ascending: false })
       .limit(MAX_TITLE_URLS),
 
@@ -256,26 +259,58 @@ async function buildTitlesSitemap(): Promise<MetadataRoute.Sitemap> {
     eligible.add(`${type}-${r.tmdb_id}`);
   }
 
-  return titles
-    .filter((item) => {
-      if (!item.tmdb_id || !isUsefulSlug(item.title)) return false;
-      const type = item.media_type === "tv" ? "tv" : "movie";
-      return eligible.has(`${type}-${item.tmdb_id}`);
-    })
-    .flatMap((item) => {
-      const type = item.media_type === "tv" ? "tv" : "movie";
-      const slug = slugify(item.title || "title");
-      const buildPath = (l: Lang) =>
-        `/${l}/title/${type}/${item.tmdb_id}-${slug}`;
+  const out: MetadataRoute.Sitemap = [];
 
-      return LANGS.map((lang) => ({
-        url: `${SITE}${buildPath(lang)}`,
+  for (const item of titles) {
+    if (!item.tmdb_id) continue;
+    const type = item.media_type === "tv" ? "tv" : "movie";
+    if (!eligible.has(`${type}-${item.tmdb_id}`)) continue;
+
+    // Cada idioma usa su propio slug (la página renderiza con slug
+    // traducido y hace redirect 308 si se accede con el slug incorrecto).
+    // Sin traducción para ese idioma cae al fallback disponible.
+    const rawByLang: Record<Lang, string> = {
+      es: item.title_es || item.title_en || item.title_pt || "",
+      en: item.title_en || item.title_es || item.title_pt || "",
+      pt: item.title_pt || item.title_en || item.title_es || "",
+    };
+    const slugByLang: Record<Lang, string> = {
+      es: slugify(rawByLang.es),
+      en: slugify(rawByLang.en),
+      pt: slugify(rawByLang.pt),
+    };
+
+    // Si ningún slug quedó utilizable, descartamos el título.
+    if (
+      !isUsefulSlug(slugByLang.es) &&
+      !isUsefulSlug(slugByLang.en) &&
+      !isUsefulSlug(slugByLang.pt)
+    ) continue;
+
+    const buildUrl = (lang: Lang) => {
+      const slug = slugByLang[lang] || slugByLang.en || slugByLang.es || "title";
+      return `${SITE}/${lang}/title/${type}/${item.tmdb_id}-${slug}`;
+    };
+
+    const languages: Record<string, string> = {
+      es: buildUrl("es"),
+      en: buildUrl("en"),
+      pt: buildUrl("pt"),
+      "x-default": buildUrl("es"),
+    };
+
+    for (const lang of LANGS) {
+      out.push({
+        url: buildUrl(lang),
         lastModified: safeDate(item.updated_at),
-        changeFrequency: "weekly" as const,
+        changeFrequency: "weekly",
         priority: 0.7,
-        alternates: sameSlugAlternates(buildPath),
-      }));
-    });
+        alternates: { languages },
+      });
+    }
+  }
+
+  return out;
 }
 
 async function buildActorsSitemap(): Promise<MetadataRoute.Sitemap> {
