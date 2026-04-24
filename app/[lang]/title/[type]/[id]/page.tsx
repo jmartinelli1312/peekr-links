@@ -245,7 +245,7 @@ function getStrings(lang: Lang) {
       notAvailableYet:
         "No streaming platforms listed yet. Peekr users will add availability as it becomes known.",
       ratingSentence: (n: number, avg: string) =>
-        `${n} Peekr ${n === 1 ? "user has" : "users have"} rated this title with an average of ${avg} out of 5 stars.`,
+        `${n} Peekr ${n === 1 ? "user has" : "users have"} rated this title with an average of ${avg} out of 10.`,
       watchedSentence: (n: number) =>
         `${n} Peekr ${n === 1 ? "user has" : "users have"} marked this as watched so far.`,
       commentsSentence: (n: number) =>
@@ -299,7 +299,7 @@ function getStrings(lang: Lang) {
       notAvailableYet:
         "Todavía no hay plataformas de streaming listadas. Los usuarios de Peekr agregarán la disponibilidad a medida que se conozca.",
       ratingSentence: (n: number, avg: string) =>
-        `${n} ${n === 1 ? "usuario de Peekr ha calificado" : "usuarios de Peekr han calificado"} este título con un promedio de ${avg} sobre 5 estrellas.`,
+        `${n} ${n === 1 ? "usuario de Peekr ha calificado" : "usuarios de Peekr han calificado"} este título con un promedio de ${avg} sobre 10.`,
       watchedSentence: (n: number) =>
         `${n} ${n === 1 ? "usuario de Peekr la marcó" : "usuarios de Peekr la marcaron"} como vista hasta ahora.`,
       commentsSentence: (n: number) =>
@@ -353,7 +353,7 @@ function getStrings(lang: Lang) {
       notAvailableYet:
         "Ainda não há plataformas de streaming listadas. Os usuários do Peekr adicionarão a disponibilidade conforme for conhecida.",
       ratingSentence: (n: number, avg: string) =>
-        `${n} ${n === 1 ? "usuário do Peekr avaliou" : "usuários do Peekr avaliaram"} este título com uma média de ${avg} de 5 estrelas.`,
+        `${n} ${n === 1 ? "usuário do Peekr avaliou" : "usuários do Peekr avaliaram"} este título com uma média de ${avg} de 10.`,
       watchedSentence: (n: number) =>
         `${n} ${n === 1 ? "usuário do Peekr marcou" : "usuários do Peekr marcaram"} como assistido até agora.`,
       commentsSentence: (n: number) =>
@@ -473,9 +473,10 @@ async function getPeekrStats(
           | null) ?? []
       )[0] ?? null;
 
+    // Peekr usa escala 1-10 en DB; mostramos directo sin dividir.
     const avgRating =
       ratingRow?.avg_rating != null
-        ? (Number(ratingRow.avg_rating) / 2).toFixed(1)
+        ? Number(ratingRow.avg_rating).toFixed(1)
         : null;
 
     return {
@@ -516,7 +517,7 @@ async function getPeekrStats(
 
   const avgRating =
     ratingRow?.avg_rating != null
-      ? (Number(ratingRow.avg_rating) / 2).toFixed(1)
+      ? Number(ratingRow.avg_rating).toFixed(1)
       : null;
 
   return {
@@ -770,8 +771,8 @@ export default async function TitlePage({ params }: PageProps) {
         ? {
             "@type": "AggregateRating",
             ratingValue: stats.avgRating,
-            bestRating: 5,
-            worstRating: 0.5,
+            bestRating: 10,
+            worstRating: 1,
             ratingCount: stats.ratingsCount,
           }
         : undefined,
@@ -1538,7 +1539,7 @@ export default async function TitlePage({ params }: PageProps) {
                       <cite>
                         — @{c.username || "user"}
                         {typeof c.rating === "number"
-                          ? ` · ⭐ ${(c.rating / 2).toFixed(1)}/5`
+                          ? ` · ⭐ ${c.rating.toFixed(1)}/10`
                           : ""}
                       </cite>
                     </blockquote>
@@ -1775,7 +1776,7 @@ export default async function TitlePage({ params }: PageProps) {
                       <div>
                         <div className="comment-user">{c.username || "user"}</div>
                         {typeof c.rating === "number" ? (
-                          <div className="comment-rating">⭐ {(c.rating / 2).toFixed(1)}/5</div>
+                          <div className="comment-rating">⭐ {c.rating.toFixed(1)}/10</div>
                         ) : null}
                         <div className="comment-content">{c.content || ""}</div>
                       </div>
