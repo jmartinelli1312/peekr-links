@@ -229,7 +229,11 @@ async function buildTitlesSitemap(): Promise<MetadataRoute.Sitemap> {
   // evita que Google clasifique el sitio como "thin content" al ver
   // miles de páginas con datos copiados de TMDB sin engagement propio.
   // A medida que la comunidad crece, más títulos pasan a ser indexables.
-  const [titlesRes, ratingsRes] = await Promise.all([
+  //
+  // Los ratings viven en `user_title_activities` (rating nullable), con RLS
+  // activa. Usamos una RPC con SECURITY DEFINER para obtener el set de
+  // (tmdb_id, media_type) que tienen rating, bypassando RLS.
+  const [titlesRes, ratedTitlesRes] = await Promise.all([
     supabase
       .from("titles_cache")
       .select("tmdb_id,media_type,title,updated_at")
@@ -238,28 +242,25 @@ async function buildTitlesSitemap(): Promise<MetadataRoute.Sitemap> {
       .order("updated_at", { ascending: false })
       .limit(MAX_TITLE_URLS),
 
-    // Set de tmdb_ids con ratings reales. La tabla `ratings` no distingue
-    // media_type (solo guarda tmdb_id); en la práctica los IDs no colisionan
-    // entre movies y tv series, así que filtrar solo por tmdb_id es seguro.
-    supabase
-      .from("ratings")
-      .select("tmdb_id")
-      .not("tmdb_id", "is", null),
+    supabase.rpc("get_peekr_rated_titles"),
   ]);
 
   const titles = (titlesRes.data as TitleRow[] | null) ?? [];
-  const ratedIds =
-    (ratingsRes.data as { tmdb_id: number }[] | null) ?? [];
+  const ratedRows =
+    (ratedTitlesRes.data as { tmdb_id: number; media_type: string }[] | null) ??
+      [];
 
-  const eligibleIds = new Set<number>();
-  for (const r of ratedIds) {
-    eligibleIds.add(r.tmdb_id);
+  const eligible = new Set<string>();
+  for (const r of ratedRows) {
+    const type = r.media_type === "tv" ? "tv" : "movie";
+    eligible.add(`${type}-${r.tmdb_id}`);
   }
 
   return titles
     .filter((item) => {
       if (!item.tmdb_id || !isUsefulSlug(item.title)) return false;
-      return eligibleIds.has(item.tmdb_id);
+      const type = item.media_type === "tv" ? "tv" : "movie";
+      return eligible.has(`${type}-${item.tmdb_id}`);
     })
     .flatMap((item) => {
       const type = item.media_type === "tv" ? "tv" : "movie";

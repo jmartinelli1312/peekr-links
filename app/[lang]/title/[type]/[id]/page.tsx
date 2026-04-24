@@ -390,25 +390,27 @@ const getBaseTitle = cache(async function getBaseTitleCached(
   return tmdbFetch<TmdbBaseTitleResponse>(`/${type}/${id}`, lang);
 });
 
-// Cuenta cuántos ratings de Peekr tiene el título. Se usa para decidir si
-// la página va `index` o `noindex` (evita que Google marque como thin
-// content páginas sin engagement real). Cacheado para que generateMetadata
-// y TitlePage compartan la misma query dentro del mismo request.
+// Cuenta cuántos ratings reales de Peekr tiene el título. Se usa para
+// decidir si la página va `index` o `noindex` (evita thin content).
+// Cacheado para que generateMetadata y TitlePage compartan la query.
 //
-// Nota: la tabla `ratings` no tiene columna `media_type` (ver schema).
-// Filtramos solo por `tmdb_id`. En la práctica los IDs de TMDB casi nunca
-// colisionan entre movies y TV series, por lo que el riesgo de falso
-// positivo (una movie con rating hace "indexable" la página de TV del
-// mismo id) es despreciable.
+// Usamos una RPC con SECURITY DEFINER (mismo patrón que get_title_peekr_rating)
+// en lugar de una query directa a `user_title_activities` porque esa tabla
+// tiene RLS restrictiva para el rol anon. La RPC corre con permisos del
+// owner y solo expone un count, no data sensible.
 const getPeekrRatingsCount = cache(async function getPeekrRatingsCountCached(
   tmdbId: number,
-  _mediaType: string
+  mediaType: string
 ): Promise<number> {
-  const { count } = await supabase
-    .from("ratings")
-    .select("id", { count: "exact", head: true })
-    .eq("tmdb_id", tmdbId);
-  return count ?? 0;
+  const { data, error } = await supabase.rpc("get_title_peekr_ratings_count", {
+    p_tmdb_id: tmdbId,
+    p_media_type: mediaType,
+  });
+  if (error) {
+    console.warn("[getPeekrRatingsCount] rpc error", error);
+    return 0;
+  }
+  return typeof data === "number" ? data : 0;
 });
 
 async function getCredits(type: string, id: number, lang: string) {
