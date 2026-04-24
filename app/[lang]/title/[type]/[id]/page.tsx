@@ -1,4 +1,7 @@
-export const revalidate = 86400;
+// Revalidamos cada hora para que cuando alguien califica, el cambio de
+// noindex → index se refleje rápido (antes era 24h, muy lento para el
+// ciclo de engagement).
+export const revalidate = 3600;
 
 import Image from "next/image";
 import Link from "next/link";
@@ -391,15 +394,20 @@ const getBaseTitle = cache(async function getBaseTitleCached(
 // la página va `index` o `noindex` (evita que Google marque como thin
 // content páginas sin engagement real). Cacheado para que generateMetadata
 // y TitlePage compartan la misma query dentro del mismo request.
+//
+// Nota: la tabla `ratings` no tiene columna `media_type` (ver schema).
+// Filtramos solo por `tmdb_id`. En la práctica los IDs de TMDB casi nunca
+// colisionan entre movies y TV series, por lo que el riesgo de falso
+// positivo (una movie con rating hace "indexable" la página de TV del
+// mismo id) es despreciable.
 const getPeekrRatingsCount = cache(async function getPeekrRatingsCountCached(
   tmdbId: number,
-  mediaType: string
+  _mediaType: string
 ): Promise<number> {
   const { count } = await supabase
     .from("ratings")
     .select("id", { count: "exact", head: true })
-    .eq("tmdb_id", tmdbId)
-    .eq("media_type", mediaType);
+    .eq("tmdb_id", tmdbId);
   return count ?? 0;
 });
 

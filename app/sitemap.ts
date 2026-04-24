@@ -238,29 +238,28 @@ async function buildTitlesSitemap(): Promise<MetadataRoute.Sitemap> {
       .order("updated_at", { ascending: false })
       .limit(MAX_TITLE_URLS),
 
-    // Set de (media_type, tmdb_id) con ratings reales. Con volumen
-    // realista (<50k ratings) el costo es despreciable.
+    // Set de tmdb_ids con ratings reales. La tabla `ratings` no distingue
+    // media_type (solo guarda tmdb_id); en la práctica los IDs no colisionan
+    // entre movies y tv series, así que filtrar solo por tmdb_id es seguro.
     supabase
       .from("ratings")
-      .select("tmdb_id, media_type")
+      .select("tmdb_id")
       .not("tmdb_id", "is", null),
   ]);
 
   const titles = (titlesRes.data as TitleRow[] | null) ?? [];
-  const ratedPairs =
-    (ratingsRes.data as { tmdb_id: number; media_type: string }[] | null) ?? [];
+  const ratedIds =
+    (ratingsRes.data as { tmdb_id: number }[] | null) ?? [];
 
-  const eligible = new Set<string>();
-  for (const r of ratedPairs) {
-    const type = r.media_type === "tv" ? "tv" : "movie";
-    eligible.add(`${type}-${r.tmdb_id}`);
+  const eligibleIds = new Set<number>();
+  for (const r of ratedIds) {
+    eligibleIds.add(r.tmdb_id);
   }
 
   return titles
     .filter((item) => {
       if (!item.tmdb_id || !isUsefulSlug(item.title)) return false;
-      const type = item.media_type === "tv" ? "tv" : "movie";
-      return eligible.has(`${type}-${item.tmdb_id}`);
+      return eligibleIds.has(item.tmdb_id);
     })
     .flatMap((item) => {
       const type = item.media_type === "tv" ? "tv" : "movie";
