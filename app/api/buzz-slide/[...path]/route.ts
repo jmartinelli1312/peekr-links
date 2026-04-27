@@ -48,7 +48,7 @@ export async function GET(
     });
   }
 
-  return new Response(jpeg, {
+  return new Response(new Uint8Array(jpeg), {
     headers: {
       "Content-Type": "image/jpeg",
       "Cache-Control": "public, max-age=31536000, immutable",
