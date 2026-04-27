@@ -50,28 +50,57 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 1) Forzar dominio canónico: https://www.peekr.app
-  if (host !== CANONICAL_HOST) {
+  // ─────────────────────────────────────────────────────────────
+  // Calculamos la URL final ANTES de redireccionar, para poder
+  // combinar host + lang + index.html en UN solo 308. Antes esto
+  // generaba redirect chains de 2 hops que GSC marcaba como
+  // "Redirect error".
+  // ─────────────────────────────────────────────────────────────
+
+  let finalPath = pathname;
+
+  // 1) Normalizar /index.html → /
+  if (finalPath === "/index.html") {
+    finalPath = "/";
+  }
+
+  // 2) Inyectar idioma si el path lo necesita y no lo tiene
+  const needsLang = !hasLangPrefix(finalPath);
+  const lang = getPreferredLang(request) || DEFAULT_LANG;
+
+  if (needsLang) {
+    const shouldRedirectForLang =
+      finalPath === "/" ||
+      finalPath.startsWith("/lists/") ||
+      finalPath.startsWith("/buzz/") ||
+      finalPath.startsWith("/explore") ||
+      finalPath.startsWith("/activity") ||
+      finalPath.startsWith("/download-app");
+
+    if (shouldRedirectForLang) {
+      finalPath = `/${lang}${finalPath}`;
+    }
+  }
+
+  // 3) Si el host o el path cambiaron, hacer UN ÚNICO redirect 308
+  const needsHostFix = host !== CANONICAL_HOST;
+  const needsPathFix = finalPath !== pathname;
+
+  if (needsHostFix || needsPathFix) {
     const url = request.nextUrl.clone();
     url.protocol = "https:";
     url.host = CANONICAL_HOST;
+    url.pathname = finalPath;
     return NextResponse.redirect(url, 308);
   }
 
-  // 2) Normalizar /index.html -> /
-  if (pathname === "/index.html") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url, 308);
-  }
-
-  // 3) Si ya viene con idioma, dejar pasar
+  // 4) Si ya viene con idioma, dejar pasar
   //    (las excepciones /xx/login, /xx/signup y /xx/user/ se manejan en next.config.ts redirects)
   if (hasLangPrefix(pathname)) {
     return NextResponse.next();
   }
 
-  // 4) Clean username URLs: /jmartinelli → serve /es/u/jmartinelli internally
+  // 5) Clean username URLs: /jmartinelli → serve /es/u/jmartinelli internally
   //    (browser keeps peekr.app/jmartinelli in the address bar)
   const segments = pathname.split("/").filter(Boolean);
   if (
@@ -79,29 +108,17 @@ export function middleware(request: NextRequest) {
     !RESERVED_SEGMENTS.has(segments[0]) &&
     /^[a-zA-Z0-9_.-]+$/.test(segments[0])
   ) {
-    const lang = getPreferredLang(request) || DEFAULT_LANG;
     const url = request.nextUrl.clone();
     url.pathname = `/${lang}/u/${segments[0]}`;
     return NextResponse.rewrite(url);
   }
 
-  // 5) Rutas que viven dentro de [lang] y necesitan prefijo de idioma
-  // Paths that should rewrite (keep original URL for OG/social crawlers)
+  // 6) Rutas que viven dentro de [lang] y necesitan rewrite (no redirect)
+  //    para preservar el URL original en cards de social/OG crawlers
   const shouldRewrite =
     pathname.startsWith("/title/") ||
     pathname.startsWith("/actor/") ||
     pathname.startsWith("/peeklist/");
-
-  // Paths that should redirect
-  const shouldRedirect =
-    pathname === "/" ||
-    pathname.startsWith("/lists/") ||
-    pathname.startsWith("/buzz/") ||
-    pathname.startsWith("/explore") ||
-    pathname.startsWith("/activity") ||
-    pathname.startsWith("/download-app");
-
-  const lang = getPreferredLang(request) || DEFAULT_LANG;
 
   if (shouldRewrite) {
     const url = request.nextUrl.clone();
@@ -111,17 +128,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  if (!shouldRedirect) {
-    return NextResponse.next();
-  }
-
-  const url = request.nextUrl.clone();
-  url.pathname = `/${lang}${pathname}`;
-
-  const query = searchParams.toString();
-  url.search = query ? `?${query}` : "";
-
-  return NextResponse.redirect(url, 301);
+  return NextResponse.next();
 }
 
 export const config = {
