@@ -112,10 +112,9 @@ function formatRelativeTime(dateString: string, lang: Lang) {
 
 function normalizeRating(value: number | null | undefined) {
   if (value == null) return null;
-  const normalized = value > 5 ? value / 2 : value;
-  return Number.isInteger(normalized)
-    ? String(normalized)
-    : normalized.toFixed(1);
+  return Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(1);
 }
 
 export default function ActivityClient({
