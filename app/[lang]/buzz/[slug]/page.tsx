@@ -264,19 +264,25 @@ export default async function BuzzArticlePage({ params }: PageProps) {
 
   if (!article) notFound();
 
-  // Sibling redirect — if the user landed on a slug written in a
-  // different language than the URL claims (e.g. hitting the Spanish
-  // slug under /en/buzz/... from a stale link or IndexNow ping), try
-  // to send them to the matching-language sibling when one exists.
-  const articleLang = (article.language || "es").toLowerCase();
-  if (article.topic_key && articleLang !== lang) {
-    const siblings = await getBuzzSiblings(article.topic_key);
-    const sibling = siblings.find(
-      (s) => (s.language || "").toLowerCase() === lang
-    );
-    if (sibling && sibling.slug !== article.slug) {
-      redirect(`/${lang}/buzz/${sibling.slug}`);
+  // Language redirect — if the URL language doesn't match the article's
+  // native language, try to send the user to the correct version:
+  //   1. If topic_key exists, look for a sibling in the requested language.
+  //   2. If no sibling found (or no topic_key), fall back to the article's
+  //      own language URL. This prevents /es/ and /pt/ from each declaring
+  //      themselves canonical for an English-only article.
+  const articleLang = (article.language || "es").toLowerCase() as Lang;
+  if (articleLang !== lang) {
+    if (article.topic_key) {
+      const siblings = await getBuzzSiblings(article.topic_key);
+      const sibling = siblings.find(
+        (s) => (s.language || "").toLowerCase() === lang
+      );
+      if (sibling && sibling.slug !== article.slug) {
+        redirect(`/${lang}/buzz/${sibling.slug}`);
+      }
     }
+    // No language-specific version exists — send to the article's native language
+    redirect(`/${articleLang}/buzz/${article.slug}`);
   }
 
   const cleanTitle = decodeHtmlEntities(article.title);
