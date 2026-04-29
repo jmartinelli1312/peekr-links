@@ -22,7 +22,6 @@ import {
   tmdbFetch,
   tmdbLangCode,
   TmdbTitle,
-  yearMonth,
 } from "./shared";
 
 type GenreEntry = {
@@ -235,15 +234,14 @@ export async function generateBestOfGenre(
   date: Date
 ): Promise<DailyArticleBatch> {
   const genre = pickGenreForWeek(date);
-  const stamp = yearMonth(date);
-  const topic_key = `bestgenre-${genre.id}-${stamp}`;
+  const topic_key = `bestgenre-${genre.id}`;
 
   const articles: GeneratedArticle[] = [];
   for (const lang of LANGS) {
     const titles = await fetchBestOfGenre(genre, lang);
     if (titles.length < 4) continue;
 
-    const slugStem = `${STRINGS[lang].slugPrefix}-${genre.slugs[lang]}-${stamp}`;
+    const slugStem = `${STRINGS[lang].slugPrefix}-${genre.slugs[lang]}`;
     articles.push(renderArticle(titles, lang, genre, topic_key, slugify(slugStem)));
   }
 

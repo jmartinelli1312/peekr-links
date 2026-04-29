@@ -21,7 +21,6 @@ import {
   tmdbFetch,
   tmdbLangCode,
   TmdbTitle,
-  yearMonth,
 } from "./shared";
 
 type Director = {
@@ -256,8 +255,7 @@ export async function generateDirectorMarathon(
   date: Date
 ): Promise<DailyArticleBatch> {
   const director = pickDirectorForWeek(date);
-  const stamp = yearMonth(date);
-  const topic_key = `directormarathon-${director.id}-${stamp}`;
+  const topic_key = `directormarathon-${director.id}`;
 
   const articles: GeneratedArticle[] = [];
   for (const lang of LANGS) {
@@ -267,7 +265,7 @@ export async function generateDirectorMarathon(
     if (films.length < 3) continue;
 
     const slug = slugify(
-      `${STRINGS[lang].slugPrefix}-${director.slug}-${stamp}`
+      `${STRINGS[lang].slugPrefix}-${director.slug}`
     );
     articles.push(
       renderArticle(films, person, lang, director, topic_key, slug)
@@ -276,7 +274,7 @@ export async function generateDirectorMarathon(
 
   return {
     template: "director-marathon",
-    topic: `${director.name} (${stamp})`,
+    topic: director.name,
     articles,
   };
 }

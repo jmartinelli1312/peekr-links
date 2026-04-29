@@ -333,12 +333,11 @@ export function renderWhatToWatchAfter(
 ): GeneratedArticle {
   const t = TEMPLATES[lang];
   const sourceSlug = slugify(source.title);
-  const stamp = yearMonth();
-  const slug = `${t.slugPrefix}-${sourceSlug}-${stamp}`;
-  // topic_key links the 3 language siblings — intentionally ignores slug
-  // (which is lang-specific) and uses the stable TMDB id + month so any
-  // lang can find its peers.
-  const topic_key = `whattowatch-${source.id}-${stamp}`;
+  const slug = `${t.slugPrefix}-${sourceSlug}`;
+  // topic_key links the 3 language siblings — uses stable TMDB id so any
+  // lang can find its peers. No date stamp so the same URL accumulates SEO
+  // authority over time (upserted on each run).
+  const topic_key = `whattowatch-${source.id}`;
 
   const sourceYear = titleYear(source);
   const headline = `${t.titlePrefix} ${source.title}${sourceYear ? ` (${sourceYear})` : ""}`;
