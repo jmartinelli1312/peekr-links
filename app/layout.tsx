@@ -9,6 +9,32 @@ export const metadata = {
   description:
     "Red social para descubrir, calificar y comentar series y películas. Hecha en Argentina para Latinoamérica.",
   metadataBase: new URL(SITE),
+  openGraph: {
+    title: "Peekr | La red social para películas y series",
+    description:
+      "Red social para descubrir, calificar y comentar series y películas. Hecha en Argentina para Latinoamérica.",
+    url: SITE,
+    siteName: "Peekr",
+    images: [
+      {
+        url: `${SITE}/og`,
+        width: 1200,
+        height: 630,
+        alt: "Peekr — La red social del cine y las series",
+      },
+    ],
+    locale: "es_AR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Peekr | La red social para películas y series",
+    description:
+      "Red social para descubrir, calificar y comentar series y películas. Hecha en Argentina para Latinoamérica.",
+    images: [`${SITE}/og`],
+    site: "@peekr_oficial",
+    creator: "@peekr_oficial",
+  },
 };
 
 // ---- Schema.org JSON-LD (site-wide) ----
