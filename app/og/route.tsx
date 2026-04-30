@@ -9,7 +9,7 @@ const BRAND = "#FA0082";
 const BG = "#0B0B0F";
 
 export async function GET() {
-  const img = new ImageResponse(
+  return new ImageResponse(
     (
       <div
         style={{
@@ -134,14 +134,10 @@ export async function GET() {
     {
       width: 1200,
       height: 630,
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "public, max-age=86400, s-maxage=86400",
+      },
     }
   );
-
-  // Twitter mobile necesita headers explícitos de cache
-  return new Response(img.body, {
-    headers: {
-      "Content-Type": "image/png",
-      "Cache-Control": "public, max-age=86400, s-maxage=86400",
-    },
-  });
 }

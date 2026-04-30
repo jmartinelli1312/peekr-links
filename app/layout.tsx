@@ -17,7 +17,7 @@ export const metadata = {
     siteName: "Peekr",
     images: [
       {
-        url: `${SITE}/og`,
+        url: `${SITE}/og.png`,
         width: 1200,
         height: 630,
         alt: "Peekr — La red social del cine y las series",
@@ -31,7 +31,7 @@ export const metadata = {
     title: "Peekr | La red social para películas y series",
     description:
       "Red social para descubrir, calificar y comentar series y películas. Hecha en Argentina para Latinoamérica.",
-    images: [`${SITE}/og`],
+    images: [`${SITE}/og.png`],
     site: "@peekr_oficial",
     creator: "@peekr_oficial",
   },

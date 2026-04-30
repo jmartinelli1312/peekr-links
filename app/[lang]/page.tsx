@@ -204,7 +204,7 @@ export async function generateMetadata({ params }: PageProps) {
       siteName: "Peekr",
       images: [
         {
-          url: `${SITE}/og`,
+          url: `${SITE}/og.png`,
           width: 1200,
           height: 630,
           alt: "Peekr — La red social del cine y las series",
@@ -215,7 +215,7 @@ export async function generateMetadata({ params }: PageProps) {
       card: "summary_large_image",
       title: t.metaTitle,
       description: t.ogDescription,
-      images: [`${SITE}/og`],
+      images: [`${SITE}/og.png`],
     },
     alternates: {
       canonical: `${SITE}/${lang}`,
