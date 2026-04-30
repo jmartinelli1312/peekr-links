@@ -780,6 +780,10 @@ export default async function TitlePage({ params }: PageProps) {
       stats.avgRating && stats.ratingsCount > 0
         ? {
             "@type": "AggregateRating",
+            itemReviewed: {
+              "@type": type === "movie" ? "Movie" : "TVSeries",
+              name: title,
+            },
             ratingValue: stats.avgRating,
             bestRating: 10,
             worstRating: 1,
@@ -890,6 +894,35 @@ export default async function TitlePage({ params }: PageProps) {
     mainEntity: faqEntities,
   };
 
+  // Review schema — emitir por cada comentario con contenido real.
+  // Permite que Google muestre reseñas individuales como rich results.
+  const reviewsJsonLd = comments
+    .filter((c) => c.content && c.content.trim().length > 0)
+    .map((c) => ({
+      "@context": "https://schema.org",
+      "@type": "Review",
+      itemReviewed: {
+        "@type": type === "movie" ? "Movie" : "TVSeries",
+        name: title,
+        url: `${SITE}/${lang}/title/${type}/${canonicalIdSlug}`,
+      },
+      ...(typeof c.rating === "number"
+        ? {
+            reviewRating: {
+              "@type": "Rating",
+              ratingValue: c.rating,
+              bestRating: 10,
+              worstRating: 1,
+            },
+          }
+        : {}),
+      author: {
+        "@type": "Person",
+        name: c.username || "Peekr User",
+      },
+      reviewBody: c.content,
+    }));
+
   return (
     <>
       <script
@@ -904,6 +937,12 @@ export default async function TitlePage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
+      {reviewsJsonLd.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(reviewsJsonLd) }}
+        />
+      )}
       <style>{`
         .title-page {
           min-height: 100vh;

@@ -17,6 +17,13 @@ type PageProps = {
   }>;
 };
 
+type RelatedTitle = {
+  tmdb_id: number;
+  media_type: string;
+  title: string;
+  year?: string | null;
+};
+
 type BuzzArticle = {
   id: number;
   slug: string;
@@ -31,6 +38,7 @@ type BuzzArticle = {
   is_published: boolean;
   language?: string | null;
   topic_key?: string | null;
+  related_titles?: RelatedTitle[] | null;
 };
 
 type BuzzSibling = {
@@ -130,6 +138,8 @@ function getStrings(lang: Lang) {
       readOriginal: "Read original source",
       defaultDescription:
         "Latest movie, TV, streaming, trailer, casting and awards news on Peekr.",
+      relatedTitles: "Titles in this article",
+      seeOnPeekr: "See on Peekr",
     },
     es: {
       back: "Volver a Buzz",
@@ -138,6 +148,8 @@ function getStrings(lang: Lang) {
       readOriginal: "Leer fuente original",
       defaultDescription:
         "Últimas noticias de películas, series, streaming, trailers, casting y premios en Peekr.",
+      relatedTitles: "Títulos en este artículo",
+      seeOnPeekr: "Ver en Peekr",
     },
     pt: {
       back: "Voltar para Buzz",
@@ -146,15 +158,27 @@ function getStrings(lang: Lang) {
       readOriginal: "Ler fonte original",
       defaultDescription:
         "Últimas notícias de filmes, séries, streaming, trailers, casting e prêmios no Peekr.",
+      relatedTitles: "Títulos neste artigo",
+      seeOnPeekr: "Ver no Peekr",
     },
   }[lang];
+}
+
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
 }
 
 async function getBuzzArticle(slug: string) {
   const { data, error } = await supabase
     .from("peekrbuzz_articles")
     .select(
-      "id,slug,title,summary,body_html,source_name,source_url,image_url,published_at,category,is_published,language,topic_key"
+      "id,slug,title,summary,body_html,source_name,source_url,image_url,published_at,category,is_published,language,topic_key,related_titles"
     )
     .eq("slug", slug)
     .eq("is_published", true)
@@ -523,6 +547,64 @@ export default async function BuzzArticlePage({ params }: PageProps) {
           color: white;
           font-weight: 700;
         }
+
+        .related-titles {
+          margin-top: 36px;
+          padding-top: 28px;
+          border-top: 1px solid rgba(255,255,255,0.08);
+          max-width: 860px;
+        }
+
+        .related-titles-heading {
+          margin: 0 0 16px 0;
+          font-size: 20px;
+          font-weight: 800;
+          color: rgba(255,255,255,0.95);
+          letter-spacing: -0.02em;
+        }
+
+        .related-titles-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .related-title-link {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 13px 16px;
+          border-radius: 14px;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.07);
+          color: white;
+          text-decoration: none;
+          font-size: 15px;
+          font-weight: 700;
+          transition: background 0.15s;
+        }
+
+        .related-title-link:hover {
+          background: rgba(255,255,255,0.07);
+        }
+
+        .related-title-name {
+          flex: 1;
+        }
+
+        .related-title-year {
+          font-size: 13px;
+          color: rgba(255,255,255,0.50);
+          font-weight: 400;
+        }
+
+        .related-title-type {
+          font-size: 11px;
+          color: rgba(250,0,130,0.8);
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          font-weight: 700;
+        }
       `}</style>
 
       <div className="buzz-article-page">
@@ -597,6 +679,29 @@ export default async function BuzzArticlePage({ params }: PageProps) {
               className="article-body"
               dangerouslySetInnerHTML={{ __html: article.body_html }}
             />
+          ) : null}
+
+          {article.related_titles && article.related_titles.length > 0 ? (
+            <div className="related-titles">
+              <h2 className="related-titles-heading">{t.relatedTitles}</h2>
+              <div className="related-titles-grid">
+                {article.related_titles.map((rt) => (
+                  <a
+                    key={rt.tmdb_id}
+                    href={`/${lang}/title/${rt.media_type}/${rt.tmdb_id}-${slugify(rt.title)}`}
+                    className="related-title-link"
+                  >
+                    <span className="related-title-name">{rt.title}</span>
+                    {rt.year ? (
+                      <span className="related-title-year">{rt.year}</span>
+                    ) : null}
+                    <span className="related-title-type">
+                      {rt.media_type === "tv" ? "Serie" : "Película"}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </div>
           ) : null}
         </section>
       </div>
