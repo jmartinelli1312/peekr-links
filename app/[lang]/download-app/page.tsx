@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 
 const BRAND = "#FA0082";
 const APP_STORE_URL = "https://apps.apple.com/app/id6756285989";
-const PLAY_STORE_URL = "";
+const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.peekr.peekr";
 
 type Lang = "en" | "es" | "pt";
 
