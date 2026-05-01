@@ -25,6 +25,12 @@ const nextConfig: NextConfig = {
         destination: "/:lang/u/:username",
         permanent: true,
       },
+      // Flutter genera /person/:id → /es/actor/:id
+      {
+        source: "/person/:id",
+        destination: "/es/actor/:id",
+        permanent: false,
+      },
     ];
   },
 
