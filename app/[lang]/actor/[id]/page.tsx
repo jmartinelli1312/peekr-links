@@ -248,6 +248,14 @@ function getStrings(lang: Lang) {
       mostPopularHeading: "Popular titles from",
       noCreditsYet:
         "This person's filmography is not yet available on Peekr.",
+      seoTitle: (name: string) =>
+        `${name} Filmography: Movies and TV Shows | Peekr`,
+      seoDescription: (name: string, count: number) =>
+        `Discover ${name}'s complete filmography on Peekr — ${count} movies and TV series you can rate, save and discuss.`,
+      moviesOf: (name: string) => `${name} Movies`,
+      tvOf: (name: string) => `${name} TV Shows`,
+      knownForOf: (name: string) => `Best of ${name}`,
+      buzzArticleLabel: "Read the full filmography article",
     },
     es: {
       actorNotFound: "Persona no encontrada",
@@ -270,6 +278,14 @@ function getStrings(lang: Lang) {
       mostPopularHeading: "Títulos destacados de",
       noCreditsYet:
         "La filmografía de esta persona todavía no está disponible en Peekr.",
+      seoTitle: (name: string) =>
+        `Filmografía de ${name}: todas sus películas y series | Peekr`,
+      seoDescription: (name: string, count: number) =>
+        `Descubre la filmografía completa de ${name} en Peekr — ${count} películas y series para calificar, guardar y compartir con la comunidad.`,
+      moviesOf: (name: string) => `Películas de ${name}`,
+      tvOf: (name: string) => `Series de ${name}`,
+      knownForOf: (name: string) => `Lo mejor de ${name}`,
+      buzzArticleLabel: "Leer el artículo completo de filmografía",
     },
     pt: {
       actorNotFound: "Pessoa não encontrada",
@@ -292,6 +308,14 @@ function getStrings(lang: Lang) {
       mostPopularHeading: "Títulos em destaque de",
       noCreditsYet:
         "A filmografia desta pessoa ainda não está disponível no Peekr.",
+      seoTitle: (name: string) =>
+        `Filmografia de ${name}: filmes e séries | Peekr`,
+      seoDescription: (name: string, count: number) =>
+        `Descubra a filmografia completa de ${name} no Peekr — ${count} filmes e séries para avaliar, salvar e compartilhar com a comunidade.`,
+      moviesOf: (name: string) => `Filmes de ${name}`,
+      tvOf: (name: string) => `Séries de ${name}`,
+      knownForOf: (name: string) => `O melhor de ${name}`,
+      buzzArticleLabel: "Ler o artigo completo de filmografia",
     },
   }[lang];
 }
@@ -321,17 +345,19 @@ export async function generateMetadata({ params }: PageProps) {
   const slug = slugify(actor.name);
   const canonicalPath = `/${lang}/actor/${numericId}-${slug}`;
 
-  const fallbackDescription =
-    lang === "es"
-      ? `${actor.name} en Peekr. ${t.defaultDescription}`
-      : lang === "pt"
-        ? `${actor.name} no Peekr. ${t.defaultDescription}`
-        : `${actor.name} on Peekr. ${t.defaultDescription}`;
+  const creditCount =
+    (actor.combined_credits?.cast?.length ?? 0) +
+    (actor.combined_credits?.crew?.length ?? 0);
 
-  const description = actor.biography?.slice(0, 155) || fallbackDescription;
+  const seoTitle = t.seoTitle(actor.name);
+  const description =
+    creditCount > 0
+      ? t.seoDescription(actor.name, creditCount)
+      : actor.biography?.slice(0, 155) ||
+        `${actor.name} en Peekr. ${t.defaultDescription}`;
 
   return {
-    title: `${actor.name} | Peekr`,
+    title: seoTitle,
     description,
     alternates: {
       canonical: `${SITE}${canonicalPath}`,
@@ -343,7 +369,7 @@ export async function generateMetadata({ params }: PageProps) {
       },
     },
     openGraph: {
-      title: `${actor.name} | Peekr`,
+      title: seoTitle,
       description,
       url: `${SITE}${canonicalPath}`,
       siteName: "Peekr",
@@ -358,7 +384,7 @@ export async function generateMetadata({ params }: PageProps) {
     },
     twitter: {
       card: "summary_large_image",
-      title: `${actor.name} | Peekr`,
+      title: seoTitle,
       description,
       images: actor.profile_path ? [`${PROFILE}${actor.profile_path}`] : [],
     },
@@ -562,6 +588,24 @@ export default async function ActorPage({ params }: PageProps) {
           max-width: 850px;
         }
 
+        .buzz-article-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 20px;
+          border-radius: 999px;
+          background: rgba(255,255,255,0.07);
+          border: 1px solid rgba(255,255,255,0.12);
+          color: rgba(255,255,255,0.92);
+          font-size: 15px;
+          font-weight: 600;
+          text-decoration: none;
+          transition: background 0.15s;
+        }
+        .buzz-article-link:hover {
+          background: rgba(255,255,255,0.12);
+        }
+
         .aka-row {
           display: flex;
           gap: 10px;
@@ -756,6 +800,15 @@ export default async function ActorPage({ params }: PageProps) {
             </p>
           </section>
 
+          <section className="section-block">
+            <Link
+              href={`/${lang}/buzz/filmografia-${slugify(actor.name)}`}
+              className="buzz-article-link"
+            >
+              {t.buzzArticleLabel} →
+            </Link>
+          </section>
+
           {actor.also_known_as && actor.also_known_as.length > 0 ? (
             <section className="section-block">
               <h2 className="section-title">{t.aka}</h2>
@@ -771,7 +824,7 @@ export default async function ActorPage({ params }: PageProps) {
 
           {knownFor.length > 0 ? (
             <section className="section-block">
-              <h2 className="section-title">{t.knownFor}</h2>
+              <h2 className="section-title">{t.knownForOf(actor.name)}</h2>
               <div className="credit-row">
                 {knownFor.map((item) => {
                   const title = item.title || item.name || "Untitled";
@@ -814,7 +867,7 @@ export default async function ActorPage({ params }: PageProps) {
 
           {movies.length > 0 ? (
             <section className="section-block">
-              <h2 className="section-title">{t.movies}</h2>
+              <h2 className="section-title">{t.moviesOf(actor.name)}</h2>
               <div className="credit-row">
                 {movies.map((item) => {
                   const title = item.title || item.name || "Untitled";
@@ -857,7 +910,7 @@ export default async function ActorPage({ params }: PageProps) {
 
           {tv.length > 0 ? (
             <section className="section-block">
-              <h2 className="section-title">{t.tv}</h2>
+              <h2 className="section-title">{t.tvOf(actor.name)}</h2>
               <div className="credit-row">
                 {tv.map((item) => {
                   const title = item.title || item.name || "Untitled";
