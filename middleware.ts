@@ -20,12 +20,14 @@ function hasLangPrefix(pathname: string) {
   return segments.length > 0 && SUPPORTED_LANGS.has(segments[0]);
 }
 
-function getPreferredLang(request: NextRequest) {
-  const acceptLanguage =
-    request.headers.get("accept-language")?.toLowerCase() || "";
-
-  if (acceptLanguage.includes("pt")) return "pt";
-  if (acceptLanguage.includes("en")) return "en";
+function getPreferredLang(request: NextRequest): string {
+  const raw = request.headers.get("accept-language") || "";
+  // Parse only the highest-priority language token (first entry before any
+  // comma or semicolon). Using .includes() on the full string was wrong:
+  // "es-419,es;q=0.9,en-US;q=0.8" would incorrectly match "en".
+  const primary = raw.split(",")[0].split(";")[0].trim().toLowerCase();
+  if (primary.startsWith("pt")) return "pt";
+  if (primary.startsWith("en")) return "en";
   return "es";
 }
 

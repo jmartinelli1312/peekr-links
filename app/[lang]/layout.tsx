@@ -1,4 +1,5 @@
 import SiteHeader from "../components/site-header";
+import AppDownloadBanner from "@/components/AppDownloadBanner";
 
 type Lang = "en" | "es" | "pt";
 
@@ -106,6 +107,7 @@ export default async function LangLayout({
       `}</style>
 
       <SiteHeader lang={lang} />
+      <AppDownloadBanner lang={lang} />
 
       <main className="peekr-main">{children}</main>
 

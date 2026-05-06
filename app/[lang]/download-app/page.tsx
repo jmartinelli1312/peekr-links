@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { cookies } from "next/headers";
 
 const BRAND = "#FA0082";
 const APP_STORE_URL = "https://apps.apple.com/app/id6756285989";
@@ -16,9 +15,11 @@ function normalizeLang(value?: string | null): Lang {
   return "en";
 }
 
-export default async function DownloadAppPage() {
-  const cookieStore = await cookies();
-  const lang = normalizeLang(cookieStore.get("lang")?.value);
+type Props = { params: Promise<{ lang: string }> };
+
+export default async function DownloadAppPage({ params }: Props) {
+  const { lang: rawLang } = await params;
+  const lang = normalizeLang(rawLang);
 
   const t = {
     en: {

@@ -675,6 +675,13 @@ export async function generateMetadata({ params }: PageProps) {
         "x-default": `${SITE}/es/title/${type}/${numericId}-${slug}`,
       },
     },
+    // Apple Smart App Banner — iOS Safari shows a native "Open in Peekr"
+    // banner at the top when the app is installed, or "Download" when it's not.
+    // The AASA already maps /*/title/* as universal links so "Open" navigates
+    // directly to this title inside the app.
+    other: {
+      "apple-itunes-app": "app-id=6756285989",
+    },
     openGraph: {
       title: `${title} | Peekr`,
       description,
