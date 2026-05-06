@@ -279,7 +279,7 @@ export default function UserProfileClient({
           .from("sneak_peeks")
           .select("id, video_url, thumbnail_url, image_urls, created_at")
           .eq("creator_id", uid)
-          .eq("status", "published")
+          .eq("is_published", true)
           .order("created_at", { ascending: false })
           .limit(24);
         setSneakPeeks((spRows as SneakPeekRow[] | null) ?? []);
