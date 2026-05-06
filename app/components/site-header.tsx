@@ -87,9 +87,27 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
     if (!pathname) return "";
     const parts = pathname.split("/").filter(Boolean);
 
+    // Already has a lang prefix — strip it
     if (parts.length > 0 && ["en", "es", "pt"].includes(parts[0])) {
       const rest = parts.slice(1).join("/");
       return rest ? `/${rest}` : "";
+    }
+
+    // Vanity username URL: browser shows /jmartinelli but middleware rewrites
+    // it internally to /es/u/jmartinelli. Switch-lang must produce /en/u/jmartinelli,
+    // not /en/jmartinelli (which would 404 — the middleware only rewrites single
+    // segments without a lang prefix, not two-segment paths like /en/jmartinelli).
+    const RESERVED = new Set([
+      "about", "admin", "api", "activity", "actor", "buzz", "contact",
+      "download-app", "explore", "go", "lists", "login", "peeklist",
+      "privacy", "signup", "sneak-peek", "support", "terms", "title", "u",
+    ]);
+    if (
+      parts.length === 1 &&
+      !RESERVED.has(parts[0]) &&
+      /^[a-zA-Z0-9_.-]+$/.test(parts[0])
+    ) {
+      return `/u/${parts[0]}`;
     }
 
     return pathname === "/" ? "" : pathname;
