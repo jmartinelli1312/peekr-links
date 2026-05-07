@@ -8,7 +8,7 @@
  */
 
 export const dynamic = "force-static";
-export const revalidate = 3600;
+export const revalidate = false; // static — la key no cambia
 
 export function GET() {
   const key = process.env.INDEXNOW_KEY?.trim();

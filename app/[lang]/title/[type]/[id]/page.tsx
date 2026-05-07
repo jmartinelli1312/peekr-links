@@ -1,7 +1,7 @@
-// Revalidamos cada hora para que cuando alguien califica, el cambio de
-// noindex → index se refleje rápido (antes era 24h, muy lento para el
-// ciclo de engagement).
-export const revalidate = 3600;
+// 24h: los datos de TMDB casi no cambian. Ratings/noindex se actualizan
+// igual durante el próximo crawl. Con baja cantidad de usuarios el TTL
+// de 1h generaba miles de rebuilds diarios por Googlebot sin beneficio real.
+export const revalidate = 86400;
 
 import Image from "next/image";
 import Link from "next/link";

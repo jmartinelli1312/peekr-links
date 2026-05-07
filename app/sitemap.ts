@@ -1,4 +1,4 @@
-export const revalidate = 3600;
+export const revalidate = 86400; // 24h — sitemap no necesita refresh horario
 
 import type { MetadataRoute } from "next";
 import { supabase } from "@/lib/supabase";
