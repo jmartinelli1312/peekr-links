@@ -58,6 +58,48 @@ type RecentBuzz = {
   published_at?: string | null;
 };
 
+type PendingArticle = {
+  id: number;
+  title: string;
+  summary?: string | null;
+  source_name?: string | null;
+  language: string;
+  image_url?: string | null;
+  published_at?: string | null;
+};
+
+type PendingCarousel = {
+  id: string;
+  draft_type?: string | null;
+  hook_text?: string | null;
+  bullet_points?: string[] | null;
+  seed_title?: string | null;
+  source_label?: string | null;
+  seed_poster_url?: string | null;
+  slide_urls?: string[] | null;
+  language?: string | null;
+  generated_at?: string | null;
+  caption?: string | null;
+};
+
+type PendingCreator = {
+  id: string;
+  user_id: string;
+  created_at?: string | null;
+  username?: string | null;
+  display_name?: string | null;
+  avatar_url?: string | null;
+};
+
+type PublishedCarousel = {
+  id: string;
+  draft_type?: string | null;
+  hook_text?: string | null;
+  seed_title?: string | null;
+  slide_urls?: string[] | null;
+  scheduled_for?: string | null;
+};
+
 function startOfTodayIso() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -91,12 +133,26 @@ function formatPct(value: number) {
   return `${value.toFixed(1)}%`;
 }
 
+const CAROUSEL_TYPE_COLORS: Record<string, string> = {
+  actualidad: "#06b6d4",
+  actor: "#a855f7",
+  lanzamiento: "#f97316",
+  reco: "#22c55e",
+};
+
 export default function AdminPage() {
   const router = useRouter();
   const [state, setState] = useState<AdminState>("loading");
   const [email, setEmail] = useState<string>("");
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
+
+  const [activeTab, setActiveTab] = useState<"pending" | "metrics" | "published">("pending");
+  const [pendingCounts, setPendingCounts] = useState({ articles: 0, carousels: 0, creators: 0 });
+  const [pendingArticles, setPendingArticles] = useState<PendingArticle[]>([]);
+  const [pendingCarousels, setPendingCarousels] = useState<PendingCarousel[]>([]);
+  const [pendingCreators, setPendingCreators] = useState<PendingCreator[]>([]);
+  const [publishedCarousels, setPublishedCarousels] = useState<PublishedCarousel[]>([]);
 
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalUsers: 0,
@@ -144,6 +200,105 @@ export default function AdminPage() {
     if (!metrics.totalUsers) return 0;
     return (metrics.mau / metrics.totalUsers) * 100;
   }, [metrics.mau, metrics.totalUsers]);
+
+  const totalPending = pendingCounts.articles + pendingCounts.carousels + pendingCounts.creators;
+
+  async function loadPendingData() {
+    const [
+      articlesCountRes,
+      carouselsCountRes,
+      creatorsCountRes,
+      pendingArticlesRes,
+      pendingCarouselsRes,
+      pendingCreatorsRes,
+      publishedCarouselsRes,
+    ] = await Promise.all([
+      supabase
+        .from("peekrbuzz_articles")
+        .select("*", { count: "exact", head: true })
+        .eq("review_status", "pending_review"),
+      supabase
+        .from("peekrbuzz_ig_queue")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending_review"),
+      supabase
+        .from("creator_applications")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending"),
+      supabase
+        .from("peekrbuzz_articles")
+        .select("id, title, summary, source_name, language, image_url, published_at")
+        .eq("review_status", "pending_review")
+        .order("published_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("peekrbuzz_ig_queue")
+        .select(
+          "id, draft_type, hook_text, bullet_points, seed_title, source_label, seed_poster_url, slide_urls, language, generated_at, caption"
+        )
+        .eq("status", "pending_review")
+        .order("generated_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("creator_applications")
+        .select("id, user_id, created_at, status")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("peekrbuzz_ig_queue")
+        .select("id, draft_type, hook_text, seed_title, slide_urls, scheduled_for")
+        .eq("status", "published")
+        .order("scheduled_for", { ascending: false })
+        .limit(30),
+    ]);
+
+    setPendingCounts({
+      articles: articlesCountRes.count ?? 0,
+      carousels: carouselsCountRes.count ?? 0,
+      creators: creatorsCountRes.count ?? 0,
+    });
+
+    setPendingArticles((pendingArticlesRes.data as PendingArticle[] | null) ?? []);
+    setPendingCarousels((pendingCarouselsRes.data as PendingCarousel[] | null) ?? []);
+
+    // Enrich creator applications with profile data
+    const creatorApps = (pendingCreatorsRes.data as Array<{
+      id: string;
+      user_id: string;
+      created_at?: string | null;
+    }> | null) ?? [];
+
+    if (creatorApps.length > 0) {
+      const userIds = creatorApps.map((a) => a.user_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, username, display_name, avatar_url")
+        .in("id", userIds);
+
+      const profileMap = new Map(
+        (profiles ?? []).map((p: { id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null }) => [p.id, p])
+      );
+
+      const enriched: PendingCreator[] = creatorApps.map((app) => {
+        const profile = profileMap.get(app.user_id);
+        return {
+          id: app.id,
+          user_id: app.user_id,
+          created_at: app.created_at,
+          username: profile?.username ?? null,
+          display_name: profile?.display_name ?? null,
+          avatar_url: profile?.avatar_url ?? null,
+        };
+      });
+
+      setPendingCreators(enriched);
+    } else {
+      setPendingCreators([]);
+    }
+
+    setPublishedCarousels((publishedCarouselsRes.data as PublishedCarousel[] | null) ?? []);
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -427,6 +582,11 @@ export default function AdminPage() {
 
         setRecentBuzz((recentBuzzRes.data as RecentBuzz[] | null) ?? []);
 
+        // Load pending / published data in parallel with rest
+        if (mounted) {
+          await loadPendingData();
+        }
+
         setState("authorized");
       } catch (err) {
         if (!mounted) return;
@@ -443,6 +603,62 @@ export default function AdminPage() {
       mounted = false;
     };
   }, [router]);
+
+  // --- Action handlers ---
+
+  async function approveArticle(id: number) {
+    setPendingArticles((prev) => prev.filter((a) => a.id !== id));
+    setPendingCounts((prev) => ({ ...prev, articles: Math.max(0, prev.articles - 1) }));
+    await supabase
+      .from("peekrbuzz_articles")
+      .update({ is_published: true, review_status: "published" })
+      .eq("id", id);
+  }
+
+  async function rejectArticle(id: number) {
+    setPendingArticles((prev) => prev.filter((a) => a.id !== id));
+    setPendingCounts((prev) => ({ ...prev, articles: Math.max(0, prev.articles - 1) }));
+    await supabase
+      .from("peekrbuzz_articles")
+      .update({ review_status: "rejected" })
+      .eq("id", id);
+  }
+
+  async function approveCarousel(id: string) {
+    setPendingCarousels((prev) => prev.filter((c) => c.id !== id));
+    setPendingCounts((prev) => ({ ...prev, carousels: Math.max(0, prev.carousels - 1) }));
+    await supabase
+      .from("peekrbuzz_ig_queue")
+      .update({ status: "approved", scheduled_for: new Date().toISOString() })
+      .eq("id", id);
+  }
+
+  async function rejectCarousel(id: string) {
+    setPendingCarousels((prev) => prev.filter((c) => c.id !== id));
+    setPendingCounts((prev) => ({ ...prev, carousels: Math.max(0, prev.carousels - 1) }));
+    await supabase
+      .from("peekrbuzz_ig_queue")
+      .update({ status: "rejected" })
+      .eq("id", id);
+  }
+
+  async function approveCreator(id: string, userId: string) {
+    setPendingCreators((prev) => prev.filter((c) => c.id !== id));
+    setPendingCounts((prev) => ({ ...prev, creators: Math.max(0, prev.creators - 1) }));
+    await Promise.all([
+      supabase.from("creator_applications").update({ status: "approved" }).eq("id", id),
+      supabase.from("profiles").update({ creator_status: "approved" }).eq("id", userId),
+    ]);
+  }
+
+  async function rejectCreator(id: string, userId: string) {
+    setPendingCreators((prev) => prev.filter((c) => c.id !== id));
+    setPendingCounts((prev) => ({ ...prev, creators: Math.max(0, prev.creators - 1) }));
+    await Promise.all([
+      supabase.from("creator_applications").update({ status: "rejected" }).eq("id", id),
+      supabase.from("profiles").update({ creator_status: "none" }).eq("id", userId),
+    ]);
+  }
 
   if (state === "loading") {
     return (
@@ -687,7 +903,75 @@ export default function AdminPage() {
           line-height: 1.5;
         }
 
-        @media (min-width: 900px) {
+        .admin-tabs {
+          display: flex;
+          gap: 4px;
+          padding-bottom: 24px;
+          border-bottom: 1px solid rgba(255,255,255,0.08);
+          margin-bottom: 32px;
+          flex-wrap: wrap;
+        }
+
+        .admin-tab {
+          padding: 10px 18px;
+          border-radius: 10px;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+          background: transparent;
+          border: 1px solid rgba(255,255,255,0.08);
+          color: rgba(255,255,255,0.6);
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .admin-tab.active {
+          background: rgba(250,0,130,0.12);
+          border-color: #FA0082;
+          color: #FA0082;
+        }
+
+        .admin-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: #FA0082;
+          color: white;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 800;
+          min-width: 18px;
+          height: 18px;
+          padding: 0 5px;
+        }
+
+        .section-title {
+          font-size: 17px;
+          font-weight: 800;
+          color: white;
+          margin: 0 0 14px 0;
+          padding-top: 24px;
+        }
+
+        .section-title:first-child { padding-top: 0; }
+
+        .section-empty {
+          padding: 28px;
+          text-align: center;
+          color: rgba(255,255,255,0.4);
+          font-size: 14px;
+          background: rgba(255,255,255,0.02);
+          border-radius: 12px;
+        }
+
+        .review-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        @media(min-width: 900px) {
           .grid-cards {
             grid-template-columns: repeat(5, minmax(0, 1fr));
           }
@@ -703,6 +987,114 @@ export default function AdminPage() {
           .analytics-links {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
+
+          .review-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .review-card {
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 14px;
+          padding: 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .review-card-top {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+        }
+
+        .review-card-thumb {
+          width: 72px;
+          height: 72px;
+          border-radius: 10px;
+          object-fit: cover;
+          flex-shrink: 0;
+          background: rgba(255,255,255,0.08);
+        }
+
+        .review-card-body {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .review-card-badges {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+          margin-bottom: 6px;
+        }
+
+        .review-badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 3px 8px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 700;
+          background: rgba(255,255,255,0.08);
+          color: rgba(255,255,255,0.7);
+        }
+
+        .review-hook {
+          font-size: 14px;
+          font-weight: 700;
+          color: white;
+          line-height: 1.4;
+          margin-bottom: 4px;
+        }
+
+        .review-summary {
+          font-size: 12px;
+          color: rgba(255,255,255,0.6);
+          line-height: 1.5;
+        }
+
+        .review-meta {
+          font-size: 11px;
+          color: rgba(255,255,255,0.4);
+          margin-top: 2px;
+        }
+
+        .review-actions {
+          display: flex;
+          gap: 8px;
+          margin-top: 4px;
+        }
+
+        .btn-approve {
+          padding: 7px 14px;
+          border-radius: 8px;
+          background: rgba(0,200,100,0.15);
+          border: 1px solid rgba(0,200,100,0.3);
+          color: #00c864;
+          font-weight: 700;
+          font-size: 12px;
+          cursor: pointer;
+        }
+
+        .btn-reject {
+          padding: 7px 14px;
+          border-radius: 8px;
+          background: transparent;
+          border: 1px solid rgba(255,255,255,0.1);
+          color: rgba(255,255,255,0.45);
+          font-weight: 700;
+          font-size: 12px;
+          cursor: pointer;
+        }
+
+        .creator-avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: 999px;
+          object-fit: cover;
+          background: rgba(255,255,255,0.1);
+          display: block;
+          flex-shrink: 0;
         }
       `}</style>
 
@@ -718,269 +1110,573 @@ export default function AdminPage() {
           <div className="card">Cargando métricas...</div>
         ) : (
           <>
-            <section className="grid-cards">
-              <div className="card">
-                <div className="card-label">Total users</div>
-                <div className="card-value">{formatNumber(metrics.totalUsers)}</div>
-                <div className="card-sub">
-                  Onboarding: {formatNumber(metrics.onboardingCompleted)} · {formatPct(onboardingRate)}
-                </div>
-              </div>
+            {/* Tab navigation */}
+            <div className="admin-tabs">
+              <button
+                className={`admin-tab${activeTab === "pending" ? " active" : ""}`}
+                onClick={() => setActiveTab("pending")}
+              >
+                Pendientes
+                {totalPending > 0 && (
+                  <span className="admin-badge">{totalPending}</span>
+                )}
+              </button>
+              <button
+                className={`admin-tab${activeTab === "metrics" ? " active" : ""}`}
+                onClick={() => setActiveTab("metrics")}
+              >
+                Metricas
+              </button>
+              <button
+                className={`admin-tab${activeTab === "published" ? " active" : ""}`}
+                onClick={() => setActiveTab("published")}
+              >
+                Publicados
+              </button>
+            </div>
 
-              <div className="card">
-                <div className="card-label">DAU</div>
-                <div className="card-value">{formatNumber(metrics.dau)}</div>
-                <div className="card-sub">
-                  Usuarios activos últimas 24h · {formatPct(dauRate)} of users
-                </div>
-              </div>
+            {/* ===================== TAB: PENDIENTES ===================== */}
+            <div style={{ display: activeTab === "pending" ? "block" : "none" }}>
 
-              <div className="card">
-                <div className="card-label">WAU</div>
-                <div className="card-value">{formatNumber(metrics.wau)}</div>
-                <div className="card-sub">
-                  Usuarios activos últimos 7 días · {formatPct(wauRate)} of users
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="card-label">MAU</div>
-                <div className="card-value">{formatNumber(metrics.mau)}</div>
-                <div className="card-sub">
-                  Usuarios activos últimos 30 días · {formatPct(mauRate)} of users
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="card-label">Total ratings</div>
-                <div className="card-value">{formatNumber(metrics.totalRatings)}</div>
-                <div className="card-sub">
-                  Hoy {formatNumber(metrics.ratingsToday)} · 7d {formatNumber(metrics.ratings7d)}
-                </div>
-              </div>
-            </section>
-
-            <section className="section">
-              <h2>Growth</h2>
-              <div className="three-col">
-                <div className="card">
-                  <div className="mini-metric">
-                    <div className="mini-name">New users today</div>
-                    <div className="mini-value">{formatNumber(metrics.newUsersToday)}</div>
-                  </div>
-                  <div className="mini-metric">
-                    <div className="mini-name">New users 7d</div>
-                    <div className="mini-value">{formatNumber(metrics.newUsers7d)}</div>
-                  </div>
-                  <div className="mini-metric">
-                    <div className="mini-name">New users 30d</div>
-                    <div className="mini-value">{formatNumber(metrics.newUsers30d)}</div>
-                  </div>
-                </div>
-
-                <div className="card">
-                  <div className="mini-metric">
-                    <div className="mini-name">Ratings today</div>
-                    <div className="mini-value">{formatNumber(metrics.ratingsToday)}</div>
-                  </div>
-                  <div className="mini-metric">
-                    <div className="mini-name">Ratings 7d</div>
-                    <div className="mini-value">{formatNumber(metrics.ratings7d)}</div>
-                  </div>
-                  <div className="mini-metric">
-                    <div className="mini-name">Ratings 30d</div>
-                    <div className="mini-value">{formatNumber(metrics.ratings30d)}</div>
-                  </div>
-                </div>
-
-                <div className="card">
-                  <div className="mini-metric">
-                    <div className="mini-name">Watchlist adds today</div>
-                    <div className="mini-value">{formatNumber(metrics.watchlistToday)}</div>
-                  </div>
-                  <div className="mini-metric">
-                    <div className="mini-name">Watchlist adds 7d</div>
-                    <div className="mini-value">{formatNumber(metrics.watchlist7d)}</div>
-                  </div>
-                  <div className="mini-metric">
-                    <div className="mini-name">Watchlist adds 30d</div>
-                    <div className="mini-value">{formatNumber(metrics.watchlist30d)}</div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="section">
-              <h2>Content</h2>
-              <div className="three-col">
-                <div className="card">
-                  <div className="mini-metric">
-                    <div className="mini-name">Total peeklists</div>
-                    <div className="mini-value">{formatNumber(metrics.totalPeeklists)}</div>
-                  </div>
-                  <div className="mini-metric">
-                    <div className="mini-name">Published PeekrBuzz</div>
-                    <div className="mini-value">{formatNumber(metrics.publishedBuzz)}</div>
-                  </div>
-                  <div className="mini-metric">
-                    <div className="mini-name">Editorial collections</div>
-                    <div className="mini-value">{formatNumber(metrics.totalEditorialCollections)}</div>
-                  </div>
-                  <div className="mini-metric">
-                    <div className="mini-name">Published editorial</div>
-                    <div className="mini-value">{formatNumber(metrics.publishedEditorialCollections)}</div>
-                  </div>
-                </div>
-
-                <div className="card">
-                  <div className="mini-metric">
-                    <div className="mini-name">DAU / Users</div>
-                    <div className="mini-value">{formatPct(dauRate)}</div>
-                  </div>
-                  <div className="mini-metric">
-                    <div className="mini-name">WAU / Users</div>
-                    <div className="mini-value">{formatPct(wauRate)}</div>
-                  </div>
-                  <div className="mini-metric">
-                    <div className="mini-name">MAU / Users</div>
-                    <div className="mini-value">{formatPct(mauRate)}</div>
-                  </div>
-                </div>
-
-                <div className="card analytics-card">
-                  <div className="mini-metric">
-                    <div className="mini-name">Web analytics</div>
-                    <div className="mini-value">Live</div>
-                  </div>
-                  <div className="section-note">
-                    Vercel ya está midiendo tráfico web. Desde aquí entras rápido a páginas, visitantes y fuentes.
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="section">
-              <h2>Web Analytics</h2>
-              <p className="section-note">
-                Accesos rápidos al panel de Vercel para revisar tráfico web, páginas más vistas y adquisición.
+              {/* Section A: Articulos Buzz */}
+              <p className="section-title">
+                Articulos Buzz
+                {pendingCounts.articles > 0 && (
+                  <span className="admin-badge" style={{ marginLeft: 8 }}>
+                    {pendingCounts.articles}
+                  </span>
+                )}
               </p>
-
-              <div className="analytics-links">
-                <a
-                  href="https://vercel.com/dashboard"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="analytics-link"
-                >
-                  <div className="analytics-link-title">Open Vercel dashboard</div>
-                  <div className="analytics-link-sub">
-                    Entra al proyecto y revisa el overview general de deployment, usage y analytics.
-                  </div>
-                </a>
-
-                <a
-                  href="https://vercel.com/analytics"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="analytics-link"
-                >
-                  <div className="analytics-link-title">Open Web Analytics</div>
-                  <div className="analytics-link-sub">
-                    Pageviews, visitantes únicos, top pages y tendencias recientes del sitio.
-                  </div>
-                </a>
-
-                <a
-                  href="https://vercel.com/analytics?view=pages"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="analytics-link"
-                >
-                  <div className="analytics-link-title">Top pages</div>
-                  <div className="analytics-link-sub">
-                    Revisa qué URLs están concentrando el tráfico y cuáles conviene optimizar primero.
-                  </div>
-                </a>
-
-                <a
-                  href="https://vercel.com/analytics?view=sources"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="analytics-link"
-                >
-                  <div className="analytics-link-title">Traffic sources</div>
-                  <div className="analytics-link-sub">
-                    Mira referrers, adquisición y desde dónde llega la gente a Peekr web.
-                  </div>
-                </a>
-              </div>
-            </section>
-
-            <section className="section">
-              <h2>Recent activity</h2>
-              <p className="section-note">Panel inicial con tablas rápidas para monitoreo manual.</p>
-
-              <div className="tables">
-                <div className="table-card">
-                  <h3>Recent signups</h3>
-                  {recentUsers.map((item) => (
-                    <div key={item.id} className="row">
-                      <div className="row-left">
-                        <div className="row-title">
-                          {item.display_name || item.username || item.id.slice(0, 8)}
-                        </div>
-                        <div className="row-sub">@{item.username || "no-username"}</div>
-                      </div>
-                      <div className="row-right">{formatDate(item.created_at)}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="table-card">
-                  <h3>Recent ratings</h3>
-                  {recentRatings.map((item) => (
-                    <div key={item.id} className="row">
-                      <div className="row-left">
-                        <div className="row-title">TMDB {item.tmdb_id}</div>
-                        <div className="row-sub">user {item.user_id.slice(0, 8)}</div>
-                      </div>
-                      <div className="row-right">
-                        ⭐ {item.rating}
-                        <div className="row-sub">{formatDate(item.created_at)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="table-card">
-                  <h3>Recent watchlist adds</h3>
-                  {recentWatchlist.map((item) => (
-                    <div key={item.id} className="row">
-                      <div className="row-left">
-                        <div className="row-title">TMDB {item.tmdb_id}</div>
-                        <div className="row-sub">user {item.user_id.slice(0, 8)}</div>
-                      </div>
-                      <div className="row-right">{formatDate(item.created_at)}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="table-card">
-                  <h3>Recent PeekrBuzz</h3>
-                  {recentBuzz.map((item) => (
-                    <div key={item.id} className="row">
-                      <div className="row-left">
-                        <div className="row-title">{item.title}</div>
-                        <div className="row-sub">
-                          {item.source_name || "—"} · {item.category || "—"}
+              {pendingArticles.length === 0 ? (
+                <div className="section-empty">Sin articulos pendientes</div>
+              ) : (
+                <div className="review-grid">
+                  {pendingArticles.map((article) => (
+                    <div key={article.id} className="review-card">
+                      <div className="review-card-top">
+                        {article.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={article.image_url}
+                            alt=""
+                            className="review-card-thumb"
+                          />
+                        ) : null}
+                        <div className="review-card-body">
+                          <div className="review-card-badges">
+                            <span className="review-badge">{article.language}</span>
+                            {article.source_name && (
+                              <span className="review-badge">{article.source_name}</span>
+                            )}
+                          </div>
+                          <div className="review-hook">{article.title}</div>
+                          {article.summary && (
+                            <div className="review-summary">
+                              {article.summary.length > 140
+                                ? article.summary.slice(0, 140) + "..."
+                                : article.summary}
+                            </div>
+                          )}
+                          <div className="review-meta">{formatDate(article.published_at)}</div>
                         </div>
                       </div>
-                      <div className="row-right">{formatDate(item.published_at)}</div>
+                      <div className="review-actions">
+                        <button
+                          className="btn-approve"
+                          onClick={() => approveArticle(article.id)}
+                        >
+                          Aprobar
+                        </button>
+                        <button
+                          className="btn-reject"
+                          onClick={() => rejectArticle(article.id)}
+                        >
+                          Rechazar
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            </section>
+              )}
+
+              {/* Section B: Carruseles IG */}
+              <p className="section-title" style={{ paddingTop: 32 }}>
+                Carruseles IG
+                {pendingCounts.carousels > 0 && (
+                  <span className="admin-badge" style={{ marginLeft: 8 }}>
+                    {pendingCounts.carousels}
+                  </span>
+                )}
+              </p>
+              {pendingCarousels.length === 0 ? (
+                <div className="section-empty">Sin carruseles pendientes</div>
+              ) : (
+                <div className="review-grid">
+                  {pendingCarousels.map((carousel) => {
+                    const typeColor =
+                      carousel.draft_type
+                        ? CAROUSEL_TYPE_COLORS[carousel.draft_type] ?? "rgba(255,255,255,0.4)"
+                        : "rgba(255,255,255,0.4)";
+                    const thumbUrl = carousel.slide_urls?.[0];
+                    return (
+                      <div key={carousel.id} className="review-card">
+                        <div className="review-card-top">
+                          {thumbUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={thumbUrl}
+                              alt=""
+                              style={{
+                                width: 80,
+                                height: 80,
+                                borderRadius: 8,
+                                objectFit: "cover",
+                                flexShrink: 0,
+                              }}
+                            />
+                          ) : null}
+                          <div className="review-card-body">
+                            <div className="review-card-badges">
+                              {carousel.draft_type && (
+                                <span
+                                  className="review-badge"
+                                  style={{ background: typeColor + "22", color: typeColor }}
+                                >
+                                  {carousel.draft_type}
+                                </span>
+                              )}
+                            </div>
+                            {(carousel.seed_title || carousel.source_label) && (
+                              <div className="review-summary" style={{ marginBottom: 4 }}>
+                                {carousel.seed_title || carousel.source_label}
+                              </div>
+                            )}
+                            {carousel.hook_text && (
+                              <div className="review-hook">{carousel.hook_text}</div>
+                            )}
+                            {carousel.bullet_points && carousel.bullet_points.length > 0 && (
+                              <div className="review-summary">
+                                {carousel.bullet_points.slice(0, 2).map((bp, i) => (
+                                  <div key={i}>• {bp}</div>
+                                ))}
+                              </div>
+                            )}
+                            <div className="review-meta">{formatDate(carousel.generated_at)}</div>
+                          </div>
+                        </div>
+                        <div className="review-actions">
+                          <button
+                            className="btn-approve"
+                            onClick={() => approveCarousel(carousel.id)}
+                          >
+                            Aprobar
+                          </button>
+                          <button
+                            className="btn-reject"
+                            onClick={() => rejectCarousel(carousel.id)}
+                          >
+                            Rechazar
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Section C: Creators */}
+              <p className="section-title" style={{ paddingTop: 32 }}>
+                Creators
+                {pendingCounts.creators > 0 && (
+                  <span className="admin-badge" style={{ marginLeft: 8 }}>
+                    {pendingCounts.creators}
+                  </span>
+                )}
+              </p>
+              {pendingCreators.length === 0 ? (
+                <div className="section-empty">Sin solicitudes de creators</div>
+              ) : (
+                <div className="review-grid">
+                  {pendingCreators.map((creator) => (
+                    <div key={creator.id} className="review-card">
+                      <div className="review-card-top" style={{ alignItems: "center" }}>
+                        {creator.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={creator.avatar_url}
+                            alt=""
+                            className="creator-avatar"
+                          />
+                        ) : (
+                          <div
+                            className="creator-avatar"
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: "rgba(255,255,255,0.5)",
+                            }}
+                          >
+                            {(creator.username ?? creator.user_id).slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="review-card-body">
+                          <div className="review-hook" style={{ fontSize: 13 }}>
+                            @{creator.username || creator.user_id.slice(0, 8)}
+                          </div>
+                          {creator.display_name && (
+                            <div className="review-summary">{creator.display_name}</div>
+                          )}
+                          <div className="review-meta">{formatDate(creator.created_at)}</div>
+                        </div>
+                      </div>
+                      <div className="review-actions">
+                        <button
+                          className="btn-approve"
+                          onClick={() => approveCreator(creator.id, creator.user_id)}
+                        >
+                          Aprobar
+                        </button>
+                        <button
+                          className="btn-reject"
+                          onClick={() => rejectCreator(creator.id, creator.user_id)}
+                        >
+                          Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ===================== TAB: METRICAS ===================== */}
+            <div style={{ display: activeTab === "metrics" ? "block" : "none" }}>
+              <section className="grid-cards">
+                <div className="card">
+                  <div className="card-label">Total users</div>
+                  <div className="card-value">{formatNumber(metrics.totalUsers)}</div>
+                  <div className="card-sub">
+                    Onboarding: {formatNumber(metrics.onboardingCompleted)} · {formatPct(onboardingRate)}
+                  </div>
+                </div>
+
+                <div className="card">
+                  <div className="card-label">DAU</div>
+                  <div className="card-value">{formatNumber(metrics.dau)}</div>
+                  <div className="card-sub">
+                    Usuarios activos ultimas 24h · {formatPct(dauRate)} of users
+                  </div>
+                </div>
+
+                <div className="card">
+                  <div className="card-label">WAU</div>
+                  <div className="card-value">{formatNumber(metrics.wau)}</div>
+                  <div className="card-sub">
+                    Usuarios activos ultimos 7 dias · {formatPct(wauRate)} of users
+                  </div>
+                </div>
+
+                <div className="card">
+                  <div className="card-label">MAU</div>
+                  <div className="card-value">{formatNumber(metrics.mau)}</div>
+                  <div className="card-sub">
+                    Usuarios activos ultimos 30 dias · {formatPct(mauRate)} of users
+                  </div>
+                </div>
+
+                <div className="card">
+                  <div className="card-label">Total ratings</div>
+                  <div className="card-value">{formatNumber(metrics.totalRatings)}</div>
+                  <div className="card-sub">
+                    Hoy {formatNumber(metrics.ratingsToday)} · 7d {formatNumber(metrics.ratings7d)}
+                  </div>
+                </div>
+              </section>
+
+              <section className="section" style={{ marginTop: 28 }}>
+                <h2>Growth</h2>
+                <div className="three-col">
+                  <div className="card">
+                    <div className="mini-metric">
+                      <div className="mini-name">New users today</div>
+                      <div className="mini-value">{formatNumber(metrics.newUsersToday)}</div>
+                    </div>
+                    <div className="mini-metric">
+                      <div className="mini-name">New users 7d</div>
+                      <div className="mini-value">{formatNumber(metrics.newUsers7d)}</div>
+                    </div>
+                    <div className="mini-metric">
+                      <div className="mini-name">New users 30d</div>
+                      <div className="mini-value">{formatNumber(metrics.newUsers30d)}</div>
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <div className="mini-metric">
+                      <div className="mini-name">Ratings today</div>
+                      <div className="mini-value">{formatNumber(metrics.ratingsToday)}</div>
+                    </div>
+                    <div className="mini-metric">
+                      <div className="mini-name">Ratings 7d</div>
+                      <div className="mini-value">{formatNumber(metrics.ratings7d)}</div>
+                    </div>
+                    <div className="mini-metric">
+                      <div className="mini-name">Ratings 30d</div>
+                      <div className="mini-value">{formatNumber(metrics.ratings30d)}</div>
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <div className="mini-metric">
+                      <div className="mini-name">Watchlist adds today</div>
+                      <div className="mini-value">{formatNumber(metrics.watchlistToday)}</div>
+                    </div>
+                    <div className="mini-metric">
+                      <div className="mini-name">Watchlist adds 7d</div>
+                      <div className="mini-value">{formatNumber(metrics.watchlist7d)}</div>
+                    </div>
+                    <div className="mini-metric">
+                      <div className="mini-name">Watchlist adds 30d</div>
+                      <div className="mini-value">{formatNumber(metrics.watchlist30d)}</div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="section" style={{ marginTop: 28 }}>
+                <h2>Content</h2>
+                <div className="three-col">
+                  <div className="card">
+                    <div className="mini-metric">
+                      <div className="mini-name">Total peeklists</div>
+                      <div className="mini-value">{formatNumber(metrics.totalPeeklists)}</div>
+                    </div>
+                    <div className="mini-metric">
+                      <div className="mini-name">Published PeekrBuzz</div>
+                      <div className="mini-value">{formatNumber(metrics.publishedBuzz)}</div>
+                    </div>
+                    <div className="mini-metric">
+                      <div className="mini-name">Editorial collections</div>
+                      <div className="mini-value">{formatNumber(metrics.totalEditorialCollections)}</div>
+                    </div>
+                    <div className="mini-metric">
+                      <div className="mini-name">Published editorial</div>
+                      <div className="mini-value">{formatNumber(metrics.publishedEditorialCollections)}</div>
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <div className="mini-metric">
+                      <div className="mini-name">DAU / Users</div>
+                      <div className="mini-value">{formatPct(dauRate)}</div>
+                    </div>
+                    <div className="mini-metric">
+                      <div className="mini-name">WAU / Users</div>
+                      <div className="mini-value">{formatPct(wauRate)}</div>
+                    </div>
+                    <div className="mini-metric">
+                      <div className="mini-name">MAU / Users</div>
+                      <div className="mini-value">{formatPct(mauRate)}</div>
+                    </div>
+                  </div>
+
+                  <div className="card analytics-card">
+                    <div className="mini-metric">
+                      <div className="mini-name">Web analytics</div>
+                      <div className="mini-value">Live</div>
+                    </div>
+                    <div className="section-note">
+                      Vercel ya esta midiendo trafico web. Desde aqui entras rapido a paginas, visitantes y fuentes.
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="section" style={{ marginTop: 28 }}>
+                <h2>Web Analytics</h2>
+                <p className="section-note">
+                  Accesos rapidos al panel de Vercel para revisar trafico web, paginas mas vistas y adquisicion.
+                </p>
+
+                <div className="analytics-links">
+                  <a
+                    href="https://vercel.com/dashboard"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="analytics-link"
+                  >
+                    <div className="analytics-link-title">Open Vercel dashboard</div>
+                    <div className="analytics-link-sub">
+                      Entra al proyecto y revisa el overview general de deployment, usage y analytics.
+                    </div>
+                  </a>
+
+                  <a
+                    href="https://vercel.com/analytics"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="analytics-link"
+                  >
+                    <div className="analytics-link-title">Open Web Analytics</div>
+                    <div className="analytics-link-sub">
+                      Pageviews, visitantes unicos, top pages y tendencias recientes del sitio.
+                    </div>
+                  </a>
+
+                  <a
+                    href="https://vercel.com/analytics?view=pages"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="analytics-link"
+                  >
+                    <div className="analytics-link-title">Top pages</div>
+                    <div className="analytics-link-sub">
+                      Revisa que URLs estan concentrando el trafico y cuales conviene optimizar primero.
+                    </div>
+                  </a>
+
+                  <a
+                    href="https://vercel.com/analytics?view=sources"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="analytics-link"
+                  >
+                    <div className="analytics-link-title">Traffic sources</div>
+                    <div className="analytics-link-sub">
+                      Mira referrers, adquisicion y desde donde llega la gente a Peekr web.
+                    </div>
+                  </a>
+                </div>
+              </section>
+
+              <section className="section" style={{ marginTop: 28 }}>
+                <h2>Recent activity</h2>
+                <p className="section-note">Panel inicial con tablas rapidas para monitoreo manual.</p>
+
+                <div className="tables">
+                  <div className="table-card">
+                    <h3>Recent signups</h3>
+                    {recentUsers.map((item) => (
+                      <div key={item.id} className="row">
+                        <div className="row-left">
+                          <div className="row-title">
+                            {item.display_name || item.username || item.id.slice(0, 8)}
+                          </div>
+                          <div className="row-sub">@{item.username || "no-username"}</div>
+                        </div>
+                        <div className="row-right">{formatDate(item.created_at)}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="table-card">
+                    <h3>Recent ratings</h3>
+                    {recentRatings.map((item) => (
+                      <div key={item.id} className="row">
+                        <div className="row-left">
+                          <div className="row-title">TMDB {item.tmdb_id}</div>
+                          <div className="row-sub">user {item.user_id.slice(0, 8)}</div>
+                        </div>
+                        <div className="row-right">
+                          &#9733; {item.rating}
+                          <div className="row-sub">{formatDate(item.created_at)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="table-card">
+                    <h3>Recent watchlist adds</h3>
+                    {recentWatchlist.map((item) => (
+                      <div key={item.id} className="row">
+                        <div className="row-left">
+                          <div className="row-title">TMDB {item.tmdb_id}</div>
+                          <div className="row-sub">user {item.user_id.slice(0, 8)}</div>
+                        </div>
+                        <div className="row-right">{formatDate(item.created_at)}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="table-card">
+                    <h3>Recent PeekrBuzz</h3>
+                    {recentBuzz.map((item) => (
+                      <div key={item.id} className="row">
+                        <div className="row-left">
+                          <div className="row-title">{item.title}</div>
+                          <div className="row-sub">
+                            {item.source_name || "—"} · {item.category || "—"}
+                          </div>
+                        </div>
+                        <div className="row-right">{formatDate(item.published_at)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            {/* ===================== TAB: PUBLICADOS ===================== */}
+            <div style={{ display: activeTab === "published" ? "block" : "none" }}>
+              <p className="section-title">Carruseles publicados</p>
+              {publishedCarousels.length === 0 ? (
+                <div className="section-empty">Sin carruseles publicados</div>
+              ) : (
+                <div className="review-grid">
+                  {publishedCarousels.map((carousel) => {
+                    const typeColor =
+                      carousel.draft_type
+                        ? CAROUSEL_TYPE_COLORS[carousel.draft_type] ?? "rgba(255,255,255,0.4)"
+                        : "rgba(255,255,255,0.4)";
+                    const thumbUrl = carousel.slide_urls?.[0];
+                    return (
+                      <div key={carousel.id} className="review-card">
+                        <div className="review-card-top">
+                          {thumbUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={thumbUrl}
+                              alt=""
+                              style={{
+                                width: 60,
+                                height: 60,
+                                borderRadius: 8,
+                                objectFit: "cover",
+                                flexShrink: 0,
+                              }}
+                            />
+                          ) : null}
+                          <div className="review-card-body">
+                            <div className="review-card-badges">
+                              {carousel.draft_type && (
+                                <span
+                                  className="review-badge"
+                                  style={{ background: typeColor + "22", color: typeColor }}
+                                >
+                                  {carousel.draft_type}
+                                </span>
+                              )}
+                            </div>
+                            {carousel.hook_text && (
+                              <div className="review-hook">{carousel.hook_text}</div>
+                            )}
+                            {carousel.seed_title && (
+                              <div className="review-summary">{carousel.seed_title}</div>
+                            )}
+                            <div className="review-meta">
+                              {formatDate(carousel.scheduled_for)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
