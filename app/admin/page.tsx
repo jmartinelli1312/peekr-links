@@ -96,6 +96,9 @@ type PublishedCarousel = {
   draft_type?: string | null;
   hook_text?: string | null;
   seed_title?: string | null;
+  seed_poster_url?: string | null;
+  source_label?: string | null;
+  language?: string | null;
   slide_urls?: string[] | null;
   scheduled_for?: string | null;
 };
@@ -139,6 +142,78 @@ const CAROUSEL_TYPE_COLORS: Record<string, string> = {
   lanzamiento: "#f97316",
   reco: "#22c55e",
 };
+
+/** Build a /api/slides URL for a given carousel draft */
+function buildSlideUrl(
+  type: string,
+  slide: 1 | 2 | 3 | 4,
+  opts: {
+    hook?: string | null;
+    point?: string | null;
+    img?: string | null;
+    title?: string | null;
+    source?: string | null;
+    lang?: string | null;
+  }
+) {
+  const p = new URLSearchParams();
+  p.set("type", type || "actualidad");
+  p.set("slide", String(slide));
+  if (opts.hook)   p.set("hook",   opts.hook.slice(0, 200));
+  if (opts.point)  p.set("point",  opts.point.slice(0, 200));
+  if (opts.img)    p.set("img",    opts.img);
+  if (opts.title)  p.set("title",  opts.title.slice(0, 80));
+  if (opts.source) p.set("source", opts.source.slice(0, 60));
+  if (opts.lang)   p.set("lang",   opts.lang === "pt" ? "pt" : "es");
+  return `/api/slides?${p.toString()}`;
+}
+
+/** Tiny carousel preview with slide switcher for the admin card */
+function CarouselPreviewCard({ carousel }: { carousel: PendingCarousel }) {
+  const [activeSlide, setActiveSlide] = useState<1 | 2 | 3 | 4>(1);
+  const type = carousel.draft_type || "actualidad";
+  const pts = carousel.bullet_points ?? [];
+
+  const urlFor = (slide: 1 | 2 | 3 | 4) =>
+    buildSlideUrl(type, slide, {
+      hook:   carousel.hook_text,
+      point:  slide === 2 ? pts[0] : pts[1],
+      img:    carousel.seed_poster_url,
+      title:  carousel.seed_title,
+      source: carousel.source_label,
+      lang:   carousel.language,
+    });
+
+  return (
+    <div>
+      {/* Main preview */}
+      <div className="carousel-preview-wrap">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          key={activeSlide}
+          src={urlFor(activeSlide)}
+          alt={`Slide ${activeSlide}`}
+          className="carousel-preview-img"
+          loading="lazy"
+        />
+      </div>
+      {/* Thumbnails */}
+      <div className="carousel-preview-thumbs">
+        {([1, 2, 3, 4] as const).map((s) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={s}
+            src={urlFor(s)}
+            alt={`Slide ${s}`}
+            className={`carousel-thumb${activeSlide === s ? " active" : ""}`}
+            loading="lazy"
+            onClick={() => setActiveSlide(s)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const router = useRouter();
@@ -247,7 +322,7 @@ export default function AdminPage() {
         .limit(20),
       supabase
         .from("peekrbuzz_ig_queue")
-        .select("id, draft_type, hook_text, seed_title, slide_urls, scheduled_for")
+        .select("id, draft_type, hook_text, seed_title, seed_poster_url, source_label, language, slide_urls, scheduled_for")
         .eq("status", "published")
         .order("scheduled_for", { ascending: false })
         .limit(30),
@@ -1016,6 +1091,61 @@ export default function AdminPage() {
           background: rgba(255,255,255,0.08);
         }
 
+        /* Carousel slide preview */
+        .carousel-preview-wrap {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+          border-radius: 10px;
+          background: rgba(0,0,0,0.6);
+          border: 1px solid rgba(255,255,255,0.06);
+          margin-bottom: 4px;
+        }
+
+        .carousel-preview-img {
+          width: 100%;
+          aspect-ratio: 4 / 5;
+          object-fit: cover;
+          display: block;
+          border-radius: 10px;
+        }
+
+        .carousel-preview-thumbs {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          scrollbar-width: none;
+          padding: 4px 0;
+        }
+
+        .carousel-preview-thumbs::-webkit-scrollbar { display: none; }
+
+        .carousel-thumb {
+          flex-shrink: 0;
+          width: 54px;
+          height: 67px;
+          border-radius: 6px;
+          object-fit: cover;
+          cursor: pointer;
+          border: 2px solid transparent;
+          opacity: 0.65;
+          transition: opacity 0.15s, border-color 0.15s;
+        }
+
+        .carousel-thumb:hover { opacity: 1; }
+        .carousel-thumb.active { opacity: 1; border-color: #FA0082; }
+
+        .carousel-preview-loading {
+          width: 100%;
+          aspect-ratio: 4 / 5;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          color: rgba(255,255,255,0.3);
+          border-radius: 10px;
+        }
+
         .review-card-body {
           flex: 1;
           min-width: 0;
@@ -1217,53 +1347,43 @@ export default function AdminPage() {
                       carousel.draft_type
                         ? CAROUSEL_TYPE_COLORS[carousel.draft_type] ?? "rgba(255,255,255,0.4)"
                         : "rgba(255,255,255,0.4)";
-                    const thumbUrl = carousel.slide_urls?.[0];
                     return (
                       <div key={carousel.id} className="review-card">
-                        <div className="review-card-top">
-                          {thumbUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={thumbUrl}
-                              alt=""
-                              style={{
-                                width: 80,
-                                height: 80,
-                                borderRadius: 8,
-                                objectFit: "cover",
-                                flexShrink: 0,
-                              }}
-                            />
-                          ) : null}
-                          <div className="review-card-body">
-                            <div className="review-card-badges">
-                              {carousel.draft_type && (
-                                <span
-                                  className="review-badge"
-                                  style={{ background: typeColor + "22", color: typeColor }}
-                                >
-                                  {carousel.draft_type}
-                                </span>
-                              )}
-                            </div>
-                            {(carousel.seed_title || carousel.source_label) && (
-                              <div className="review-summary" style={{ marginBottom: 4 }}>
-                                {carousel.seed_title || carousel.source_label}
-                              </div>
-                            )}
-                            {carousel.hook_text && (
-                              <div className="review-hook">{carousel.hook_text}</div>
-                            )}
-                            {carousel.bullet_points && carousel.bullet_points.length > 0 && (
-                              <div className="review-summary">
-                                {carousel.bullet_points.slice(0, 2).map((bp, i) => (
-                                  <div key={i}>• {bp}</div>
-                                ))}
-                              </div>
-                            )}
-                            <div className="review-meta">{formatDate(carousel.generated_at)}</div>
-                          </div>
+
+                        {/* ── Live slide preview ── */}
+                        <CarouselPreviewCard carousel={carousel} />
+
+                        {/* ── Text metadata ── */}
+                        <div className="review-card-badges" style={{ paddingTop: 4 }}>
+                          {carousel.draft_type && (
+                            <span
+                              className="review-badge"
+                              style={{ background: typeColor + "22", color: typeColor }}
+                            >
+                              {carousel.draft_type}
+                            </span>
+                          )}
+                          {carousel.language && (
+                            <span className="review-badge">{carousel.language}</span>
+                          )}
                         </div>
+                        {(carousel.seed_title || carousel.source_label) && (
+                          <div className="review-summary" style={{ marginBottom: 2 }}>
+                            {carousel.seed_title || carousel.source_label}
+                          </div>
+                        )}
+                        {carousel.hook_text && (
+                          <div className="review-hook">{carousel.hook_text}</div>
+                        )}
+                        {carousel.bullet_points && carousel.bullet_points.length > 0 && (
+                          <div className="review-summary">
+                            {carousel.bullet_points.slice(0, 2).map((bp, i) => (
+                              <div key={i}>• {bp}</div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="review-meta">{formatDate(carousel.generated_at)}</div>
+
                         <div className="review-actions">
                           <button
                             className="btn-approve"
@@ -1631,45 +1751,50 @@ export default function AdminPage() {
                       carousel.draft_type
                         ? CAROUSEL_TYPE_COLORS[carousel.draft_type] ?? "rgba(255,255,255,0.4)"
                         : "rgba(255,255,255,0.4)";
-                    const thumbUrl = carousel.slide_urls?.[0];
+                    const previewUrl = buildSlideUrl(
+                      carousel.draft_type || "actualidad",
+                      1,
+                      {
+                        hook: carousel.hook_text,
+                        img: carousel.seed_poster_url,
+                        title: carousel.seed_title,
+                        source: carousel.source_label,
+                        lang: carousel.language,
+                      }
+                    );
                     return (
                       <div key={carousel.id} className="review-card">
-                        <div className="review-card-top">
-                          {thumbUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={thumbUrl}
-                              alt=""
-                              style={{
-                                width: 60,
-                                height: 60,
-                                borderRadius: 8,
-                                objectFit: "cover",
-                                flexShrink: 0,
-                              }}
-                            />
-                          ) : null}
-                          <div className="review-card-body">
-                            <div className="review-card-badges">
-                              {carousel.draft_type && (
-                                <span
-                                  className="review-badge"
-                                  style={{ background: typeColor + "22", color: typeColor }}
-                                >
-                                  {carousel.draft_type}
-                                </span>
-                              )}
-                            </div>
-                            {carousel.hook_text && (
-                              <div className="review-hook">{carousel.hook_text}</div>
-                            )}
-                            {carousel.seed_title && (
-                              <div className="review-summary">{carousel.seed_title}</div>
-                            )}
-                            <div className="review-meta">
-                              {formatDate(carousel.scheduled_for)}
-                            </div>
-                          </div>
+                        {/* Live slide 1 preview */}
+                        <div className="carousel-preview-wrap">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={previewUrl}
+                            alt="Slide 1"
+                            className="carousel-preview-img"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="review-card-badges" style={{ paddingTop: 4 }}>
+                          {carousel.draft_type && (
+                            <span
+                              className="review-badge"
+                              style={{ background: typeColor + "22", color: typeColor }}
+                            >
+                              {carousel.draft_type}
+                            </span>
+                          )}
+                          {carousel.language && (
+                            <span className="review-badge">{carousel.language}</span>
+                          )}
+                        </div>
+                        {carousel.hook_text && (
+                          <div className="review-hook">{carousel.hook_text}</div>
+                        )}
+                        {carousel.seed_title && (
+                          <div className="review-summary">{carousel.seed_title}</div>
+                        )}
+                        <div className="review-meta">
+                          {formatDate(carousel.scheduled_for)}
                         </div>
                       </div>
                     );
