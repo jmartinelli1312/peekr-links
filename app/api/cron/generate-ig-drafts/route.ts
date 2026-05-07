@@ -166,7 +166,7 @@ async function generateActualidad(
 ): Promise<DraftDetail | null> {
   const { data: articles, error } = await admin
     .from("peekrbuzz_articles")
-    .select("id, title, summary, image_url, source_name")
+    .select("id, title, summary, image_url, source_name, slug")
     .eq("review_status", "pending_review")
     .eq("is_published", false)
     .eq("language", lang)
@@ -181,6 +181,7 @@ async function generateActualidad(
     summary: string;
     image_url: string | null;
     source_name: string;
+    slug: string | null;
   };
 
   // ── Ask Gemini to generate content AND identify the main title ────────────
@@ -213,6 +214,11 @@ async function generateActualidad(
       }
     }
 
+    // Build Peekr buzz article URL for OG preview on social platforms
+    const articleUrl = article.slug
+      ? `https://www.peekr.app/${lang}/buzz/${article.slug}`
+      : null;
+
     const { error: insertError } = await admin.from("peekrbuzz_ig_queue").insert({
       draft_type: "actualidad",
       article_id: article.id,
@@ -222,6 +228,7 @@ async function generateActualidad(
       seed_poster_url: posterUrl,
       seed_title: seedTitle ?? null,
       source_label: article.source_name,
+      article_url: articleUrl,
       status: "pending_review",
       language: lang,
     });

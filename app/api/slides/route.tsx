@@ -129,6 +129,9 @@ async function loadFonts() {
   return fonts;
 }
 
+// ─── Peekr logo URL (served from Next.js public assets) ──────────
+const LOGO_URL = "https://www.peekr.app/assets/logo-icon.png";
+
 // ─── Shared micro-components ──────────────────────────────────────
 
 /** Four progress pills — current slide wider and filled */
@@ -156,8 +159,8 @@ function ProgressDots(slide: number, accent: string) {
   );
 }
 
-/** Peekr "P" mark + wordmark */
-function PeekrBrand(accent: string) {
+/** Peekr brand mark — always uses the official logo icon */
+function PeekrBrand() {
   return (
     <div
       style={{
@@ -166,40 +169,31 @@ function PeekrBrand(accent: string) {
         gap: 10,
       }}
     >
-      <div
+      <img
+        src={LOGO_URL}
         style={{
           width: 38,
           height: 38,
           borderRadius: 10,
-          background: accent,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 20,
-          fontWeight: 800,
-          color: "#000",
-          fontFamily: "Inter",
         }}
-      >
-        P
-      </div>
+      />
       <span
         style={{
           color: "rgba(255,255,255,0.75)",
           fontSize: 22,
           fontWeight: 700,
-          letterSpacing: 3,
+          letterSpacing: 1,
           fontFamily: "Inter",
         }}
       >
-        PEEKR
+        Peekr
       </span>
     </div>
   );
 }
 
-/** Type badge pill */
-function TypeBadge(emoji: string, label: string, accent: string) {
+/** Type badge pill — always shows "Peekrbuzz" brand regardless of carousel type */
+function TypeBadge(emoji: string, _label: string, accent: string) {
   return (
     <div
       style={{
@@ -218,11 +212,11 @@ function TypeBadge(emoji: string, label: string, accent: string) {
           color: accent,
           fontSize: 18,
           fontWeight: 700,
-          letterSpacing: 3,
+          letterSpacing: 1,
           fontFamily: "Inter",
         }}
       >
-        {label}
+        Peekrbuzz
       </span>
     </div>
   );
@@ -321,7 +315,7 @@ function Slide1(
           padding: "40px 54px",
         }}
       >
-        {PeekrBrand(t.accent)}
+        {PeekrBrand()}
         {TypeBadge(t.emoji, label, t.accent)}
       </div>
 
@@ -522,7 +516,7 @@ function SlideContent(
             marginBottom: 60,
           }}
         >
-          {PeekrBrand(t.accent)}
+          {PeekrBrand()}
           {TypeBadge(t.emoji, label, t.accent)}
         </div>
 
@@ -692,7 +686,7 @@ function Slide4(t: Theme, type: CarouselType, lang: "es" | "pt") {
           padding: "40px 54px",
         }}
       >
-        {PeekrBrand(t.accent)}
+        {PeekrBrand()}
         {TypeBadge(t.emoji, lang === "pt" ? t.labelPt : t.label, t.accent)}
       </div>
 
@@ -706,25 +700,17 @@ function Slide4(t: Theme, type: CarouselType, lang: "es" | "pt") {
           padding: "0 60px",
         }}
       >
-        {/* Large P logo */}
-        <div
+        {/* Large Peekr logo */}
+        <img
+          src={LOGO_URL}
           style={{
             width: 120,
             height: 120,
             borderRadius: 30,
-            background: `linear-gradient(135deg, ${t.grad1} 0%, ${t.grad2} 100%)`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 70,
-            fontWeight: 800,
-            color: "#000",
           }}
-        >
-          P
-        </div>
+        />
 
-        {/* PEEKRBUZZ */}
+        {/* PeekrBuzz wordmark */}
         <div
           style={{
             color: "#FFFFFF",
@@ -734,7 +720,7 @@ function Slide4(t: Theme, type: CarouselType, lang: "es" | "pt") {
             textAlign: "center",
           }}
         >
-          PEEKRBUZZ
+          PeekrBuzz
         </div>
 
         {/* Subtext */}
