@@ -1,9 +1,9 @@
 import { Metadata } from "next";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { createClient } from "@supabase/supabase-js";
 import UserProfileClient from "./user-profile-client";
 
-// Revalidate every 5 min — server-fetched, so we can keep it fresh
-export const revalidate = 300;
+// Server-rendered on every request — profile data should be fresh
+export const dynamic = "force-dynamic";
 
 const SITE = "https://www.peekr.app";
 
@@ -16,7 +16,16 @@ function normalizeLang(value?: string | null): Lang {
   return "en";
 }
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// Anon Supabase client for server components.
+// All content tables already have USING(true) policies, so no service role
+// key is needed — the anon key is sufficient to read public profile data.
+function getAnonClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
+}
 
 function dedupeWatched<T extends { tmdb_id: number; media_type?: string | null }>(items: T[]): T[] {
   const seen = new Set<string>();
@@ -38,7 +47,7 @@ export async function generateMetadata({
   const { lang: rawLang, username } = await params;
   const lang = normalizeLang(rawLang);
 
-  const supabase = getSupabaseAdmin();
+  const supabase = getAnonClient();
   const { data: profile } = await supabase
     .from("profiles")
     .select("display_name,bio,avatar_url")
@@ -144,11 +153,11 @@ export default async function UserProfilePage({
     },
   }[lang];
 
-  // ── Server-side data fetch (bypasses RLS — visible to everyone) ──────────
+  // ── Server-side data fetch (anon key — works with existing public RLS policies)
 
-  const supabase = getSupabaseAdmin();
+  const supabase = getAnonClient();
 
-  // 1. Profile
+  // 1. Profile — profiles has USING(true) policies, anon can read
   const { data: profileRaw } = await supabase
     .from("profiles")
     .select(
@@ -176,7 +185,7 @@ export default async function UserProfilePage({
   const uid = profileRaw.id as string;
   const isPrivate = profileRaw.is_private === true;
 
-  // 2. Follower / following counts
+  // 2. Follow counts — follows now has USING(true) policy for anon reads
   const [followersRes, followingRes] = await Promise.all([
     supabase
       .from("follows")
@@ -191,7 +200,8 @@ export default async function UserProfilePage({
   const followersCount = followersRes.count ?? 0;
   const followingCount = followingRes.count ?? 0;
 
-  // 3. Content (only if profile is public — private profiles show nothing until followed)
+  // 3. Content — only fetch for public profiles.
+  //    Private profiles: client re-fetches after auth check confirms follower status.
   let watchedData: Array<{
     tmdb_id: number;
     title: string | null;
@@ -235,10 +245,10 @@ export default async function UserProfilePage({
     type: "following";
   }> = [];
 
-  // For private accounts the server returns empty — client will re-check after auth
   if (!isPrivate) {
     const [watchedRes, likesRes, spRes, createdRes, followingListRes] =
       await Promise.all([
+        // user_title_activities: USING(true)
         supabase
           .from("user_title_activities")
           .select("tmdb_id,title,poster_path,media_type,rating,watched_at")
@@ -246,6 +256,7 @@ export default async function UserProfilePage({
           .order("watched_at", { ascending: false })
           .limit(120),
 
+        // title_likes: USING(true)
         supabase
           .from("title_likes")
           .select("tmdb_id, media_type")
@@ -253,6 +264,7 @@ export default async function UserProfilePage({
           .order("created_at", { ascending: false })
           .limit(80),
 
+        // sneak_peeks: USING(is_published = true OR creator = me)
         profileRaw.is_creator === true || profileRaw.creator_status === "approved"
           ? supabase
               .from("sneak_peeks")
@@ -263,11 +275,13 @@ export default async function UserProfilePage({
               .limit(24)
           : Promise.resolve({ data: [] }),
 
+        // peeklists: USING(true)
         supabase
           .from("peeklists")
           .select("id,title,visibility,cover_url")
           .eq("created_by", uid),
 
+        // peeklist_follows: USING(true)
         supabase
           .from("peeklist_follows")
           .select("peeklists(id,title,visibility,cover_url)")
@@ -278,8 +292,9 @@ export default async function UserProfilePage({
       (watchedRes.data as typeof watchedData | null) ?? []
     );
 
-    // Enrich likes with titles_cache
-    const likesRows = (likesRes.data as Array<{ tmdb_id: number; media_type: string | null }> | null) ?? [];
+    // Enrich likes with titles_cache — titles_cache: USING(true)
+    const likesRows =
+      (likesRes.data as Array<{ tmdb_id: number; media_type: string | null }> | null) ?? [];
     if (likesRows.length > 0) {
       const ids = likesRows.map((r) => r.tmdb_id);
       const { data: cacheRows } = await supabase
@@ -309,11 +324,23 @@ export default async function UserProfilePage({
     sneakPeeksData = (spRes.data as typeof sneakPeeksData | null) ?? [];
 
     peeklistsCreatedData = (
-      (createdRes.data as Array<{ id: string | number; title: string | null; visibility?: string | null; cover_url?: string | null }> | null) ?? []
+      (createdRes.data as Array<{
+        id: string | number;
+        title: string | null;
+        visibility?: string | null;
+        cover_url?: string | null;
+      }> | null) ?? []
     ).map((item) => ({ ...item, type: "created" as const }));
 
     peeklistsFollowingData = (
-      (followingListRes.data as Array<{ peeklists: { id: string | number; title: string | null; visibility?: string | null; cover_url?: string | null } | null }> | null) ?? []
+      (followingListRes.data as Array<{
+        peeklists: {
+          id: string | number;
+          title: string | null;
+          visibility?: string | null;
+          cover_url?: string | null;
+        } | null;
+      }> | null) ?? []
     )
       .map((row) => row.peeklists)
       .filter((pl): pl is NonNullable<typeof pl> => pl != null)
