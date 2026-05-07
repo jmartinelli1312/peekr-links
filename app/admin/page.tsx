@@ -700,12 +700,71 @@ export default function AdminPage() {
   }
 
   async function approveCarousel(id: string) {
+    const carousel = pendingCarousels.find((c) => c.id === id);
+    // Optimistic UI update
     setPendingCarousels((prev) => prev.filter((c) => c.id !== id));
     setPendingCounts((prev) => ({ ...prev, carousels: Math.max(0, prev.carousels - 1) }));
-    await supabase
-      .from("peekrbuzz_ig_queue")
-      .update({ status: "approved", scheduled_for: new Date().toISOString() })
-      .eq("id", id);
+
+    const baseUpdate = {
+      status: "approved",
+      scheduled_for: new Date().toISOString(),
+    };
+
+    if (!carousel) {
+      await supabase.from("peekrbuzz_ig_queue").update(baseUpdate).eq("id", id);
+      return;
+    }
+
+    // Render all 4 slides → upload to Supabase Storage → persist slide_urls
+    try {
+      const pts = carousel.bullet_points ?? [];
+      const lang = carousel.language === "pt" ? "pt" : "es";
+
+      // Fetch all 4 rendered PNGs in parallel from /api/slides
+      const slideBlobs = await Promise.all(
+        ([1, 2, 3, 4] as const).map((slide) =>
+          fetch(
+            buildSlideUrl(carousel.draft_type || "actualidad", slide, {
+              hook:   carousel.hook_text,
+              point:  slide === 2 ? (pts[0] ?? null) : (pts[1] ?? null),
+              img:    carousel.seed_poster_url,
+              title:  carousel.seed_title,
+              source: carousel.source_label,
+              lang,
+            })
+          ).then((r) => r.blob())
+        )
+      );
+
+      // Upload each PNG to buzz-slides/{id}/slide-{n}.png
+      await Promise.all(
+        slideBlobs.map((blob, i) =>
+          supabase.storage
+            .from("buzz-slides")
+            .upload(`${id}/slide-${i + 1}.png`, blob, {
+              contentType: "image/png",
+              upsert: true,
+            })
+        )
+      );
+
+      // Build public URLs
+      const slideUrls = ([1, 2, 3, 4] as const).map((n) => {
+        const { data } = supabase.storage
+          .from("buzz-slides")
+          .getPublicUrl(`${id}/slide-${n}.png`);
+        return data.publicUrl;
+      });
+
+      await supabase
+        .from("peekrbuzz_ig_queue")
+        .update({ ...baseUpdate, slide_urls: slideUrls })
+        .eq("id", id);
+    } catch (err) {
+      // Render failed — approve anyway without slide URLs
+      console.error("approveCarousel: slide render/upload failed:", err);
+      await supabase.from("peekrbuzz_ig_queue").update(baseUpdate).eq("id", id);
+    }
   }
 
   async function rejectCarousel(id: string) {
