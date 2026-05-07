@@ -91,6 +91,20 @@ type PendingCreator = {
   avatar_url?: string | null;
 };
 
+type NewsletterEdition = {
+  id: number;
+  edition_date: string;
+  status: string;
+  content_json: {
+    topOnPeekr:  Array<{ title: string; tmdbId: number; mediaType: string; tmdbRating: number; platforms: string[] }>;
+    newReleases: Array<{ title: string; tmdbId: number; mediaType: string; tmdbRating: number; platforms: string[] }>;
+    editionDate:   string;
+    editionDatePt: string;
+  };
+  created_at: string;
+  total_sent?: number | null;
+};
+
 type PublishedCarousel = {
   id: string;
   draft_type?: string | null;
@@ -223,10 +237,12 @@ export default function AdminPage() {
   const [error, setError] = useState<string>("");
 
   const [activeTab, setActiveTab] = useState<"pending" | "metrics" | "published">("pending");
-  const [pendingCounts, setPendingCounts] = useState({ articles: 0, carousels: 0, creators: 0 });
+  const [pendingCounts, setPendingCounts] = useState({ articles: 0, carousels: 0, creators: 0, newsletters: 0 });
   const [pendingArticles, setPendingArticles] = useState<PendingArticle[]>([]);
   const [pendingCarousels, setPendingCarousels] = useState<PendingCarousel[]>([]);
   const [pendingCreators, setPendingCreators] = useState<PendingCreator[]>([]);
+  const [pendingNewsletters, setPendingNewsletters] = useState<NewsletterEdition[]>([]);
+  const [sendingNewsletterId, setSendingNewsletterId] = useState<number | null>(null);
   const [publishedCarousels, setPublishedCarousels] = useState<PublishedCarousel[]>([]);
 
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -276,16 +292,18 @@ export default function AdminPage() {
     return (metrics.mau / metrics.totalUsers) * 100;
   }, [metrics.mau, metrics.totalUsers]);
 
-  const totalPending = pendingCounts.articles + pendingCounts.carousels + pendingCounts.creators;
+  const totalPending = pendingCounts.articles + pendingCounts.carousels + pendingCounts.creators + pendingCounts.newsletters;
 
   async function loadPendingData() {
     const [
       articlesCountRes,
       carouselsCountRes,
       creatorsCountRes,
+      newslettersCountRes,
       pendingArticlesRes,
       pendingCarouselsRes,
       pendingCreatorsRes,
+      pendingNewslettersRes,
       publishedCarouselsRes,
     ] = await Promise.all([
       supabase
@@ -300,6 +318,10 @@ export default function AdminPage() {
         .from("creator_applications")
         .select("*", { count: "exact", head: true })
         .eq("status", "pending"),
+      supabase
+        .from("newsletter_editions")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending_review"),
       supabase
         .from("peekrbuzz_articles")
         .select("id, title, summary, source_name, language, image_url, published_at")
@@ -321,6 +343,12 @@ export default function AdminPage() {
         .order("created_at", { ascending: false })
         .limit(20),
       supabase
+        .from("newsletter_editions")
+        .select("id, edition_date, status, content_json, created_at, total_sent")
+        .eq("status", "pending_review")
+        .order("edition_date", { ascending: false })
+        .limit(5),
+      supabase
         .from("peekrbuzz_ig_queue")
         .select("id, draft_type, hook_text, seed_title, seed_poster_url, source_label, language, slide_urls, scheduled_for")
         .eq("status", "published")
@@ -329,13 +357,15 @@ export default function AdminPage() {
     ]);
 
     setPendingCounts({
-      articles: articlesCountRes.count ?? 0,
-      carousels: carouselsCountRes.count ?? 0,
-      creators: creatorsCountRes.count ?? 0,
+      articles:     articlesCountRes.count ?? 0,
+      carousels:    carouselsCountRes.count ?? 0,
+      creators:     creatorsCountRes.count ?? 0,
+      newsletters:  newslettersCountRes.count ?? 0,
     });
 
     setPendingArticles((pendingArticlesRes.data as PendingArticle[] | null) ?? []);
     setPendingCarousels((pendingCarouselsRes.data as PendingCarousel[] | null) ?? []);
+    setPendingNewsletters((pendingNewslettersRes.data as NewsletterEdition[] | null) ?? []);
 
     // Enrich creator applications with profile data
     const creatorApps = (pendingCreatorsRes.data as Array<{
@@ -792,6 +822,39 @@ export default function AdminPage() {
       supabase.from("creator_applications").update({ status: "rejected" }).eq("id", id),
       supabase.from("profiles").update({ creator_status: "none" }).eq("id", userId),
     ]);
+  }
+
+  async function sendNewsletter(id: number) {
+    setSendingNewsletterId(id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("No active session");
+
+      const res = await fetch("/api/admin/newsletter/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ edition_id: id }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError((data as any).error ?? `Error ${res.status} al enviar newsletter`);
+        return;
+      }
+
+      // Optimistic remove from pending list
+      setPendingNewsletters((prev) => prev.filter((n) => n.id !== id));
+      setPendingCounts((prev) => ({ ...prev, newsletters: Math.max(0, prev.newsletters - 1) }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error enviando newsletter");
+    } finally {
+      setSendingNewsletterId(null);
+    }
   }
 
   if (state === "loading") {
@@ -1527,6 +1590,95 @@ export default function AdminPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Section D: Newsletter */}
+              <p className="section-title" style={{ paddingTop: 32 }}>
+                Newsletter semanal
+                {pendingCounts.newsletters > 0 && (
+                  <span className="admin-badge" style={{ marginLeft: 8 }}>
+                    {pendingCounts.newsletters}
+                  </span>
+                )}
+              </p>
+              {pendingNewsletters.length === 0 ? (
+                <div className="section-empty">Sin newsletters pendientes de envío</div>
+              ) : (
+                <div className="review-grid">
+                  {pendingNewsletters.map((edition) => {
+                    const topTitles  = edition.content_json?.topOnPeekr  ?? [];
+                    const newReleases = edition.content_json?.newReleases ?? [];
+                    const isSending  = sendingNewsletterId === edition.id;
+                    return (
+                      <div key={edition.id} className="review-card">
+                        <div className="review-card-badges">
+                          <span className="review-badge">📧 Newsletter</span>
+                          <span className="review-badge">{edition.edition_date}</span>
+                        </div>
+
+                        <div className="review-hook" style={{ fontSize: 14, marginTop: 4 }}>
+                          Edición del {edition.edition_date}
+                        </div>
+                        <div className="review-meta">Generada {formatDate(edition.created_at)}</div>
+
+                        {topTitles.length > 0 && (
+                          <div className="review-summary" style={{ marginTop: 6 }}>
+                            <strong style={{ color: "rgba(255,255,255,0.8)" }}>
+                              🔥 Top Peekr esta semana:
+                            </strong>
+                            <div style={{ marginTop: 2 }}>
+                              {topTitles.slice(0, 4).map((t, i) => (
+                                <div key={i}>
+                                  {i + 1}. {t.title}
+                                  {t.tmdbRating > 0 && (
+                                    <span style={{ color: "rgba(255,255,255,0.45)", marginLeft: 4 }}>
+                                      ★ {t.tmdbRating.toFixed(1)}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {newReleases.length > 0 && (
+                          <div className="review-summary" style={{ marginTop: 6 }}>
+                            <strong style={{ color: "rgba(255,255,255,0.8)" }}>
+                              🎬 Nuevos lanzamientos:
+                            </strong>
+                            <div style={{ marginTop: 2 }}>
+                              {newReleases.slice(0, 4).map((r, i) => (
+                                <div key={i}>
+                                  {i + 1}. {r.title}
+                                  {r.platforms?.length > 0 && (
+                                    <span style={{ color: "rgba(255,255,255,0.45)", marginLeft: 4 }}>
+                                      · {r.platforms.slice(0, 2).join(", ")}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="review-actions" style={{ marginTop: 8 }}>
+                          <button
+                            className="btn-approve"
+                            onClick={() => sendNewsletter(edition.id)}
+                            disabled={isSending}
+                            style={{
+                              opacity: isSending ? 0.6 : 1,
+                              cursor: isSending ? "not-allowed" : "pointer",
+                              padding: "8px 16px",
+                            }}
+                          >
+                            {isSending ? "Enviando..." : "✉️ Enviar newsletter"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
