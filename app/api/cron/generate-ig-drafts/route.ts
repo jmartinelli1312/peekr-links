@@ -45,6 +45,83 @@ async function tmdbGet(path: string): Promise<Record<string, unknown>> {
   return res.json();
 }
 
+/**
+ * TMDB TV genre IDs to exclude — non-fiction / talk / reality formats.
+ * Combined-credits cast items include `genre_ids` per credit.
+ */
+const EXCLUDED_TV_GENRES = new Set([
+  10767, // Talk
+  10763, // News
+  10764, // Reality
+  10766, // Soap
+  10762, // Kids (optional — remove if you want animated content)
+]);
+
+/**
+ * Given a TMDB person id, return up to `limit` real movie/series titles
+ * (sorted by popularity, excluding talk shows / reality / news).
+ */
+async function getFilteredCredits(personId: number, limit = 8): Promise<string[]> {
+  try {
+    const data = await tmdbGet(`/person/${personId}/combined_credits?language=es-ES`);
+    const cast = (data.cast as Array<{
+      id: number;
+      title?: string;
+      name?: string;
+      media_type: string;
+      genre_ids?: number[];
+      popularity?: number;
+      character?: string;
+    }>) ?? [];
+
+    return cast
+      .filter((c) => {
+        // Keep movies unconditionally (movies don't have talk show genre)
+        if (c.media_type === "movie") return true;
+        // For TV, exclude non-fiction genres
+        if (c.media_type === "tv") {
+          const genres = c.genre_ids ?? [];
+          return !genres.some((g) => EXCLUDED_TV_GENRES.has(g));
+        }
+        return false;
+      })
+      .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0))
+      .slice(0, limit)
+      .map((c) => c.title ?? c.name ?? "")
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Search TMDB for a movie or TV show by title and return:
+ * - `posterUrl`: TMDB poster (w780), or null
+ * - `tmdbTitle`: canonical title from TMDB
+ */
+async function findTmdbPoster(query: string): Promise<{ posterUrl: string | null; tmdbTitle: string }> {
+  try {
+    // Try movie first, then TV
+    for (const type of ["movie", "tv"] as const) {
+      const data = await tmdbGet(`/search/${type}?query=${encodeURIComponent(query)}&language=es-ES`);
+      const results = (data.results as Array<{
+        poster_path?: string | null;
+        title?: string;
+        name?: string;
+        popularity?: number;
+      }>) ?? [];
+      const hit = results.find((r) => r.poster_path);
+      if (hit) {
+        return {
+          posterUrl: `https://image.tmdb.org/t/p/w780${hit.poster_path}`,
+          tmdbTitle: String(hit.title ?? hit.name ?? query),
+        };
+      }
+    }
+  } catch { /* ignore */ }
+  return { posterUrl: null, tmdbTitle: query };
+}
+
 // ── Utility ───────────────────────────────────────────────────────────────────
 
 function dayOfYear(d: Date): number {
@@ -106,11 +183,15 @@ async function generateActualidad(
     source_name: string;
   };
 
+  // ── Ask Gemini to generate content AND identify the main title ────────────
   const prompt =
     `Eres editor de redes sociales de Peekr (app de películas/series para LatAm). Artículo:\n` +
     `Título: ${article.title}\nResumen: ${article.summary}\n\n` +
-    `Generá:\n1. Hook impactante (≤80 chars, sin emojis)\n2. 4 puntos clave (≤90 chars c/u)\n\n` +
-    `Responde SOLO JSON:\n{"hook":"...","points":["...","...","...","..."]}`;
+    `Generá:\n1. Hook impactante (≤80 chars, sin emojis)\n2. 4 puntos clave sobre la película/serie/estreno (≤90 chars c/u)\n` +
+    `3. main_title: nombre exacto de la película o serie principal del artículo (o null si no aplica)\n\n` +
+    `IMPORTANTE: Si el artículo es sobre una aparición en un talk show o programa de entrevistas (Fallon, Kimmel, Leno, The View, etc.), ` +
+    `devuelve main_title con el nombre de la película/serie que promocionaba el invitado, no el talk show.\n\n` +
+    `Responde SOLO JSON:\n{"hook":"...","points":["...","...","...","..."],"main_title":"..."}`;
 
   let geminiText = "";
   try {
@@ -118,6 +199,19 @@ async function generateActualidad(
     const parsed = parseGeminiJson(geminiText);
     const hook_text = String(parsed.hook ?? "");
     const bullet_points = (parsed.points as string[]) ?? [];
+    const mainTitle = parsed.main_title ? String(parsed.main_title) : null;
+
+    // ── Resolve poster: prefer TMDB over RSS article image ─────────────────
+    let posterUrl: string | null = article.image_url ?? null;
+    let seedTitle: string | undefined;
+
+    if (mainTitle) {
+      const tmdb = await findTmdbPoster(mainTitle);
+      if (tmdb.posterUrl) {
+        posterUrl = tmdb.posterUrl;    // ← official TMDB poster, not show photo
+        seedTitle = tmdb.tmdbTitle;
+      }
+    }
 
     const { error: insertError } = await admin.from("peekrbuzz_ig_queue").insert({
       draft_type: "actualidad",
@@ -125,7 +219,8 @@ async function generateActualidad(
       hook_text,
       bullet_points,
       caption: `${hook_text}\n\nLink en bio → PeekrBuzz`,
-      seed_poster_url: article.image_url ?? null,
+      seed_poster_url: posterUrl,
+      seed_title: seedTitle ?? null,
       source_label: article.source_name,
       status: "pending_review",
       language: lang,
@@ -149,9 +244,43 @@ async function generateActor(
   const today = new Date();
   const person = ACTORS[dayOfYear(today) % ACTORS.length];
 
+  // ── 1. Look up person in TMDB ──────────────────────────────────────────────
+  let profileUrl: string | null = null;
+  let topCreditsLine = "";
+
+  try {
+    const searchData = await tmdbGet(
+      `/search/person?query=${encodeURIComponent(person)}&language=es-ES`
+    );
+    const results = (searchData.results as Array<{
+      id: number;
+      profile_path?: string | null;
+      popularity?: number;
+    }>) ?? [];
+
+    const hit = results.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0))[0];
+
+    if (hit) {
+      // Profile photo from TMDB
+      if (hit.profile_path) {
+        profileUrl = `https://image.tmdb.org/t/p/w780${hit.profile_path}`;
+      }
+
+      // Top movie/series credits, filtered — no talk shows
+      const credits = await getFilteredCredits(hit.id);
+      if (credits.length > 0) {
+        topCreditsLine = `\nPelículas y series principales (solo ficción): ${credits.join(", ")}.`;
+      }
+    }
+  } catch (err) {
+    console.warn("[actor] TMDB lookup failed:", err instanceof Error ? err.message : err);
+  }
+
+  // ── 2. Generate carousel content with Gemini ───────────────────────────────
   const prompt =
-    `Sos editor de Peekr, app de cine para LatAm. Generá un carrusel de Instagram sobre ${person} con ángulo de trayectoria/logros/dato sorprendente.\n\n` +
-    `En español:\n1. Hook impactante (≤80 chars)\n2. 4 puntos fascinantes (≤90 chars c/u)\n3. Caption para IG (≤200 chars + 5 hashtags)\n\n` +
+    `Sos editor de Peekr, app de cine para LatAm. Generá un carrusel de Instagram sobre ${person} con ángulo de trayectoria/logros en CINE y SERIES DE FICCIÓN únicamente.${topCreditsLine}\n\n` +
+    `IMPORTANTE: No menciones talk shows, programas de entrevistas, apariciones en shows nocturnos ni reality shows. Solo películas y series de ficción.\n\n` +
+    `En español:\n1. Hook impactante sobre su carrera en cine/series (≤80 chars)\n2. 4 puntos fascinantes de su filmografía real (≤90 chars c/u)\n3. Caption con CTA y 5 hashtags de cine\n\n` +
     `SOLO JSON:\n{"hook":"...","points":["...","...","...","..."],"caption":"..."}`;
 
   try {
@@ -167,6 +296,7 @@ async function generateActor(
       bullet_points,
       caption,
       seed_title: person,
+      seed_poster_url: profileUrl,   // ← TMDB profile photo, not null
       status: "pending_review",
       language: "es",
     });
