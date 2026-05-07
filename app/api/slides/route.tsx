@@ -94,25 +94,22 @@ const THEMES: Record<CarouselType, Theme> = {
 };
 
 // ─── Font loading ─────────────────────────────────────────────────
-// Cached at module level – edge runtime reuses warm instances
+// Satori (ImageResponse) supports TTF / WOFF — NOT WOFF2.
+// We use @fontsource/inter v4 which ships .woff files.
+// Cached at module level – edge runtime reuses warm instances.
 let _inter400: ArrayBuffer | null = null;
 let _inter700: ArrayBuffer | null = null;
 let _inter800: ArrayBuffer | null = null;
 
 async function loadFonts() {
   if (!_inter400 || !_inter700 || !_inter800) {
+    // v4.5.15 provides .woff (not woff2) — Satori-compatible
     const base =
-      "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.17/files";
+      "https://cdn.jsdelivr.net/npm/@fontsource/inter@4.5.15/files";
     const results = await Promise.allSettled([
-      fetch(`${base}/inter-latin-400-normal.woff2`, {
-        cache: "force-cache",
-      }).then((r) => r.arrayBuffer()),
-      fetch(`${base}/inter-latin-700-normal.woff2`, {
-        cache: "force-cache",
-      }).then((r) => r.arrayBuffer()),
-      fetch(`${base}/inter-latin-800-normal.woff2`, {
-        cache: "force-cache",
-      }).then((r) => r.arrayBuffer()),
+      fetch(`${base}/inter-latin-400-normal.woff`).then((r) => r.arrayBuffer()),
+      fetch(`${base}/inter-latin-700-normal.woff`).then((r) => r.arrayBuffer()),
+      fetch(`${base}/inter-latin-800-normal.woff`).then((r) => r.arrayBuffer()),
     ]);
     _inter400 =
       results[0].status === "fulfilled" ? results[0].value : null;
@@ -491,6 +488,7 @@ function SlideContent(
       {/* ── Large decorative number ── */}
       <div
         style={{
+          display: "flex",
           position: "absolute",
           bottom: 120,
           right: 40,
@@ -569,6 +567,7 @@ function SlideContent(
         {title && (
           <div
             style={{
+              display: "flex",
               color: "rgba(255,255,255,0.45)",
               fontSize: 26,
               fontWeight: 600,
@@ -586,6 +585,8 @@ function SlideContent(
         {/* Main point text */}
         <div
           style={{
+            display: "flex",
+            flexWrap: "wrap",
             color: "#FFFFFF",
             fontSize: 54,
             fontWeight: 700,
@@ -593,6 +594,7 @@ function SlideContent(
             marginTop: 32,
             maxWidth: 900,
             flex: 1,
+            alignContent: "flex-start",
           }}
         >
           {point ||
@@ -806,42 +808,48 @@ function Slide4(t: Theme, type: CarouselType, lang: "es" | "pt") {
 
 // ─── Route handler ────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
-  const p = new URL(request.url).searchParams;
+  try {
+    const p = new URL(request.url).searchParams;
 
-  const rawType = p.get("type") ?? "actualidad";
-  const type: CarouselType =
-    rawType === "actor" || rawType === "lanzamiento" || rawType === "reco"
-      ? rawType
-      : "actualidad";
+    const rawType = p.get("type") ?? "actualidad";
+    const type: CarouselType =
+      rawType === "actor" || rawType === "lanzamiento" || rawType === "reco"
+        ? rawType
+        : "actualidad";
 
-  const slideNum = Math.max(1, Math.min(4, parseInt(p.get("slide") ?? "1")));
-  const hook     = (p.get("hook")   ?? "").slice(0, 200);
-  const point    = (p.get("point")  ?? "").slice(0, 200);
-  const img      = p.get("img")     ?? "";
-  const title    = (p.get("title")  ?? "").slice(0, 80);
-  const source   = (p.get("source") ?? "").slice(0, 60);
-  const rawLang  = p.get("lang")    ?? "es";
-  const lang: "es" | "pt" = rawLang === "pt" ? "pt" : "es";
+    const slideNum = Math.max(1, Math.min(4, parseInt(p.get("slide") ?? "1")));
+    const hook     = (p.get("hook")   ?? "").slice(0, 200);
+    const point    = (p.get("point")  ?? "").slice(0, 200);
+    const img      = p.get("img")     ?? "";
+    const title    = (p.get("title")  ?? "").slice(0, 80);
+    const source   = (p.get("source") ?? "").slice(0, 60);
+    const rawLang  = p.get("lang")    ?? "es";
+    const lang: "es" | "pt" = rawLang === "pt" ? "pt" : "es";
 
-  const t = THEMES[type];
-  const fonts = await loadFonts();
+    const t = THEMES[type];
+    const fonts = await loadFonts();
 
-  let jsx: ReactElement;
+    let jsx: ReactElement;
 
-  if (slideNum === 1) {
-    jsx = Slide1(t, type, hook, img, source, lang);
-  } else if (slideNum === 4) {
-    jsx = Slide4(t, type, lang);
-  } else {
-    jsx = SlideContent(t, type, slideNum as 2 | 3, point, title, lang);
+    if (slideNum === 1) {
+      jsx = Slide1(t, type, hook, img, source, lang);
+    } else if (slideNum === 4) {
+      jsx = Slide4(t, type, lang);
+    } else {
+      jsx = SlideContent(t, type, slideNum as 2 | 3, point, title, lang);
+    }
+
+    return new ImageResponse(jsx, {
+      width: W,
+      height: H,
+      fonts,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[/api/slides] render error:", msg);
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
-
-  return new ImageResponse(jsx, {
-    width: W,
-    height: H,
-    fonts,
-    headers: {
-      "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-    },
-  });
 }
