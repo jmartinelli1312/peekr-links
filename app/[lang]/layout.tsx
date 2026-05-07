@@ -17,6 +17,29 @@ function normalizeLang(value?: string | null): Lang {
   return "es";
 }
 
+const OG_LOCALE: Record<Lang, string> = {
+  es: "es_ES",
+  en: "en_US",
+  pt: "pt_BR",
+};
+
+// Sets og:locale per language so Google and social crawlers see the correct
+// locale even though <html lang> is fixed to "es" in the root layout.
+// Child page metadata overrides this when it sets its own openGraph block,
+// but any page that omits og:locale inherits the correct value here.
+export async function generateMetadata({
+  params,
+}: Pick<LayoutProps, "params">) {
+  const { lang: rawLang } = await params;
+  const lang = normalizeLang(rawLang);
+
+  return {
+    openGraph: {
+      locale: OG_LOCALE[lang],
+    },
+  };
+}
+
 export default async function LangLayout({
   children,
   params,

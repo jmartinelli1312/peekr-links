@@ -3,6 +3,19 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   async redirects() {
     return [
+      // Non-www → www (canonical domain)
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "peekr.app" }],
+        destination: "https://www.peekr.app/:path*",
+        permanent: true,
+      },
+      // Buzz articles published without language prefix → /es/buzz/:slug
+      {
+        source: "/buzz/:slug",
+        destination: "/es/buzz/:slug",
+        permanent: true,
+      },
       {
         source: "/index.html",
         destination: "/",

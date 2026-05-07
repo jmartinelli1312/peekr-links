@@ -104,9 +104,9 @@ function categoryLabel(category?: string | null, lang: Lang = "en") {
 function getStrings(lang: Lang) {
   return {
     en: {
-      pageTitle: "PeekrBuzz | Peekr",
+      pageTitle: "PeekrBuzz – Movie & TV News, Trailers and Casting",
       metaDescription:
-        "Latest movie, TV, streaming, trailer, casting and awards news on Peekr.",
+        "Latest news on movies, TV shows, streaming, trailers, casting and awards. Updated daily on Peekr.",
       title: "PeekrBuzz",
       subtitle:
         "Fresh stories from movies, TV, streaming, trailers, casting and awards.",
@@ -115,9 +115,9 @@ function getStrings(lang: Lang) {
         "Entertainment headlines curated for discovery across movies and series.",
     },
     es: {
-      pageTitle: "PeekrBuzz | Peekr",
+      pageTitle: "PeekrBuzz – Noticias de Cine, Series y Streaming",
       metaDescription:
-        "Últimas noticias de películas, series, streaming, trailers, casting y premios en Peekr.",
+        "Noticias de películas, series, streaming, trailers, casting y premios. Actualizadas a diario en Peekr.",
       title: "PeekrBuzz",
       subtitle:
         "Historias frescas sobre películas, series, streaming, trailers, casting y premios.",
@@ -126,9 +126,9 @@ function getStrings(lang: Lang) {
         "Titulares de entretenimiento curados para discovery en películas y series.",
     },
     pt: {
-      pageTitle: "PeekrBuzz | Peekr",
+      pageTitle: "PeekrBuzz – Notícias de Cinema, Séries e Streaming",
       metaDescription:
-        "Últimas notícias de filmes, séries, streaming, trailers, casting e prêmios no Peekr.",
+        "Notícias de filmes, séries, streaming, trailers, casting e prêmios. Atualizadas diariamente no Peekr.",
       title: "PeekrBuzz",
       subtitle:
         "Histórias frescas sobre filmes, séries, streaming, trailers, casting e prêmios.",
