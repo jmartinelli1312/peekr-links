@@ -161,7 +161,7 @@ export default async function UserProfilePage({
   const { data: profileRaw } = await supabase
     .from("profiles")
     .select(
-      "id, username, avatar_url, bio, language, is_private, display_name, is_creator, creator_status"
+      "id, username, avatar_url, bio, language, is_private, display_name, creator_status"
     )
     .eq("username", username)
     .maybeSingle();
@@ -265,7 +265,7 @@ export default async function UserProfilePage({
           .limit(80),
 
         // sneak_peeks: USING(is_published = true OR creator = me)
-        profileRaw.is_creator === true || profileRaw.creator_status === "approved"
+        profileRaw.creator_status === "approved"
           ? supabase
               .from("sneak_peeks")
               .select("id, video_url, thumbnail_url, image_urls, created_at")

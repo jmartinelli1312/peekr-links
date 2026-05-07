@@ -18,7 +18,6 @@ type ProfileRow = {
   language: string | null;
   is_private: boolean | null;
   display_name: string | null;
-  is_creator: boolean | null;
   creator_status: string | null;
 };
 
@@ -174,7 +173,7 @@ export default function UserProfileClient({
   const uid = profile.id;
   const isPrivate = profile.is_private === true;
   const isOwnProfile = meId != null && uid === meId;
-  const isCreator = profile.is_creator === true || profile.creator_status === "approved";
+  const isCreator = profile.creator_status === "approved";
 
   // ── On mount: resolve auth + follow status ────────────────────────────────
   useEffect(() => {
