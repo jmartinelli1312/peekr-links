@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import WeeklyEditorialTab from "./WeeklyEditorialTab";
 import PublicationScheduleTab from "./PublicationScheduleTab";
+import PublishedArchiveTab from "./PublishedArchiveTab";
 
 type AdminState = "loading" | "authorized" | "unauthorized";
 
@@ -1680,68 +1681,9 @@ export default function AdminPage() {
             </div>
 
             {/* ===================== TAB: PUBLICADOS ===================== */}
-            <div style={{ display: activeTab === "published" ? "block" : "none" }}>
-              <p className="section-title">Carruseles publicados</p>
-              {publishedCarousels.length === 0 ? (
-                <div className="section-empty">Sin carruseles publicados</div>
-              ) : (
-                <div className="review-grid">
-                  {publishedCarousels.map((carousel) => {
-                    const typeColor =
-                      carousel.draft_type
-                        ? CAROUSEL_TYPE_COLORS[carousel.draft_type] ?? "rgba(255,255,255,0.4)"
-                        : "rgba(255,255,255,0.4)";
-                    const previewUrl = buildSlideUrl(
-                      carousel.draft_type || "actualidad",
-                      1,
-                      {
-                        hook: carousel.hook_text,
-                        img: carousel.seed_poster_url,
-                        title: carousel.seed_title,
-                        source: carousel.source_label,
-                        lang: carousel.language,
-                      }
-                    );
-                    return (
-                      <div key={carousel.id} className="review-card">
-                        {/* Live slide 1 preview */}
-                        <div className="carousel-preview-wrap">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={previewUrl}
-                            alt="Slide 1"
-                            className="carousel-preview-img"
-                            loading="lazy"
-                          />
-                        </div>
-                        <div className="review-card-badges" style={{ paddingTop: 4 }}>
-                          {carousel.draft_type && (
-                            <span
-                              className="review-badge"
-                              style={{ background: typeColor + "22", color: typeColor }}
-                            >
-                              {carousel.draft_type}
-                            </span>
-                          )}
-                          {carousel.language && (
-                            <span className="review-badge">{carousel.language}</span>
-                          )}
-                        </div>
-                        {carousel.hook_text && (
-                          <div className="review-hook">{carousel.hook_text}</div>
-                        )}
-                        {carousel.seed_title && (
-                          <div className="review-summary">{carousel.seed_title}</div>
-                        )}
-                        <div className="review-meta">
-                          {formatDate(carousel.scheduled_for)}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {activeTab === "published" && (
+              <PublishedArchiveTab supabase={supabase} />
+            )}
 
             {/* ===================== TAB: EDITORIAL ===================== */}
             {activeTab === "editorial" && (
