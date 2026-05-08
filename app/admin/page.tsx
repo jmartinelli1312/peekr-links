@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import WeeklyEditorialTab from "./WeeklyEditorialTab";
 
 type AdminState = "loading" | "authorized" | "unauthorized";
 
@@ -236,7 +237,7 @@ export default function AdminPage() {
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
-  const [activeTab, setActiveTab] = useState<"pending" | "metrics" | "published">("pending");
+  const [activeTab, setActiveTab] = useState<"pending" | "metrics" | "published" | "editorial">("pending");
   const [pendingCounts, setPendingCounts] = useState({ articles: 0, carousels: 0, creators: 0, newsletters: 0 });
   const [pendingArticles, setPendingArticles] = useState<PendingArticle[]>([]);
   const [pendingCarousels, setPendingCarousels] = useState<PendingCarousel[]>([]);
@@ -1387,6 +1388,13 @@ export default function AdminPage() {
               >
                 Publicados
               </button>
+              <button
+                className={`admin-tab${activeTab === "editorial" ? " active" : ""}`}
+                onClick={() => setActiveTab("editorial")}
+                style={{ fontWeight: 700, color: activeTab === "editorial" ? "#a855f7" : undefined }}
+              >
+                📋 Editorial
+              </button>
             </div>
 
             {/* ===================== TAB: PENDIENTES ===================== */}
@@ -2015,6 +2023,11 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
+
+            {/* ===================== TAB: EDITORIAL ===================== */}
+            {activeTab === "editorial" && (
+              <WeeklyEditorialTab supabase={supabase} />
+            )}
           </>
         )}
       </div>
