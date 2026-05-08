@@ -1110,7 +1110,122 @@ export default function WeeklyEditorialTab({
         </div>
       </div>
 
-      {/* ── 3. NEWSLETTER ────────────────────────────────────────────── */}
+      {/* ── 3. CANALES DE PUBLICACIÓN ────────────────────────────────── */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#d0d0d0", marginBottom: 14, paddingLeft: 2 }}>
+          Canales de Publicación
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {[
+            {
+              icon: "📸",
+              name: "Instagram",
+              handle: "@peekr.app",
+              freq: "4 posts diarios",
+              detail: "Actualidad · Historia · Recomendaciones · Dato Peekr",
+              color: "#e1306c",
+            },
+            {
+              icon: "🧵",
+              name: "Threads",
+              handle: "@peekr.app",
+              freq: "4 posts diarios",
+              detail: "Mismo contenido que IG — publicación simultánea",
+              color: "#000000",
+            },
+            {
+              icon: "📘",
+              name: "Facebook",
+              handle: "Peekr",
+              freq: "4 posts diarios",
+              detail: "Actualidad · Historia · Recomendaciones · Dato Peekr",
+              color: "#1877f2",
+            },
+            {
+              icon: "🦋",
+              name: "Bluesky",
+              handle: "@peekr.app",
+              freq: "4 posts diarios",
+              detail: "Actualidad · Historia · Recomendaciones · Dato Peekr",
+              color: "#0085ff",
+            },
+            {
+              icon: "📰",
+              name: "PeekrBuzz ES",
+              handle: "peekr.app/buzz",
+              freq: "1 artículo/día · 7 artículos/semana",
+              detail: "Contenido original en español · categorías: actualidad, historia, reco, dato_peekr, awards",
+              color: "#f97316",
+            },
+            {
+              icon: "📰",
+              name: "PeekrBuzz PT",
+              handle: "peekr.app/buzz",
+              freq: "1 artículo/día · 7 artículos/semana",
+              detail: "Conteúdo original em português · mesmas categorías",
+              color: "#4ade80",
+            },
+            {
+              icon: "🌐",
+              name: "PeekrBuzz EN",
+              handle: "peekr.app/buzz",
+              freq: "1 artículo cada 2 días · 3–4 artículos/semana",
+              detail: "Original content in English · same categories",
+              color: "#38bdf8",
+            },
+            {
+              icon: "📧",
+              name: "Newsletter ES",
+              handle: "email",
+              freq: "1 por semana · lunes 08:00 UTC",
+              detail: "Enviado a todos los usuarios registrados en español",
+              color: "#a78bfa",
+            },
+            {
+              icon: "📧",
+              name: "Newsletter PT",
+              handle: "email",
+              freq: "1 por semana · lunes 08:00 UTC",
+              detail: "Enviado a todos os usuários registrados em português",
+              color: "#86efac",
+            },
+          ].map((ch) => (
+            <div key={ch.name} style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: "#111",
+              border: `1px solid ${ch.color}22`,
+              borderRadius: 8,
+              padding: "10px 14px",
+            }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>{ch.icon}</span>
+              <div style={{ minWidth: 130, flexShrink: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: ch.color }}>{ch.name}</div>
+                <div style={{ fontSize: 11, color: "#57534e" }}>{ch.handle}</div>
+              </div>
+              <div style={{
+                background: ch.color + "18",
+                border: `1px solid ${ch.color}33`,
+                borderRadius: 4,
+                padding: "2px 8px",
+                fontSize: 11,
+                color: ch.color,
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}>
+                {ch.freq}
+              </div>
+              <div style={{ fontSize: 11, color: "#78716c", lineHeight: 1.4 }}>
+                {ch.detail}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 4. NEWSLETTER ────────────────────────────────────────────── */}
       <div>
         <div
           style={{

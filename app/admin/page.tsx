@@ -1369,19 +1369,20 @@ export default function AdminPage() {
             {/* Tab navigation */}
             <div className="admin-tabs">
               <button
+                className={`admin-tab${activeTab === "editorial" ? " active" : ""}`}
+                onClick={() => setActiveTab("editorial")}
+                style={{ fontWeight: 700, color: activeTab === "editorial" ? "#a855f7" : "#a855f7" }}
+              >
+                📋 Editorial
+              </button>
+              <button
                 className={`admin-tab${activeTab === "pending" ? " active" : ""}`}
                 onClick={() => setActiveTab("pending")}
               >
-                Pendientes
-                {totalPending > 0 && (
-                  <span className="admin-badge">{totalPending}</span>
+                Cronograma
+                {pendingCounts.creators > 0 && (
+                  <span className="admin-badge">{pendingCounts.creators}</span>
                 )}
-              </button>
-              <button
-                className={`admin-tab${activeTab === "metrics" ? " active" : ""}`}
-                onClick={() => setActiveTab("metrics")}
-              >
-                Metricas
               </button>
               <button
                 className={`admin-tab${activeTab === "published" ? " active" : ""}`}
@@ -1390,11 +1391,15 @@ export default function AdminPage() {
                 Publicados
               </button>
               <button
-                className={`admin-tab${activeTab === "editorial" ? " active" : ""}`}
-                onClick={() => setActiveTab("editorial")}
-                style={{ fontWeight: 700, color: activeTab === "editorial" ? "#a855f7" : undefined }}
+                className={`admin-tab${activeTab === "metrics" ? " active" : ""}`}
+                onClick={() => setActiveTab("metrics")}
+                style={{
+                  color: activeTab === "metrics" ? "#f0abfc" : "#e879f9",
+                  fontWeight: 700,
+                  borderColor: activeTab === "metrics" ? "#d946ef" : "transparent",
+                }}
               >
-                📋 Editorial
+                📊 Métricas
               </button>
             </div>
 
