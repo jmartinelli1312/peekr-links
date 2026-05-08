@@ -9,6 +9,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
 import TitleTabs from "./title-tabs";
+import ReviewsModal from "@/components/ReviewsModal";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB = "https://api.themoviedb.org/3";
@@ -257,8 +258,10 @@ function getStrings(lang: Lang) {
         `TMDB: ${avg}/10 (${count.toLocaleString("en-US")} votes)`,
       beFirstToRate: "Be the first to rate this title on Peekr.",
       tmdbRating: "TMDB rating",
+      reviewsBtn: "Reviews",
     },
     es: {
+      reviewsBtn: "Ver reseñas",
       directedBy: "Dirigida por",
       createdBy: "Creada por",
       watchTrailer: "Ver tráiler",
@@ -313,6 +316,7 @@ function getStrings(lang: Lang) {
       tmdbRating: "Rating en TMDB",
     },
     pt: {
+      reviewsBtn: "Ver reseñas",
       directedBy: "Dirigido por",
       createdBy: "Criada por",
       watchTrailer: "Ver trailer",
@@ -365,6 +369,7 @@ function getStrings(lang: Lang) {
         `TMDB: ${avg}/10 (${count.toLocaleString("pt-BR")} votos)`,
       beFirstToRate: "Seja o primeiro a avaliar este título no Peekr.",
       tmdbRating: "Avaliação no TMDB",
+      reviewsBtn: "Ver resenhas",
     },
   }[lang];
 }
@@ -1522,16 +1527,18 @@ export default async function TitlePage({ params }: PageProps) {
                 👁 {stats.watchedCount} {t.watched}
               </div>
             ) : null}
-            {stats.commentsCount > 0 ? (
-              <div className="hero-stat">
-                💬 {stats.commentsCount} {t.commentsCount}
-              </div>
-            ) : null}
             {stats.viewsCount > 0 ? (
               <div className="hero-stat">
                 👀 {stats.viewsCount} {t.views}
               </div>
             ) : null}
+            <ReviewsModal
+              tmdbId={numericId}
+              mediaType={type}
+              title={title}
+              label={t.reviewsBtn}
+              count={stats.commentsCount > 0 ? stats.commentsCount : undefined}
+            />
           </div>
 
           {/* ============================================================
