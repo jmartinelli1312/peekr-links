@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ReviewItem } from "@/app/api/reviews/route";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,6 +181,10 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
 
+  // Must be client-side before portal works
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   // Translation state: id → translated text
   const [translations, setTranslations] = useState<Record<number, string>>({});
   // Whether to auto-translate all (true when browser lang != 'es' by default)
@@ -199,10 +204,22 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
     if (lang !== "es") setAutoTranslate(true);
   }, [open]);
 
-  // Scroll lock
+  // Scroll lock — iOS-safe: overflow:hidden on body breaks position:fixed on Safari.
+  // Instead pin the body with position:fixed and restore scroll on close.
   useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    if (!open) return;
+    const scrollY = window.scrollY;
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    document.body.style.overscrollBehavior = "none";
+    return () => {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overscrollBehavior = "";
+      window.scrollTo(0, scrollY);
+    };
   }, [open]);
 
   // Escape key
@@ -251,8 +268,8 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
         )}
       </button>
 
-      {/* ── Modal ── */}
-      {open && (
+      {/* ── Modal — rendered via portal so position:fixed isn't trapped by parent stacking contexts ── */}
+      {open && mounted && createPortal(
         <div
           className="r-overlay"
           ref={overlayRef}
@@ -261,6 +278,8 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
           aria-modal="true"
         >
           <div className="r-panel">
+            {/* Drag handle — visible on mobile */}
+            <div className="r-drag-handle" aria-hidden="true" />
             {/* Header */}
             <div className="r-panel-header">
               <div>
@@ -305,11 +324,12 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <style>{`
-        /* Trigger */
+        /* ── Trigger ── */
         .reviews-btn {
           display: inline-flex; align-items: center; gap: 6px;
           padding: 6px 14px; border-radius: 20px;
@@ -317,7 +337,7 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
           background: rgba(255,255,255,.06);
           color: rgba(255,255,255,.85); font-size: 13px; font-weight: 600;
           cursor: pointer; transition: background .15s, border-color .15s;
-          white-space: nowrap;
+          white-space: nowrap; touch-action: manipulation;
         }
         .reviews-btn:hover { background: rgba(168,85,247,.18); border-color: rgba(168,85,247,.5); color: #fff; }
         .reviews-btn-count {
@@ -325,58 +345,98 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
           border-radius: 10px; padding: 1px 7px; margin-left: 2px;
         }
 
-        /* Overlay */
+        /* ── Overlay ── */
         .r-overlay {
-          position: fixed; inset: 0; background: rgba(0,0,0,.75);
-          backdrop-filter: blur(4px); z-index: 1000;
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0; /* explicit fallback */
+          inset: 0;
+          background: rgba(0,0,0,.75);
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
+          z-index: 9999;
           display: flex; align-items: flex-end; justify-content: center;
+          overscroll-behavior: none;
+          animation: r-fade-in .18s ease;
         }
-        @media (min-width: 640px) { .r-overlay { align-items: center; padding: 24px; } }
+        @media (min-width: 640px) {
+          .r-overlay { align-items: center; padding: 24px; }
+        }
+        @keyframes r-fade-in { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Panel */
+        /* ── Panel ── */
         .r-panel {
-          background: #0f1014; border: 1px solid rgba(255,255,255,.1);
-          border-radius: 20px 20px 0 0; width: 100%; max-width: 660px;
-          max-height: 88vh; display: flex; flex-direction: column; overflow: hidden;
+          background: #0f1014;
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 20px 20px 0 0;
+          width: 100%; max-width: 660px;
+          /* dynamic viewport height so content clears iOS Safari bottom bar */
+          max-height: calc(92dvh - env(safe-area-inset-bottom));
+          max-height: calc(92vh - env(safe-area-inset-bottom)); /* fallback */
+          display: flex; flex-direction: column; overflow: hidden;
+          padding-bottom: env(safe-area-inset-bottom);
+          animation: r-slide-up .25s cubic-bezier(.32,0,.67,0) reverse,
+                     r-slide-up .25s cubic-bezier(.33,1,.68,1) forwards;
         }
-        @media (min-width: 640px) { .r-panel { border-radius: 20px; max-height: 82vh; } }
+        @keyframes r-slide-up {
+          from { transform: translateY(100%); }
+          to   { transform: translateY(0); }
+        }
+        @media (min-width: 640px) {
+          .r-panel {
+            border-radius: 20px;
+            max-height: 82vh;
+            padding-bottom: 0;
+            animation: r-fade-in .18s ease;
+          }
+        }
 
-        /* Panel header */
+        /* ── Drag handle (mobile only) ── */
+        .r-drag-handle {
+          width: 36px; height: 4px; border-radius: 2px;
+          background: rgba(255,255,255,.2);
+          margin: 10px auto 0; flex-shrink: 0;
+        }
+        @media (min-width: 640px) { .r-drag-handle { display: none; } }
+
+        /* ── Panel header ── */
         .r-panel-header {
           display: flex; align-items: flex-start; justify-content: space-between;
-          padding: 18px 18px 14px; border-bottom: 1px solid rgba(255,255,255,.08);
+          padding: 14px 18px 14px; border-bottom: 1px solid rgba(255,255,255,.08);
           flex-shrink: 0; gap: 12px;
         }
         .r-panel-title { font-size: 18px; font-weight: 800; color: #fff; margin: 0 0 2px; }
         .r-panel-sub {
           font-size: 12px; color: rgba(255,255,255,.4); margin: 0;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px;
         }
         .r-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
-        /* Translate-all button */
+        /* ── Translate-all button ── */
         .r-translate-all-btn {
           font-size: 12px; font-weight: 600; padding: 4px 12px;
           border-radius: 14px; border: 1px solid rgba(255,255,255,.2);
           background: rgba(255,255,255,.06); color: rgba(255,255,255,.7);
           cursor: pointer; white-space: nowrap; transition: all .15s;
+          touch-action: manipulation;
         }
         .r-translate-all-btn:hover { background: rgba(168,85,247,.2); border-color: rgba(168,85,247,.5); color: #fff; }
         .r-translate-all-btn.active { background: rgba(168,85,247,.2); border-color: #a855f7; color: #d8b4fe; }
 
         .r-close {
           background: none; border: none; color: rgba(255,255,255,.5);
-          font-size: 18px; cursor: pointer; padding: 0; line-height: 1;
+          font-size: 20px; cursor: pointer; padding: 4px; line-height: 1;
+          touch-action: manipulation; -webkit-tap-highlight-color: transparent;
         }
         .r-close:hover { color: #fff; }
 
-        /* Body */
+        /* ── Scrollable body ── */
         .r-panel-body {
           overflow-y: auto; padding: 8px 16px 28px; flex: 1;
+          -webkit-overflow-scrolling: touch;
           scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent;
         }
 
-        /* Spinner */
+        /* ── Spinner ── */
         .r-loading { display: flex; justify-content: center; padding: 48px 0; }
         .r-spinner {
           width: 28px; height: 28px; border: 3px solid rgba(168,85,247,.3);
@@ -385,13 +445,12 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
         @keyframes r-spin { to { transform: rotate(360deg); } }
         .r-empty { text-align: center; color: rgba(255,255,255,.3); font-size: 14px; padding: 48px 0; }
 
-        /* Card */
+        /* ── Review card ── */
         .r-card { padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
         .r-card:last-child { border-bottom: none; }
-
         .r-header { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 9px; }
 
-        /* Avatar */
+        /* ── Avatar ── */
         .r-avatar {
           width: 38px; height: 38px; border-radius: 50%; object-fit: cover;
           flex-shrink: 0; border: 2px solid rgba(255,255,255,.1);
@@ -407,14 +466,14 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
         .r-username { font-size: 14px; font-weight: 700; color: #fff; }
         .r-handle { font-size: 11px; color: rgba(255,255,255,.3); }
 
-        /* Creator badge */
+        /* ── Creator verified badge ── */
         .r-badge {
           font-size: 10px; font-weight: 700; color: #a855f7;
           background: rgba(168,85,247,.15); border: 1px solid rgba(168,85,247,.3);
           border-radius: 10px; padding: 1px 7px;
         }
 
-        /* Rating badge — 10-point scale */
+        /* ── Rating badge — 10-point scale ── */
         .rating-badge {
           font-size: 13px; font-weight: 700;
           border: 1px solid; border-radius: 8px;
@@ -423,21 +482,22 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
         }
         .rating-badge-denom { font-size: 10px; opacity: .6; margin-left: 1px; }
 
-        /* Body */
+        /* ── Comment body ── */
         .r-body { font-size: 14px; color: rgba(255,255,255,.85); line-height: 1.55; margin: 0 0 8px; word-break: break-word; }
         .r-translating { color: rgba(255,255,255,.35); font-style: italic; }
 
-        /* Footer */
+        /* ── Card footer ── */
         .r-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .r-footer-right { display: flex; align-items: center; gap: 8px; }
         .r-date { font-size: 11px; color: rgba(255,255,255,.25); }
         .r-likes { font-size: 11px; color: rgba(255,255,255,.3); }
 
-        /* Per-review translate button */
+        /* ── Per-review translate button ── */
         .r-translate-btn {
           font-size: 11px; color: rgba(255,255,255,.35); background: none;
           border: none; cursor: pointer; padding: 0; text-decoration: underline;
           text-underline-offset: 2px; transition: color .1s;
+          touch-action: manipulation;
         }
         .r-translate-btn:hover { color: rgba(255,255,255,.7); }
         .r-translated { color: rgba(168,85,247,.6); }
