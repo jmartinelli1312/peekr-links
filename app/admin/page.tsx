@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import WeeklyEditorialTab from "./WeeklyEditorialTab";
 import PublicationScheduleTab from "./PublicationScheduleTab";
 import PublishedArchiveTab from "./PublishedArchiveTab";
+import UserGeoTab from "./UserGeoTab";
 
 type AdminState = "loading" | "authorized" | "unauthorized";
 
@@ -1611,6 +1612,12 @@ export default function AdminPage() {
                     </div>
                   </a>
                 </div>
+              </section>
+
+              {/* ── GEO / PLATFORM BREAKDOWN ── */}
+              <section className="section" style={{ marginTop: 28 }}>
+                <h2>Geografía y Plataforma</h2>
+                <UserGeoTab supabase={supabase} />
               </section>
 
               <section className="section" style={{ marginTop: 28 }}>
