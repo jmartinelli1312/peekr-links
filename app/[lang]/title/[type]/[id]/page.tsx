@@ -316,7 +316,6 @@ function getStrings(lang: Lang) {
       tmdbRating: "Rating en TMDB",
     },
     pt: {
-      reviewsBtn: "Ver reseñas",
       directedBy: "Dirigido por",
       createdBy: "Criada por",
       watchTrailer: "Ver trailer",
