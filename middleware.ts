@@ -8,7 +8,7 @@ const CANONICAL_HOST = "www.peekr.app";
 // Paths that must NOT be treated as usernames
 const RESERVED_SEGMENTS = new Set([
   "es", "en", "pt",
-  "about", "admin", "go", "lang", "login", "privacy", "signup",
+  "about", "admin", "get", "go", "lang", "login", "privacy", "signup",
   "support", "terms", "test", "test-supabase", "lists", "buzz",
   "contact", "download-app", "explore", "title", "actor",
   "activity", "peeklist", "user", "u", "api", "sitemap.xml",
