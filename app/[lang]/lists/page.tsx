@@ -3,6 +3,7 @@ export const revalidate = 21600;
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -39,6 +40,15 @@ type EditorialCollection = {
   is_published: boolean;
   sort_order: number;
   item_count?: number | null;
+};
+
+type CreatorPeeklistItem = {
+  id: string;
+  title: string;
+  cover_url: string | null;
+  creator_name: string;
+  creator_username: string;
+  creator_avatar: string | null;
 };
 
 type TmdbPerson = {
@@ -192,6 +202,51 @@ async function getCollectionsBySourceType(
   );
 }
 
+async function getCreatorPeeklists(): Promise<CreatorPeeklistItem[]> {
+  const admin = getSupabaseAdmin();
+
+  // 1. Get all approved creators
+  const { data: creators } = await admin
+    .from("approved_creators")
+    .select("id, username, display_name, avatar_url");
+
+  if (!creators || creators.length === 0) return [];
+
+  const creatorIds = (creators as { id: string }[]).map((c) => c.id);
+  const creatorMap = new Map(
+    (creators as { id: string; username: string; display_name: string | null; avatar_url: string | null }[])
+      .map((c) => [c.id, c])
+  );
+
+  // 2. Get their public peeklists ordered by followers
+  const { data: lists } = await admin
+    .from("peeklists")
+    .select("id, title, cover_url, custom_cover_url, created_by, follower_count")
+    .eq("visibility", "public")
+    .in("created_by", creatorIds)
+    .order("follower_count", { ascending: false })
+    .limit(30);
+
+  return ((lists ?? []) as {
+    id: string;
+    title: string;
+    cover_url: string | null;
+    custom_cover_url: string | null;
+    created_by: string;
+    follower_count: number | null;
+  }[]).map((row) => {
+    const creator = creatorMap.get(row.created_by);
+    return {
+      id: row.id,
+      title: row.title,
+      cover_url: row.custom_cover_url ?? row.cover_url ?? null,
+      creator_name: creator?.display_name || creator?.username || "Creator",
+      creator_username: creator?.username || "",
+      creator_avatar: creator?.avatar_url ?? null,
+    };
+  });
+}
+
 async function getPopularPeople(lang: Lang) {
   const apiLang = tmdbLanguage(lang);
 
@@ -283,6 +338,8 @@ function getStrings(lang: Lang) {
         "Discover directors shaping what people are watching now.",
       trendingTitle: "Trending now",
       trendingText: "Strictly filtered trending collections by category.",
+      creatorListsTitle: "Peekr Creator Lists",
+      creatorListsText: "Public lists curated by verified Peekr creators.",
     },
     es: {
       metaTitle: "Peeklists | Peekr",
@@ -309,6 +366,8 @@ function getStrings(lang: Lang) {
       trendingTitle: "En tendencia ahora",
       trendingText:
         "Colecciones trending con filtros estrictos por categoría.",
+      creatorListsTitle: "Listas de Creadores Peekr",
+      creatorListsText: "Listas públicas curadas por creadores verificados de Peekr.",
     },
     pt: {
       metaTitle: "Peeklists | Peekr",
@@ -334,6 +393,8 @@ function getStrings(lang: Lang) {
         "Descubra diretores que estão moldando o que as pessoas assistem agora.",
       trendingTitle: "Em alta agora",
       trendingText: "Coleções em alta com filtros estritos por categoria.",
+      creatorListsTitle: "Listas de Criadores Peekr",
+      creatorListsText: "Listas públicas curadas por criadores verificados do Peekr.",
     },
   }[lang];
 }
@@ -380,6 +441,55 @@ function PeeklistsRow({
 
           <div className="peeklist-meta">
             <div className="peeklist-title">{pl.title || "Peeklist"}</div>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function CreatorPeeklistsRow({
+  items,
+  lang,
+}: {
+  items: CreatorPeeklistItem[];
+  lang: Lang;
+}) {
+  return (
+    <div className="peeklists-row">
+      {items.map((pl) => (
+        <Link
+          key={pl.id}
+          href={`/${lang}/peeklist/${pl.id}`}
+          className="peeklist-card"
+        >
+          {pl.cover_url ? (
+            <img
+              src={pl.cover_url}
+              alt={pl.title}
+              className="peeklist-cover"
+            />
+          ) : (
+            <div className="peeklist-fallback" />
+          )}
+          <div className="peeklist-meta">
+            <div className="peeklist-title">{pl.title}</div>
+            <div className="creator-chip">
+              {pl.creator_avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={pl.creator_avatar}
+                  alt={pl.creator_name}
+                  className="creator-chip-avatar"
+                />
+              ) : (
+                <div className="creator-chip-avatar creator-chip-init">
+                  {pl.creator_name[0]?.toUpperCase() ?? "C"}
+                </div>
+              )}
+              <span className="creator-chip-name">{pl.creator_name}</span>
+              <span className="creator-chip-badge">✓</span>
+            </div>
           </div>
         </Link>
       ))}
@@ -465,10 +575,11 @@ export default async function ListsPage({ params }: PageProps) {
 
   const t = getStrings(lang);
 
-  const [awards, curated, regional, platform, trending, people] =
+  const [awards, curated, creatorLists, regional, platform, trending, people] =
     await Promise.all([
       getCollectionsByCategory(["awards"], lang, 24),
       getCollectionsByCategory(["curated"], lang, 40),
+      getCreatorPeeklists(),
       getCollectionsByCategory(["regional"], lang, 20),
       getCollectionsBySourceType(["platform_releases"], lang, 16),
       getCollectionsBySourceType(["trend_driven"], lang, 16),
@@ -568,6 +679,50 @@ export default async function ListsPage({ params }: PageProps) {
           color: rgba(255,255,255,0.96);
         }
 
+        /* Creator chip inside peeklist card */
+        .creator-chip {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          margin-top: 8px;
+        }
+
+        .creator-chip-avatar {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 1px solid rgba(255,255,255,0.15);
+          flex-shrink: 0;
+        }
+
+        .creator-chip-init {
+          background: linear-gradient(135deg, ${BRAND}, #7c3aed);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 9px;
+          font-weight: 800;
+          color: #fff;
+        }
+
+        .creator-chip-name {
+          font-size: 11px;
+          color: rgba(255,255,255,0.45);
+          font-weight: 600;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 160px;
+        }
+
+        .creator-chip-badge {
+          font-size: 9px;
+          color: ${BRAND};
+          font-weight: 800;
+          flex-shrink: 0;
+        }
+
         .person-card {
           width: 132px;
           min-width: 132px;
@@ -639,6 +794,13 @@ export default async function ListsPage({ params }: PageProps) {
           <section>
             <SectionHeader title={t.curatedTitle} text={t.curatedText} />
             <PeeklistsRow items={curated} lang={lang} />
+          </section>
+        ) : null}
+
+        {creatorLists.length > 0 ? (
+          <section>
+            <SectionHeader title={t.creatorListsTitle} text={t.creatorListsText} />
+            <CreatorPeeklistsRow items={creatorLists} lang={lang} />
           </section>
         ) : null}
 
