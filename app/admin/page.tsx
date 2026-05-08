@@ -313,7 +313,7 @@ export default function AdminPage() {
       supabase
         .from("peekrbuzz_ig_queue")
         .select("*", { count: "exact", head: true })
-        .eq("status", "pending_review"),
+        .in("status", ["pending_review", "pending_approval"]),
       supabase
         .from("creator_applications")
         .select("*", { count: "exact", head: true })
@@ -326,16 +326,17 @@ export default function AdminPage() {
         .from("peekrbuzz_articles")
         .select("id, title, summary, source_name, language, image_url, published_at")
         .eq("review_status", "pending_review")
+        .order("language", { ascending: true })
         .order("published_at", { ascending: false })
-        .limit(20),
+        .limit(60),
       supabase
         .from("peekrbuzz_ig_queue")
         .select(
           "id, draft_type, hook_text, bullet_points, seed_title, source_label, seed_poster_url, slide_urls, language, generated_at, caption"
         )
-        .eq("status", "pending_review")
+        .in("status", ["pending_review", "pending_approval"])
         .order("generated_at", { ascending: false })
-        .limit(20),
+        .limit(30),
       supabase
         .from("creator_applications")
         .select("id, user_id, created_at, status")
@@ -738,6 +739,7 @@ export default function AdminPage() {
     const baseUpdate = {
       status: "approved",
       scheduled_for: new Date().toISOString(),
+      // normalize: clear pending_approval / pending_review → approved
     };
 
     if (!carousel) {
