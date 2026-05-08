@@ -250,8 +250,10 @@ async function getCreatorPeeklists(): Promise<CreatorPeeklistItem[]> {
 async function getPopularPeople(lang: Lang) {
   const apiLang = tmdbLanguage(lang);
 
+  // person/popular is stable, globally curated, and always has photos.
+  // trending/person/week was pulling Chinese/Korean celebrities with missing photos.
   const trending = await fetchTMDB<{ results: TmdbPerson[] }>(
-    `${TMDB_BASE}/trending/person/week?api_key=${TMDB_KEY}&language=${apiLang}`
+    `${TMDB_BASE}/person/popular?api_key=${TMDB_KEY}&language=${apiLang}`
   );
 
   const all = trending?.results ?? [];
