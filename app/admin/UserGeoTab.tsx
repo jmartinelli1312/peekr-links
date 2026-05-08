@@ -13,12 +13,8 @@ interface Props {
 type UserRow = {
   id: string;
   country_code: string | null;
-  created_at: string;
-};
-
-type TokenRow = {
-  user_id: string;
   platform: string | null;
+  created_at: string;
 };
 
 type SliceData = { label: string; count: number; pct: number; color: string };
@@ -251,7 +247,6 @@ export default function UserGeoTab({ supabase }: Props) {
   // Data state
   const [newUsers, setNewUsers] = useState<UserRow[]>([]);
   const [allUsers, setAllUsers] = useState<UserRow[]>([]);
-  const [tokens, setTokens] = useState<TokenRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -271,7 +266,7 @@ export default function UserGeoTab({ supabase }: Props) {
       // New users in date range
       const { data: newData, error: e1 } = await supabase
         .from("profiles")
-        .select("id, country_code, created_at")
+        .select("id, country_code, platform, created_at")
         .gte("created_at", fromTs)
         .lte("created_at", toTs)
         .order("created_at", { ascending: false });
@@ -280,18 +275,11 @@ export default function UserGeoTab({ supabase }: Props) {
       // All users (global)
       const { data: allData, error: e2 } = await supabase
         .from("profiles")
-        .select("id, country_code, created_at");
+        .select("id, country_code, platform, created_at");
       if (e2) throw e2;
-
-      // Push tokens for all users (to get platform)
-      const { data: tokenData, error: e3 } = await supabase
-        .from("push_tokens")
-        .select("user_id, platform");
-      if (e3) throw e3;
 
       setNewUsers((newData ?? []) as UserRow[]);
       setAllUsers((allData ?? []) as UserRow[]);
-      setTokens((tokenData ?? []) as TokenRow[]);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -305,26 +293,13 @@ export default function UserGeoTab({ supabase }: Props) {
 
   // ── Build derived stats ────────────────────────────────────────────────────
 
-  // Map user_id → platform (first token found)
-  const platformMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const t of tokens) {
-      if (t.user_id && t.platform && !map.has(t.user_id)) {
-        map.set(t.user_id, t.platform);
-      }
-    }
-    return map;
-  }, [tokens]);
-
   function countBy(rows: UserRow[], key: "country_code" | "platform") {
     const counts: Record<string, number> = {};
     for (const r of rows) {
-      let val: string;
-      if (key === "country_code") {
-        val = r.country_code?.toUpperCase() ?? "Desconocido";
-      } else {
-        val = platformMap.get(r.id) ?? "unknown";
-      }
+      const raw = r[key];
+      const val = key === "country_code"
+        ? (raw?.toUpperCase() ?? "Desconocido")
+        : (raw ?? "Sin dato");
       counts[val] = (counts[val] ?? 0) + 1;
     }
     return counts;
@@ -332,22 +307,22 @@ export default function UserGeoTab({ supabase }: Props) {
 
   const newCountrySlices = useMemo(() =>
     buildSlices(countBy(newUsers, "country_code"), k => COUNTRY_NAMES[k] ?? k, 10),
-    [newUsers, platformMap] // eslint-disable-line react-hooks/exhaustive-deps
+    [newUsers] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const newPlatformSlices = useMemo(() =>
     buildSlices(countBy(newUsers, "platform"), k => PLATFORM_LABEL[k] ?? k, 5),
-    [newUsers, platformMap] // eslint-disable-line react-hooks/exhaustive-deps
+    [newUsers] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const allCountrySlices = useMemo(() =>
     buildSlices(countBy(allUsers, "country_code"), k => COUNTRY_NAMES[k] ?? k, 12),
-    [allUsers, platformMap] // eslint-disable-line react-hooks/exhaustive-deps
+    [allUsers] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const allPlatformSlices = useMemo(() =>
     buildSlices(countBy(allUsers, "platform"), k => PLATFORM_LABEL[k] ?? k, 5),
-    [allUsers, platformMap] // eslint-disable-line react-hooks/exhaustive-deps
+    [allUsers] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // ── Render helpers ──────────────────────────────────────────────────────────
