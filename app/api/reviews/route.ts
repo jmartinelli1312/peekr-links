@@ -96,13 +96,13 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 4. Fetch creators for badge
+  // 4. Fetch creators for badge — PK on approved_creators is `id` (the user UUID)
   const { data: creators } = await supabase
     .from("approved_creators")
-    .select("user_id")
-    .in("user_id", userIds);
+    .select("id")
+    .in("id", userIds);
 
-  const creatorSet = new Set((creators ?? []).map((c: { user_id: string }) => c.user_id));
+  const creatorSet = new Set((creators ?? []).map((c: { id: string }) => c.id));
 
   // 5. Assemble reviews
   const reviews: ReviewItem[] = rows.map((row) => {
