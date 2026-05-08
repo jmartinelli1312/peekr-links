@@ -1516,7 +1516,8 @@ export default async function TitlePage({ params }: PageProps) {
               <div className="hero-stat">
                 ⭐ {stats.avgRating} · {t.peekrRating}
               </div>
-            ) : base.vote_average && base.vote_count && base.vote_count > 0 ? (
+            ) : null}
+            {base.vote_average && base.vote_count && base.vote_count > 0 ? (
               <div className="hero-stat">
                 ⭐ {base.vote_average.toFixed(1)} · {t.tmdbRating}
               </div>
