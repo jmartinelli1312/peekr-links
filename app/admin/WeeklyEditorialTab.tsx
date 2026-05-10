@@ -487,6 +487,8 @@ export default function WeeklyEditorialTab({
   >(null);
   const [approved, setApproved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testSentMsg, setTestSentMsg] = useState<string | null>(null);
 
   // ── Derived selection state ────────────────────────────────────────────────
   const [selectedArticleIds, setSelectedArticleIds] = useState<{
@@ -774,6 +776,47 @@ export default function WeeklyEditorialTab({
       setError(e instanceof Error ? e.message : "Error aprobando semana");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSendTest(lang: "es" | "pt") {
+    setSendingTest(true);
+    setTestSentMsg(null);
+    setError(null);
+    try {
+      // Find the newsletter edition for this week
+      const { data: edition } = await supabase
+        .from("newsletter_editions")
+        .select("id, status")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!edition) {
+        setError("No hay ninguna edición de newsletter generada aún. Esperá al cron del lunes.");
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { setError("No hay sesión activa"); return; }
+
+      const res = await fetch("/api/admin/newsletter/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ edition_id: edition.id, email: "jmartinellir@gmail.com", lang }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError((data as any).error ?? `Error ${res.status}`);
+        return;
+      }
+      setTestSentMsg(`✓ Prueba enviada a jmartinellir@gmail.com (${lang.toUpperCase()})`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error enviando prueba");
+    } finally {
+      setSendingTest(false);
     }
   }
 
@@ -1627,6 +1670,30 @@ export default function WeeklyEditorialTab({
               {"{{nombre}}"}
             </span>{" "}
             se reemplaza con el nombre de cada usuario al enviar
+          </div>
+
+          {/* Test send button */}
+          <div style={{ marginTop: 16, textAlign: "center" }}>
+            {testSentMsg ? (
+              <div style={{ color: "#4ade80", fontSize: 13, fontWeight: 600 }}>{testSentMsg}</div>
+            ) : (
+              <button
+                disabled={sendingTest}
+                onClick={() => newsletterPreviewOpen && handleSendTest(newsletterPreviewOpen)}
+                style={{
+                  background: sendingTest ? "#333" : "rgba(124,58,237,0.85)",
+                  border: "none",
+                  borderRadius: 6,
+                  padding: "8px 20px",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: sendingTest ? "not-allowed" : "pointer",
+                }}
+              >
+                {sendingTest ? "Enviando…" : "📨 Enviar prueba a mi email"}
+              </button>
+            )}
           </div>
         </div>
       </Modal>
