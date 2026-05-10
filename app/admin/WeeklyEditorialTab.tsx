@@ -350,7 +350,17 @@ function CarouselOptionCard({
   onSelect: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const bullets = option.bullet_points ?? [];
+  // Defensive: bullet_points may come from DB as an object if Gemini returned malformed JSON
+  const rawBullets = option.bullet_points as unknown;
+  const bullets: string[] = Array.isArray(rawBullets)
+    ? (rawBullets as unknown[]).map((b) =>
+        typeof b === "string" ? b : JSON.stringify(b)
+      )
+    : rawBullets !== null && typeof rawBullets === "object"
+    ? Object.values(rawBullets as Record<string, unknown>).map((v) =>
+        typeof v === "string" ? v : JSON.stringify(v)
+      )
+    : [];
   const visibleBullets = expanded ? bullets : bullets.slice(0, 2);
 
   return (
