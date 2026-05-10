@@ -95,21 +95,24 @@ const LANG_TARGETS = { es: 14, pt: 14, en: 7 };
 
 // ─── Week helpers ─────────────────────────────────────────────────────────────
 
+function isoWeekKey(date: Date): string {
+  // Correct ISO 8601 week number: week containing the nearest Thursday.
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  // Shift to Thursday of the same ISO week (Mon=1..Sun=7 → Thu=4)
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const jan1 = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, "0")}`;
+}
+
 function getTargetWeekKey(): string {
   const now = new Date();
   const dayOfWeek = now.getDay(); // 0=Sun, 6=Sat
   const target = new Date(now);
+  // On Sat/Sun show the coming week so the plan is always the next publishing week
   if (dayOfWeek === 6) target.setDate(now.getDate() + 2); // Sat → next Mon
   else if (dayOfWeek === 0) target.setDate(now.getDate() + 1); // Sun → next Mon
-
-  // ISO week number
-  const jan4 = new Date(target.getFullYear(), 0, 4);
-  const dayOfYear = Math.ceil(
-    (target.getTime() - new Date(target.getFullYear(), 0, 0).getTime()) /
-      86400000
-  );
-  const weekNum = Math.ceil((dayOfYear + jan4.getDay()) / 7);
-  return `${target.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
+  return isoWeekKey(target);
 }
 
 function getWeekLabel(weekKey: string): string {
