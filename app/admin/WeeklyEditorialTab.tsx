@@ -5,6 +5,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// Articles can carry all 4 themes; carousels are now only generated for 2 of them.
+type ArticleTheme = "actualidad" | "historia" | "reco" | "dato_peekr";
+
 type WeeklyPlan = {
   id: string;
   week_key: string;
@@ -32,7 +35,7 @@ type BuzzArticle = {
   title: string;
   summary: string | null;
   language: "es" | "pt" | "en";
-  editorial_theme: "actualidad" | "historia" | "reco" | "dato_peekr" | null;
+  editorial_theme: ArticleTheme | null;
   week_key: string;
   day_slot: number | null;
   article_status: "draft_option" | "selected";
@@ -194,8 +197,23 @@ function StatusBadge({ status }: { status: WeeklyPlan["status"] }) {
   );
 }
 
-function ThemeBadge({ theme }: { theme: ThemeType | null }) {
+const ARTICLE_THEME_COLORS: Record<ArticleTheme, string> = {
+  actualidad: "#0ea5e9",
+  dato_peekr: "#a855f7",
+  historia:   "#f59e0b",
+  reco:       "#10b981",
+};
+const ARTICLE_THEME_LABELS: Record<ArticleTheme, string> = {
+  actualidad: "Actualidad",
+  dato_peekr: "Dato Peekr",
+  historia:   "Historia",
+  reco:       "Reco",
+};
+
+function ThemeBadge({ theme }: { theme: ArticleTheme | null }) {
   if (!theme) return null;
+  const color = ARTICLE_THEME_COLORS[theme] ?? "#888";
+  const label = ARTICLE_THEME_LABELS[theme] ?? theme;
   return (
     <span
       style={{
@@ -204,14 +222,14 @@ function ThemeBadge({ theme }: { theme: ThemeType | null }) {
         borderRadius: 8,
         fontSize: 10,
         fontWeight: 700,
-        color: THEME_COLORS[theme],
-        background: `${THEME_COLORS[theme]}22`,
-        border: `1px solid ${THEME_COLORS[theme]}44`,
+        color,
+        background: `${color}22`,
+        border: `1px solid ${color}44`,
         textTransform: "uppercase",
         letterSpacing: "0.04em",
       }}
     >
-      {THEME_LABELS[theme]}
+      {label}
     </span>
   );
 }
