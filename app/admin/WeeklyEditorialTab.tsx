@@ -517,9 +517,9 @@ export default function WeeklyEditorialTab({
           .in("status", ["pending_review", "approved"]),
       ]);
 
-      if (planRes.error) throw planRes.error;
-      if (articlesRes.error) throw articlesRes.error;
-      if (carouselsRes.error) throw carouselsRes.error;
+      if (planRes.error) throw new Error(`weekly_editorial_plans: ${planRes.error.message}`);
+      if (articlesRes.error) throw new Error(`peekrbuzz_articles: ${articlesRes.error.message}`);
+      if (carouselsRes.error) throw new Error(`peekrbuzz_ig_queue: ${carouselsRes.error.message}`);
 
       const planData = planRes.data as WeeklyPlan | null;
       const articles = (articlesRes.data ?? []) as BuzzArticle[];
@@ -772,7 +772,7 @@ export default function WeeklyEditorialTab({
   const ptCount = selectedArticleIds.pt.size;
   const enCount = selectedArticleIds.en.size;
   const carouselSelectedCount = selectedCarouselMap.size;
-  const carouselTarget = 7 * 4; // 28
+  const carouselTarget = 7 * THEMES.length; // 14 (7 days × 2 themes)
 
   const hasNewsletterEs = !!(plan?.newsletter_draft_es);
   const hasNewsletterPt = !!(plan?.newsletter_draft_pt);
