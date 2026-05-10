@@ -489,6 +489,8 @@ export default function WeeklyEditorialTab({
   const [error, setError] = useState<string | null>(null);
   const [sendingTest, setSendingTest] = useState(false);
   const [testSentMsg, setTestSentMsg] = useState<string | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   // ── Derived selection state ────────────────────────────────────────────────
   const [selectedArticleIds, setSelectedArticleIds] = useState<{
@@ -776,6 +778,22 @@ export default function WeeklyEditorialTab({
       setError(e instanceof Error ? e.message : "Error aprobando semana");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleLoadPreview(lang: "es" | "pt") {
+    setLoadingPreview(true);
+    setPreviewHtml(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      const res = await fetch(`/api/admin/newsletter/preview?lang=${lang}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setPreviewHtml(await res.text());
+    } finally {
+      setLoadingPreview(false);
     }
   }
 
@@ -1493,174 +1511,59 @@ export default function WeeklyEditorialTab({
         </div>
       </div>
 
-      {/* Newsletter preview modal — renders as an actual email template */}
+      {/* Newsletter preview modal — real email HTML via srcdoc iframe */}
       <Modal
         open={!!newsletterPreviewOpen}
-        onClose={() => setNewsletterPreviewOpen(null)}
-        title={`Newsletter ${newsletterPreviewOpen?.toUpperCase() ?? ""} — Vista previa de email`}
+        onClose={() => {
+          setNewsletterPreviewOpen(null);
+          setTestSentMsg(null);
+          setPreviewHtml(null);
+        }}
+        title={`Newsletter ${newsletterPreviewOpen?.toUpperCase() ?? ""} — Preview del email real`}
       >
-        {/* Outer email-client background */}
-        <div style={{ background: "#e8e8e8", borderRadius: 8, padding: "20px 0" }}>
-          {/* Email card */}
-          <div
-            style={{
-              maxWidth: 560,
-              margin: "0 auto",
-              background: "#ffffff",
-              borderRadius: 8,
-              overflow: "hidden",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
-            }}
-          >
-            {/* ── Email Header ── */}
-            <div
-              style={{
-                background: "#000",
-                padding: "28px 32px",
-                textAlign: "center",
-                borderBottom: "1px solid rgba(255,255,255,0.08)",
-              }}
-            >
-              <div
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Load preview button (loads on demand to avoid auth complexity with iframe src) */}
+          {!previewHtml && (
+            <div style={{ textAlign: "center" }}>
+              <button
+                disabled={loadingPreview}
+                onClick={() => newsletterPreviewOpen && handleLoadPreview(newsletterPreviewOpen)}
                 style={{
-                  color: "#FA0082",
-                  fontSize: 30,
-                  fontWeight: 900,
-                  letterSpacing: "-0.03em",
-                  fontFamily: "system-ui, -apple-system, sans-serif",
-                }}
-              >
-                Peekr
-              </div>
-              <div
-                style={{
-                  color: "rgba(255,255,255,0.35)",
-                  fontSize: 12,
-                  marginTop: 4,
-                  fontFamily: "system-ui, sans-serif",
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                }}
-              >
-                Newsletter Semanal
-              </div>
-            </div>
-
-            {/* ── Personalized greeting ── */}
-            <div
-              style={{
-                background: "#fff0f7",
-                borderBottom: "1px solid #ffd6ec",
-                padding: "14px 32px",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <span style={{ fontSize: 20 }}>👋</span>
-              <span
-                style={{
-                  color: "#b3005a",
+                  background: loadingPreview ? "#222" : "#1a1a1a",
+                  border: "1px solid #333",
+                  borderRadius: 6,
+                  padding: "10px 20px",
+                  color: loadingPreview ? "#666" : "#ccc",
+                  fontSize: 13,
                   fontWeight: 600,
-                  fontSize: 15,
-                  fontFamily: "system-ui, sans-serif",
+                  cursor: loadingPreview ? "not-allowed" : "pointer",
                 }}
               >
-                {newsletterPreviewOpen === "es" ? "Hola," : "Olá,"}{" "}
-                <span
-                  style={{
-                    background: "#ffe0f0",
-                    border: "1px dashed #FA0082",
-                    borderRadius: 4,
-                    padding: "2px 8px",
-                    fontFamily: "monospace",
-                    fontSize: 12,
-                    color: "#FA0082",
-                  }}
-                >
-                  {"{{nombre}}"}
-                </span>
-              </span>
-            </div>
-
-            {/* ── Newsletter body ── */}
-            <div
-              style={{
-                padding: "24px 32px 8px",
-                fontFamily: "Georgia, 'Times New Roman', serif",
-              }}
-              dangerouslySetInnerHTML={{
-                __html: markdownToHtml(
-                  newsletterPreviewOpen === "es"
-                    ? plan?.newsletter_draft_es ?? ""
-                    : plan?.newsletter_draft_pt ?? ""
-                ),
-              }}
-            />
-
-            {/* ── Footer ── */}
-            <div
-              style={{
-                background: "#f9fafb",
-                borderTop: "1px solid #e5e7eb",
-                padding: "16px 32px",
-                textAlign: "center",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 11,
-                  color: "#9ca3af",
-                  fontFamily: "system-ui, sans-serif",
-                  lineHeight: 1.7,
-                }}
-              >
-                <strong style={{ color: "#6b7280" }}>Peekr</strong> · peekr.app
-                <br />
-                {newsletterPreviewOpen === "es"
-                  ? "Recibís esta newsletter porque te registraste en Peekr. "
-                  : "Você recebe esta newsletter porque se cadastrou no Peekr. "}
-                <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  style={{ color: "#9ca3af", textDecoration: "underline" }}
-                >
-                  {newsletterPreviewOpen === "es"
-                    ? "Cancelar suscripción"
-                    : "Cancelar inscrição"}
-                </a>
+                {loadingPreview ? "Cargando preview…" : "👁 Cargar preview del email"}
+              </button>
+              <div style={{ fontSize: 11, color: "#555", marginTop: 6 }}>
+                Usa el último newsletter guardado en DB — con posters, ratings y CTAs reales
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Merge-tag legend */}
-          <div
-            style={{
-              marginTop: 12,
-              textAlign: "center",
-              fontSize: 11,
-              color: "#888",
-              fontFamily: "system-ui, sans-serif",
-            }}
-          >
-            <span
+          {/* iframe with real email HTML */}
+          {previewHtml && (
+            <iframe
+              srcDoc={previewHtml}
+              sandbox="allow-same-origin"
               style={{
-                background: "#ffe0f0",
-                border: "1px dashed #FA0082",
-                borderRadius: 3,
-                padding: "1px 6px",
-                fontFamily: "monospace",
-                color: "#FA0082",
-                fontSize: 11,
+                width: "100%",
+                height: 620,
+                border: "1px solid #2a2a2a",
+                borderRadius: 8,
               }}
-            >
-              {"{{nombre}}"}
-            </span>{" "}
-            se reemplaza con el nombre de cada usuario al enviar
-          </div>
+              title="Newsletter preview"
+            />
+          )}
 
-          {/* Test send button */}
-          <div style={{ marginTop: 16, textAlign: "center" }}>
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
             {testSentMsg ? (
               <div style={{ color: "#4ade80", fontSize: 13, fontWeight: 600 }}>{testSentMsg}</div>
             ) : (
@@ -1668,17 +1571,17 @@ export default function WeeklyEditorialTab({
                 disabled={sendingTest}
                 onClick={() => newsletterPreviewOpen && handleSendTest(newsletterPreviewOpen)}
                 style={{
-                  background: sendingTest ? "#333" : "rgba(124,58,237,0.85)",
+                  background: sendingTest ? "#333" : "#FA0082",
                   border: "none",
                   borderRadius: 6,
-                  padding: "8px 20px",
-                  color: "#fff",
+                  padding: "9px 20px",
+                  color: sendingTest ? "#888" : "#000",
                   fontSize: 13,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   cursor: sendingTest ? "not-allowed" : "pointer",
                 }}
               >
-                {sendingTest ? "Enviando…" : "📨 Enviar prueba a mi email"}
+                {sendingTest ? "Enviando (~15s)…" : "📨 Enviar prueba a mi email"}
               </button>
             )}
           </div>
