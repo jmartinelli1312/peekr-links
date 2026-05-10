@@ -1528,34 +1528,34 @@ export default function WeeklyEditorialTab({
             {/* ── Email Header ── */}
             <div
               style={{
-                background: "linear-gradient(135deg, #7c3aed 0%, #9333ea 100%)",
+                background: "#000",
                 padding: "28px 32px",
                 textAlign: "center",
+                borderBottom: "1px solid rgba(255,255,255,0.08)",
               }}
             >
               <div
                 style={{
-                  color: "#fff",
+                  color: "#FA0082",
                   fontSize: 30,
                   fontWeight: 900,
-                  letterSpacing: "0.14em",
+                  letterSpacing: "-0.03em",
                   fontFamily: "system-ui, -apple-system, sans-serif",
                 }}
               >
-                PEEKR
+                Peekr
               </div>
               <div
                 style={{
-                  color: "rgba(255,255,255,0.65)",
+                  color: "rgba(255,255,255,0.35)",
                   fontSize: 12,
-                  marginTop: 6,
+                  marginTop: 4,
                   fontFamily: "system-ui, sans-serif",
-                  letterSpacing: "0.03em",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
                 }}
               >
-                {newsletterPreviewOpen === "es"
-                  ? "Tu weekly de cine y series para LATAM"
-                  : "Seu weekly de cinema e séries para a América Latina"}
+                Newsletter Semanal
               </div>
             </div>
 
