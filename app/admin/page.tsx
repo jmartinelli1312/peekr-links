@@ -1,12 +1,80 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Component } from "react";
+import type { ErrorInfo, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import WeeklyEditorialTab from "./WeeklyEditorialTab";
 import PublicationScheduleTab from "./PublicationScheduleTab";
 import PublishedArchiveTab from "./PublishedArchiveTab";
 import UserGeoTab from "./UserGeoTab";
+
+// ─── Error Boundary ───────────────────────────────────────────────────────────
+// Catches runtime exceptions inside WeeklyEditorialTab and shows the actual
+// error message instead of crashing the whole admin page.
+class EditorialErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[WeeklyEditorialTab] runtime error:", error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div
+          style={{
+            background: "rgba(239,68,68,0.12)",
+            border: "1px solid rgba(239,68,68,0.4)",
+            borderRadius: 12,
+            padding: "20px 24px",
+            color: "#fca5a5",
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>
+            ⚠ Error al cargar el tab Editorial
+          </div>
+          <pre
+            style={{
+              fontSize: 12,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-all",
+              color: "#f87171",
+              margin: 0,
+            }}
+          >
+            {this.state.error.message}
+            {"\n\n"}
+            {this.state.error.stack}
+          </pre>
+          <button
+            onClick={() => this.setState({ error: null })}
+            style={{
+              marginTop: 14,
+              background: "rgba(239,68,68,0.2)",
+              border: "1px solid rgba(239,68,68,0.4)",
+              borderRadius: 8,
+              padding: "6px 16px",
+              color: "#fca5a5",
+              cursor: "pointer",
+              fontSize: 12,
+            }}
+          >
+            Reintentar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 type AdminState = "loading" | "authorized" | "unauthorized";
 
@@ -1694,7 +1762,9 @@ export default function AdminPage() {
 
             {/* ===================== TAB: EDITORIAL ===================== */}
             {activeTab === "editorial" && (
-              <WeeklyEditorialTab supabase={supabase} />
+              <EditorialErrorBoundary>
+                <WeeklyEditorialTab supabase={supabase} />
+              </EditorialErrorBoundary>
             )}
           </>
         )}
