@@ -1539,7 +1539,7 @@ export default function WeeklyEditorialTab({
                   cursor: loadingPreview ? "not-allowed" : "pointer",
                 }}
               >
-                {loadingPreview ? "Cargando preview…" : "👁 Cargar preview del email"}
+                {loadingPreview ? "Cargando (~15s)…" : "👁 Cargar preview del email"}
               </button>
               <div style={{ fontSize: 11, color: "#555", marginTop: 6 }}>
                 Usa el último newsletter guardado en DB — con posters, ratings y CTAs reales

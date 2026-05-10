@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
       Authorization: `Bearer ${cronSecret}`,
     },
     body: JSON.stringify({ action: "preview_html", lang }),
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(60_000),
   });
 
   if (!edgeRes.ok) {
