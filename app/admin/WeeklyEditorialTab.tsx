@@ -137,6 +137,30 @@ function getWeekLabel(weekKey: string): string {
   return `${startDay} de ${startMonth} – ${endDay} de ${endMonth} ${endYear}`;
 }
 
+// ─── Newsletter email preview helpers ─────────────────────────────────────────
+
+/** Converts the Gemini-generated Markdown newsletter into basic inline-styled HTML
+ *  suitable for rendering inside a preview div (no CSS classes needed). */
+function markdownToHtml(md: string): string {
+  return md
+    .split(/\n\n+/)
+    .map((block) => {
+      const trimmed = block.trim();
+      if (!trimmed) return "";
+      if (trimmed.startsWith("## ")) {
+        return `<h2 style="font-size:17px;font-weight:700;color:#111827;margin:22px 0 8px;padding-bottom:6px;border-bottom:2px solid #7c3aed;">${trimmed.slice(3)}</h2>`;
+      }
+      if (trimmed.startsWith("# ")) {
+        return `<h1 style="font-size:20px;font-weight:800;color:#111827;margin:0 0 14px;">${trimmed.slice(2)}</h1>`;
+      }
+      const withBold = trimmed.replace(/\*\*([^*]+)\*\*/g, '<strong style="color:#1f2937;">$1</strong>');
+      const withBreaks = withBold.replace(/\n/g, "<br>");
+      return `<p style="font-size:15px;line-height:1.75;color:#374151;margin:0 0 14px;">${withBreaks}</p>`;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: WeeklyPlan["status"] }) {
@@ -1368,16 +1392,21 @@ export default function WeeklyEditorialTab({
                     placeholder="Ej: Tono más casual, enfocarse en series de ciencia ficción…"
                     style={{
                       width: "100%",
-                      background: "#111",
-                      border: "1px solid #333",
+                      background: "#0d0d0d",
+                      border: "1px solid #444",
                       borderRadius: 8,
-                      padding: "8px 10px",
-                      color: "#d0d0d0",
+                      padding: "9px 11px",
+                      color: "#e0e0e0",
                       fontSize: 12,
                       resize: "vertical",
                       fontFamily: "inherit",
                       boxSizing: "border-box",
+                      outline: "none",
+                      display: "block",
+                      transition: "border-color 0.15s",
                     }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#7c3aed"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "#444"; }}
                   />
                 </div>
 
@@ -1406,27 +1435,172 @@ export default function WeeklyEditorialTab({
         </div>
       </div>
 
-      {/* Newsletter preview modal */}
+      {/* Newsletter preview modal — renders as an actual email template */}
       <Modal
         open={!!newsletterPreviewOpen}
         onClose={() => setNewsletterPreviewOpen(null)}
-        title={`Newsletter ${newsletterPreviewOpen?.toUpperCase() ?? ""} — Preview`}
+        title={`Newsletter ${newsletterPreviewOpen?.toUpperCase() ?? ""} — Vista previa de email`}
       >
-        <pre
-          style={{
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            fontSize: 13,
-            color: "#d0d0d0",
-            lineHeight: 1.6,
-            fontFamily: "inherit",
-            margin: 0,
-          }}
-        >
-          {newsletterPreviewOpen === "es"
-            ? plan?.newsletter_draft_es ?? ""
-            : plan?.newsletter_draft_pt ?? ""}
-        </pre>
+        {/* Outer email-client background */}
+        <div style={{ background: "#e8e8e8", borderRadius: 8, padding: "20px 0" }}>
+          {/* Email card */}
+          <div
+            style={{
+              maxWidth: 560,
+              margin: "0 auto",
+              background: "#ffffff",
+              borderRadius: 8,
+              overflow: "hidden",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+            }}
+          >
+            {/* ── Email Header ── */}
+            <div
+              style={{
+                background: "linear-gradient(135deg, #7c3aed 0%, #9333ea 100%)",
+                padding: "28px 32px",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  color: "#fff",
+                  fontSize: 30,
+                  fontWeight: 900,
+                  letterSpacing: "0.14em",
+                  fontFamily: "system-ui, -apple-system, sans-serif",
+                }}
+              >
+                PEEKR
+              </div>
+              <div
+                style={{
+                  color: "rgba(255,255,255,0.65)",
+                  fontSize: 12,
+                  marginTop: 6,
+                  fontFamily: "system-ui, sans-serif",
+                  letterSpacing: "0.03em",
+                }}
+              >
+                {newsletterPreviewOpen === "es"
+                  ? "Tu weekly de cine y series para LATAM"
+                  : "Seu weekly de cinema e séries para a América Latina"}
+              </div>
+            </div>
+
+            {/* ── Personalized greeting ── */}
+            <div
+              style={{
+                background: "#faf5ff",
+                borderBottom: "1px solid #e9d5ff",
+                padding: "14px 32px",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: 20 }}>👋</span>
+              <span
+                style={{
+                  color: "#6b21a8",
+                  fontWeight: 600,
+                  fontSize: 15,
+                  fontFamily: "system-ui, sans-serif",
+                }}
+              >
+                {newsletterPreviewOpen === "es" ? "Hola," : "Olá,"}{" "}
+                <span
+                  style={{
+                    background: "#ede9fe",
+                    border: "1px dashed #a855f7",
+                    borderRadius: 4,
+                    padding: "2px 8px",
+                    fontFamily: "monospace",
+                    fontSize: 12,
+                    color: "#7c3aed",
+                  }}
+                >
+                  {"{{nombre}}"}
+                </span>
+              </span>
+            </div>
+
+            {/* ── Newsletter body ── */}
+            <div
+              style={{
+                padding: "24px 32px 8px",
+                fontFamily: "Georgia, 'Times New Roman', serif",
+              }}
+              dangerouslySetInnerHTML={{
+                __html: markdownToHtml(
+                  newsletterPreviewOpen === "es"
+                    ? plan?.newsletter_draft_es ?? ""
+                    : plan?.newsletter_draft_pt ?? ""
+                ),
+              }}
+            />
+
+            {/* ── Footer ── */}
+            <div
+              style={{
+                background: "#f9fafb",
+                borderTop: "1px solid #e5e7eb",
+                padding: "16px 32px",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "#9ca3af",
+                  fontFamily: "system-ui, sans-serif",
+                  lineHeight: 1.7,
+                }}
+              >
+                <strong style={{ color: "#6b7280" }}>Peekr</strong> · peekr.app
+                <br />
+                {newsletterPreviewOpen === "es"
+                  ? "Recibís esta newsletter porque te registraste en Peekr. "
+                  : "Você recebe esta newsletter porque se cadastrou no Peekr. "}
+                <a
+                  href="#"
+                  onClick={(e) => e.preventDefault()}
+                  style={{ color: "#9ca3af", textDecoration: "underline" }}
+                >
+                  {newsletterPreviewOpen === "es"
+                    ? "Cancelar suscripción"
+                    : "Cancelar inscrição"}
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Merge-tag legend */}
+          <div
+            style={{
+              marginTop: 12,
+              textAlign: "center",
+              fontSize: 11,
+              color: "#888",
+              fontFamily: "system-ui, sans-serif",
+            }}
+          >
+            <span
+              style={{
+                background: "#ede9fe",
+                border: "1px dashed #a855f7",
+                borderRadius: 3,
+                padding: "1px 6px",
+                fontFamily: "monospace",
+                color: "#7c3aed",
+                fontSize: 11,
+              }}
+            >
+              {"{{nombre}}"}
+            </span>{" "}
+            se reemplaza con el nombre de cada usuario al enviar
+          </div>
+        </div>
       </Modal>
 
       {/* ── 4. PEEKRBUZZ ARTICLES ─────────────────────────────────────── */}
