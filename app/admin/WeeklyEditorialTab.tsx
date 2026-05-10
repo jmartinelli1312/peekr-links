@@ -50,7 +50,7 @@ type CarouselOption = {
   caption: string;
   seed_title: string | null;
   article_url: string | null;
-  status: "draft_option" | "approved";
+  status: "pending_review" | "approved";
 };
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -477,7 +477,7 @@ export default function WeeklyEditorialTab({
             "id,week_key,day_slot,theme_type,option_index,hook_text,bullet_points,caption,seed_title,article_url,status"
           )
           .eq("week_key", weekKey)
-          .in("status", ["draft_option", "approved"]),
+          .in("status", ["pending_review", "approved"]),
       ]);
 
       if (planRes.error) throw planRes.error;
@@ -648,7 +648,7 @@ export default function WeeklyEditorialTab({
         sameGroup.map((c) =>
           supabase
             .from("peekrbuzz_ig_queue")
-            .update({ status: "draft_option" })
+            .update({ status: "pending_review" })
             .eq("id", c.id)
         )
       );
@@ -668,7 +668,7 @@ export default function WeeklyEditorialTab({
             status:
               !alreadySelected && c.id === option.id
                 ? "approved"
-                : "draft_option",
+                : "pending_review",
           };
         })
       );
