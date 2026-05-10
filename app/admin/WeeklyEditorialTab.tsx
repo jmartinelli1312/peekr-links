@@ -83,7 +83,7 @@ const THEME_ICONS: Record<ThemeType, string> = {
 
 const THEME_COLORS: Record<ThemeType, string> = {
   actualidad: "#0ea5e9",
-  dato_peekr: "#a855f7",
+  dato_peekr: "#FA0082",
 };
 
 const LANG_TARGETS = { es: 14, pt: 14, en: 7 };
@@ -151,7 +151,7 @@ function markdownToHtml(md: string): string {
       const trimmed = block.trim();
       if (!trimmed) return "";
       if (trimmed.startsWith("## ")) {
-        return `<h2 style="font-size:17px;font-weight:700;color:#111827;margin:22px 0 8px;padding-bottom:6px;border-bottom:2px solid #7c3aed;">${trimmed.slice(3)}</h2>`;
+        return `<h2 style="font-size:17px;font-weight:700;color:#111827;margin:22px 0 8px;padding-bottom:6px;border-bottom:2px solid #FA0082;">${trimmed.slice(3)}</h2>`;
       }
       if (trimmed.startsWith("# ")) {
         return `<h1 style="font-size:20px;font-weight:800;color:#111827;margin:0 0 14px;">${trimmed.slice(2)}</h1>`;
@@ -199,7 +199,7 @@ function StatusBadge({ status }: { status: WeeklyPlan["status"] }) {
 
 const ARTICLE_THEME_COLORS: Record<ArticleTheme, string> = {
   actualidad: "#0ea5e9",
-  dato_peekr: "#a855f7",
+  dato_peekr: "#FA0082",
   historia:   "#f59e0b",
   reco:       "#10b981",
 };
@@ -237,7 +237,7 @@ function ThemeBadge({ theme }: { theme: ArticleTheme | null }) {
 function ProgressBar({
   value,
   max,
-  color = "#7c3aed",
+  color = "#FA0082",
 }: {
   value: number;
   max: number;
@@ -368,7 +368,7 @@ function CarouselOptionCard({
       onClick={onSelect}
       style={{
         background: "#111",
-        border: `2px solid ${selected ? "#7c3aed" : "#2a2a2a"}`,
+        border: `2px solid ${selected ? "#FA0082" : "#2a2a2a"}`,
         borderRadius: 8,
         padding: "10px 12px",
         cursor: "pointer",
@@ -384,7 +384,7 @@ function CarouselOptionCard({
             position: "absolute",
             top: 6,
             right: 8,
-            color: "#7c3aed",
+            color: "#FA0082",
             fontSize: 14,
             fontWeight: 900,
           }}
@@ -432,7 +432,7 @@ function CarouselOptionCard({
           style={{
             background: "none",
             border: "none",
-            color: "#7c3aed",
+            color: "#FA0082",
             fontSize: 10,
             cursor: "pointer",
             padding: "4px 0 0",
@@ -784,19 +784,6 @@ export default function WeeklyEditorialTab({
     setTestSentMsg(null);
     setError(null);
     try {
-      // Find the newsletter edition for this week
-      const { data: edition } = await supabase
-        .from("newsletter_editions")
-        .select("id, status")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!edition) {
-        setError("No hay ninguna edición de newsletter generada aún. Esperá al cron del lunes.");
-        return;
-      }
-
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) { setError("No hay sesión activa"); return; }
@@ -804,7 +791,7 @@ export default function WeeklyEditorialTab({
       const res = await fetch("/api/admin/newsletter/test", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ edition_id: edition.id, email: "jmartinellir@gmail.com", lang }),
+        body: JSON.stringify({ email: "jmartinellir@gmail.com", lang }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -873,7 +860,7 @@ export default function WeeklyEditorialTab({
           padding: "4px 8px",
           fontSize: 11,
           color: filled ? "#d0d0d0" : "#444",
-          borderLeft: filled ? "3px solid #7c3aed55" : "3px solid transparent",
+          borderLeft: filled ? "3px solid #FA008255" : "3px solid transparent",
           overflow: "hidden",
           display: "-webkit-box",
           WebkitLineClamp: 2,
@@ -910,7 +897,7 @@ export default function WeeklyEditorialTab({
                 width: 8,
                 height: 8,
                 borderRadius: "50%",
-                background: "#7c3aed",
+                background: "#FA0082",
                 opacity: 0.4 + i * 0.2,
                 animation: `pulse ${i * 0.3 + 0.6}s ease-in-out infinite alternate`,
               }}
@@ -988,7 +975,7 @@ export default function WeeklyEditorialTab({
             <span style={{ fontSize: 13, color: "#888" }}>{weekKey}</span>
             {plan && <StatusBadge status={plan.status} />}
             {saving && (
-              <span style={{ fontSize: 11, color: "#7c3aed" }}>Guardando…</span>
+              <span style={{ fontSize: 11, color: "#FA0082" }}>Guardando…</span>
             )}
           </div>
           <div style={{ fontSize: 15, color: "#bbb", fontWeight: 600 }}>
@@ -1003,7 +990,7 @@ export default function WeeklyEditorialTab({
             border: "1px solid rgba(124,58,237,0.4)",
             borderRadius: 8,
             padding: "8px 18px",
-            color: regenerating ? "#666" : "#a78bfa",
+            color: regenerating ? "#666" : "#ff80bf",
             fontSize: 13,
             fontWeight: 600,
             cursor: regenerating ? "not-allowed" : "pointer",
@@ -1269,7 +1256,7 @@ export default function WeeklyEditorialTab({
               handle: "email",
               freq: "1 por semana · lunes 08:00 UTC",
               detail: "Enviado a todos los usuarios registrados en español",
-              color: "#a78bfa",
+              color: "#ff80bf",
             },
             {
               icon: "📧",
@@ -1386,7 +1373,7 @@ export default function WeeklyEditorialTab({
                         border: "1px solid rgba(124,58,237,0.4)",
                         borderRadius: 6,
                         padding: "4px 10px",
-                        color: "#a78bfa",
+                        color: "#ff80bf",
                         fontSize: 11,
                         cursor: "pointer",
                         fontWeight: 600,
@@ -1476,7 +1463,7 @@ export default function WeeklyEditorialTab({
                       display: "block",
                       transition: "border-color 0.15s",
                     }}
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#7c3aed"; }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#FA0082"; }}
                     onBlur={(e) => { e.currentTarget.style.borderColor = "#444"; }}
                   />
                 </div>
@@ -1491,7 +1478,7 @@ export default function WeeklyEditorialTab({
                     border: "1px solid rgba(124,58,237,0.4)",
                     borderRadius: 8,
                     padding: "7px 14px",
-                    color: isRegening ? "#666" : "#a78bfa",
+                    color: isRegening ? "#666" : "#ff80bf",
                     fontSize: 12,
                     fontWeight: 600,
                     cursor: isRegening ? "not-allowed" : "pointer",
@@ -1562,8 +1549,8 @@ export default function WeeklyEditorialTab({
             {/* ── Personalized greeting ── */}
             <div
               style={{
-                background: "#faf5ff",
-                borderBottom: "1px solid #e9d5ff",
+                background: "#fff0f7",
+                borderBottom: "1px solid #ffd6ec",
                 padding: "14px 32px",
                 display: "flex",
                 alignItems: "center",
@@ -1573,7 +1560,7 @@ export default function WeeklyEditorialTab({
               <span style={{ fontSize: 20 }}>👋</span>
               <span
                 style={{
-                  color: "#6b21a8",
+                  color: "#b3005a",
                   fontWeight: 600,
                   fontSize: 15,
                   fontFamily: "system-ui, sans-serif",
@@ -1582,13 +1569,13 @@ export default function WeeklyEditorialTab({
                 {newsletterPreviewOpen === "es" ? "Hola," : "Olá,"}{" "}
                 <span
                   style={{
-                    background: "#ede9fe",
-                    border: "1px dashed #a855f7",
+                    background: "#ffe0f0",
+                    border: "1px dashed #FA0082",
                     borderRadius: 4,
                     padding: "2px 8px",
                     fontFamily: "monospace",
                     fontSize: 12,
-                    color: "#7c3aed",
+                    color: "#FA0082",
                   }}
                 >
                   {"{{nombre}}"}
@@ -1658,12 +1645,12 @@ export default function WeeklyEditorialTab({
           >
             <span
               style={{
-                background: "#ede9fe",
-                border: "1px dashed #a855f7",
+                background: "#ffe0f0",
+                border: "1px dashed #FA0082",
                 borderRadius: 3,
                 padding: "1px 6px",
                 fontFamily: "monospace",
-                color: "#7c3aed",
+                color: "#FA0082",
                 fontSize: 11,
               }}
             >
@@ -1831,7 +1818,7 @@ export default function WeeklyEditorialTab({
                             background: "#111",
                             border: `2px solid ${
                               isSelected
-                                ? "#7c3aed"
+                                ? "#FA0082"
                                 : "#2a2a2a"
                             }`,
                             borderRadius: 10,
@@ -1848,7 +1835,7 @@ export default function WeeklyEditorialTab({
                                 position: "absolute",
                                 top: 8,
                                 right: 10,
-                                color: "#7c3aed",
+                                color: "#FA0082",
                                 fontSize: 16,
                                 fontWeight: 900,
                               }}
@@ -1869,7 +1856,7 @@ export default function WeeklyEditorialTab({
                               <span
                                 style={{
                                   fontSize: 9,
-                                  color: "#7c3aed",
+                                  color: "#FA0082",
                                   background: "rgba(124,58,237,0.15)",
                                   padding: "1px 5px",
                                   borderRadius: 4,
@@ -2199,10 +2186,10 @@ export default function WeeklyEditorialTab({
             disabled={!allComplete || saving}
             style={{
               background: allComplete && !saving
-                ? "linear-gradient(135deg, #7c3aed, #9333ea)"
+                ? "linear-gradient(135deg, #FA0082, #e6006e)"
                 : "#2a2a2a",
               border: allComplete && !saving
-                ? "1px solid #a855f7"
+                ? "1px solid #FA0082"
                 : "1px solid #333",
               borderRadius: 10,
               padding: "0 24px",

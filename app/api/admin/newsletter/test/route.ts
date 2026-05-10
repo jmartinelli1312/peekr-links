@@ -30,10 +30,10 @@ export async function POST(req: NextRequest) {
 
     if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const body = (await req.json()) as { edition_id?: number; email?: string; lang?: string };
+    const body = (await req.json()) as { email?: string; lang?: string };
 
-    if (!body.edition_id || !body.email) {
-      return NextResponse.json({ error: "edition_id and email required" }, { status: 400 });
+    if (!body.email) {
+      return NextResponse.json({ error: "email required" }, { status: 400 });
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -50,12 +50,11 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${cronSecret}`,
       },
       body: JSON.stringify({
-        action:     "test",
-        edition_id: body.edition_id,
-        email:      body.email,
-        lang:       body.lang ?? "es",
+        action: "test",
+        email:  body.email,
+        lang:   body.lang ?? "es",
       }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(60_000),
     });
 
     const edgeData = await edgeRes.json().catch(() => ({}));

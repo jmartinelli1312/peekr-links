@@ -224,7 +224,7 @@ function formatPct(value: number) {
 
 const CAROUSEL_TYPE_COLORS: Record<string, string> = {
   actualidad: "#06b6d4",
-  actor: "#a855f7",
+  actor: "#FA0082",
   lanzamiento: "#f97316",
   reco: "#22c55e",
 };
@@ -1441,7 +1441,7 @@ export default function AdminPage() {
               <button
                 className={`admin-tab${activeTab === "editorial" ? " active" : ""}`}
                 onClick={() => setActiveTab("editorial")}
-                style={{ fontWeight: 700, color: activeTab === "editorial" ? "#a855f7" : "#a855f7" }}
+                style={{ fontWeight: 700, color: activeTab === "editorial" ? "#FA0082" : "#FA0082" }}
               >
                 📋 Editorial
               </button>
@@ -1464,9 +1464,9 @@ export default function AdminPage() {
                 className={`admin-tab${activeTab === "metrics" ? " active" : ""}`}
                 onClick={() => setActiveTab("metrics")}
                 style={{
-                  color: activeTab === "metrics" ? "#f0abfc" : "#e879f9",
+                  color: activeTab === "metrics" ? "#ff80bf" : "#FA0082",
                   fontWeight: 700,
-                  borderColor: activeTab === "metrics" ? "#d946ef" : "transparent",
+                  borderColor: activeTab === "metrics" ? "#e6006e" : "transparent",
                 }}
               >
                 📊 Métricas
