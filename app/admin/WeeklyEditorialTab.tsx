@@ -64,30 +64,22 @@ interface WeeklyEditorialTabProps {
 const DAYS_ES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const THEMES = [
   "actualidad",
-  "historia",
-  "reco",
   "dato_peekr",
 ] as const;
 type ThemeType = (typeof THEMES)[number];
 
 const THEME_LABELS: Record<ThemeType, string> = {
   actualidad: "Actualidad",
-  historia: "Historia",
-  reco: "Recomendaciones",
   dato_peekr: "Dato Peekr",
 };
 
 const THEME_ICONS: Record<ThemeType, string> = {
   actualidad: "📰",
-  historia: "🎬",
-  reco: "⭐",
   dato_peekr: "📊",
 };
 
 const THEME_COLORS: Record<ThemeType, string> = {
   actualidad: "#0ea5e9",
-  historia: "#f97316",
-  reco: "#22c55e",
   dato_peekr: "#a855f7",
 };
 
