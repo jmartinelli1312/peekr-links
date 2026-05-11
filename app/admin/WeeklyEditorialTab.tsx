@@ -53,6 +53,7 @@ type CarouselOption = {
   caption: string;
   seed_title: string | null;
   article_url: string | null;
+  seed_poster_url: string | null;
   status: "pending_review" | "approved";
 };
 
@@ -65,28 +66,46 @@ interface WeeklyEditorialTabProps {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DAYS_ES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-const THEMES = [
-  "actualidad",
-  "dato_peekr",
-] as const;
+const THEMES = ["actualidad", "historia"] as const;
 type ThemeType = (typeof THEMES)[number];
 
 const THEME_LABELS: Record<ThemeType, string> = {
   actualidad: "Actualidad",
-  dato_peekr: "Dato Peekr",
+  historia:   "Historia",
 };
 
 const THEME_ICONS: Record<ThemeType, string> = {
   actualidad: "📰",
-  dato_peekr: "📊",
+  historia:   "🎬",
 };
 
 const THEME_COLORS: Record<ThemeType, string> = {
   actualidad: "#0ea5e9",
-  dato_peekr: "#FA0082",
+  historia:   "#f59e0b",
 };
 
-const LANG_TARGETS = { es: 14, pt: 14, en: 7 };
+// Articles: user selects 7 ES; EN+PT are auto-translated from the selected ES articles.
+const ARTICLE_ES_TARGET = 7;
+
+// UTC hour at which each theme's carousel is published
+const CAROUSEL_PUBLISH_HOURS: Record<string, number> = {
+  actualidad: 13,
+  historia:   15,
+  reco:       14,
+};
+
+/** Returns the ISO scheduled_for string for a given day_slot + theme.
+ *  If the computed time is already in the past, returns now so the cron
+ *  publishes on the next run rather than scheduling all future slots
+ *  at once when the admin approves the full week. */
+function computeScheduledFor(weekStart: string, daySlot: number, themeType: string): string {
+  const hour = CAROUSEL_PUBLISH_HOURS[themeType] ?? 13;
+  const base = new Date(`${weekStart}T00:00:00Z`);
+  base.setUTCDate(base.getUTCDate() + (daySlot - 1));
+  base.setUTCHours(hour, 0, 0, 0);
+  const now = new Date();
+  return (base <= now ? now : base).toISOString();
+}
 
 // ─── Week helpers ─────────────────────────────────────────────────────────────
 
@@ -392,6 +411,13 @@ function CarouselOptionCard({
           ✓
         </div>
       )}
+      {option.seed_poster_url && (
+        <img
+          src={option.seed_poster_url}
+          alt=""
+          style={{ width: "100%", height: 60, objectFit: "cover", borderRadius: 4, marginBottom: 6 }}
+        />
+      )}
       <div
         style={{
           fontSize: 12,
@@ -481,6 +507,8 @@ export default function WeeklyEditorialTab({
   const [newsletterPromptEs, setNewsletterPromptEs] = useState("");
   const [newsletterPromptPt, setNewsletterPromptPt] = useState("");
   const [saving, setSaving] = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [translateMsg, setTranslateMsg] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const [newsletterRegenLoading, setNewsletterRegenLoading] = useState<
     "es" | "pt" | null
@@ -493,11 +521,9 @@ export default function WeeklyEditorialTab({
   const [loadingPreview, setLoadingPreview] = useState(false);
 
   // ── Derived selection state ────────────────────────────────────────────────
-  const [selectedArticleIds, setSelectedArticleIds] = useState<{
-    es: Set<number>;
-    pt: Set<number>;
-    en: Set<number>;
-  }>({ es: new Set(), pt: new Set(), en: new Set() });
+  const [selectedEsIds, setSelectedEsIds] = useState<Set<number>>(new Set());
+  // Keep legacy shape for remaining code that refs selectedArticleIds
+  const selectedArticleIds = { es: selectedEsIds, pt: new Set<number>(), en: new Set<number>() };
 
   // key = `${day_slot}-${theme_type}`, value = carousel option id
   const [selectedCarouselMap, setSelectedCarouselMap] = useState<
@@ -525,9 +551,10 @@ export default function WeeklyEditorialTab({
         supabase
           .from("peekrbuzz_ig_queue")
           .select(
-            "id,week_key,day_slot,theme_type,option_index,hook_text,bullet_points,caption,seed_title,article_url,status"
+            "id,week_key,day_slot,theme_type,option_index,hook_text,bullet_points,caption,seed_title,article_url,status,seed_poster_url"
           )
           .eq("week_key", weekKey)
+          .in("theme_type", ["actualidad", "historia", "reco"])
           .in("status", ["pending_review", "approved"]),
       ]);
 
@@ -548,18 +575,12 @@ export default function WeeklyEditorialTab({
         setNewsletterPromptPt(planData.newsletter_prompt ?? "");
       }
 
-      // Rebuild selection state from DB
+      // Rebuild selection state from DB (only ES articles are user-selected)
       const es = new Set<number>();
-      const pt = new Set<number>();
-      const en = new Set<number>();
       for (const a of articles) {
-        if (a.article_status === "selected") {
-          if (a.language === "es") es.add(a.id);
-          else if (a.language === "pt") pt.add(a.id);
-          else if (a.language === "en") en.add(a.id);
-        }
+        if (a.article_status === "selected" && a.language === "es") es.add(a.id);
       }
-      setSelectedArticleIds({ es, pt, en });
+      setSelectedEsIds(es);
 
       const carouselMap = new Map<string, string>();
       for (const c of carousels) {
@@ -607,12 +628,40 @@ export default function WeeklyEditorialTab({
     }
   }
 
-  // ── Toggle article selection ───────────────────────────────────────────────
+  // ── Translate selected ES articles to EN+PT ────────────────────────────────
+  async function handleTranslate() {
+    setTranslating(true);
+    setTranslateMsg(null);
+    setError(null);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate_weekly_buzz`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ action: "translate", week_key: weekKey }),
+        }
+      );
+      if (!res.ok) throw new Error(`Error ${res.status}: ${await res.text()}`);
+      const data = await res.json() as { translated?: number };
+      setTranslateMsg(`✓ ${data.translated ?? 0} artículos traducidos (EN + PT)`);
+      await loadData();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error traduciendo artículos");
+    } finally {
+      setTranslating(false);
+    }
+  }
+
+  // ── Toggle article selection (ES only) ────────────────────────────────────
   async function handleArticleToggle(article: BuzzArticle) {
     const lang = article.language as "es" | "pt" | "en";
     const currentSet = new Set(selectedArticleIds[lang]);
     const isSelected = currentSet.has(article.id);
-    const target = LANG_TARGETS[lang];
+    const target = lang === "es" ? ARTICLE_ES_TARGET : 0;
 
     if (!isSelected && currentSet.size >= target) return; // cap reached
 
@@ -635,7 +684,7 @@ export default function WeeklyEditorialTab({
       daySlot = Math.floor(pos / dotsPerDay) + 1;
     }
 
-    setSelectedArticleIds((prev) => ({ ...prev, [lang]: currentSet }));
+    if (lang === "es") setSelectedEsIds(new Set(currentSet));
 
     // Recompute day_slots for all selected in this lang
     const updatedArticles = buzzArticles.map((a) => {
@@ -691,7 +740,7 @@ export default function WeeklyEditorialTab({
 
     setSaving(true);
     try {
-      // Reset all options for same day/theme
+      // Reset all options for same day/theme (clear scheduled_for too)
       const sameGroup = carouselOptions.filter(
         (c) => c.day_slot === option.day_slot && c.theme_type === option.theme_type
       );
@@ -699,14 +748,17 @@ export default function WeeklyEditorialTab({
         sameGroup.map((c) =>
           supabase
             .from("peekrbuzz_ig_queue")
-            .update({ status: "pending_review" })
+            .update({ status: "pending_review", scheduled_for: null })
             .eq("id", c.id)
         )
       );
       if (!alreadySelected) {
+        const scheduledFor = plan?.week_start
+          ? computeScheduledFor(plan.week_start, option.day_slot, option.theme_type)
+          : new Date().toISOString();
         await supabase
           .from("peekrbuzz_ig_queue")
-          .update({ status: "approved" })
+          .update({ status: "approved", scheduled_for: scheduledFor })
           .eq("id", option.id);
       }
       // Update local state
@@ -826,20 +878,27 @@ export default function WeeklyEditorialTab({
   }
 
   // ── Completion checks ──────────────────────────────────────────────────────
-  const esCount = selectedArticleIds.es.size;
-  const ptCount = selectedArticleIds.pt.size;
-  const enCount = selectedArticleIds.en.size;
+  const esCount = selectedEsIds.size;
+  // EN+PT translation status from DB
+  const enTranslated = buzzArticles.filter(a => a.language === "en").length;
+  const ptTranslated = buzzArticles.filter(a => a.language === "pt").length;
+
+  const actualidadSelected = [...selectedCarouselMap.keys()].filter(k => k.endsWith("-actualidad")).length;
+  const historiaSelected   = [...selectedCarouselMap.keys()].filter(k => k.endsWith("-historia")).length;
+  const recoSelected       = selectedCarouselMap.has("4-reco") ? 1 : 0;
   const carouselSelectedCount = selectedCarouselMap.size;
-  const carouselTarget = 7 * THEMES.length; // 14 (7 days × 2 themes)
+  const carouselTarget = 7 + 7 + 1; // 15 total: 7 actualidad + 7 historia + 1 reco
 
   const hasNewsletterEs = !!(plan?.newsletter_draft_es);
   const hasNewsletterPt = !!(plan?.newsletter_draft_pt);
 
   const allComplete =
-    esCount >= LANG_TARGETS.es &&
-    ptCount >= LANG_TARGETS.pt &&
-    enCount >= LANG_TARGETS.en &&
-    carouselSelectedCount >= carouselTarget &&
+    esCount >= ARTICLE_ES_TARGET &&
+    enTranslated > 0 &&
+    ptTranslated > 0 &&
+    actualidadSelected >= 7 &&
+    historiaSelected   >= 7 &&
+    recoSelected       >= 1 &&
     hasNewsletterEs &&
     hasNewsletterPt;
 
@@ -929,10 +988,8 @@ export default function WeeklyEditorialTab({
   // ── Generating banner ──────────────────────────────────────────────────────
   const isGenerating = !plan || plan.status === "generating";
 
-  // ── Article count warnings ─────────────────────────────────────────────────
+  // ── Article count (ES options available) ──────────────────────────────────
   const esOptions = buzzArticles.filter((a) => a.language === "es").length;
-  const ptOptions = buzzArticles.filter((a) => a.language === "pt").length;
-  const enOptions = buzzArticles.filter((a) => a.language === "en").length;
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -1107,66 +1164,40 @@ export default function WeeklyEditorialTab({
               </tr>
             </thead>
             <tbody>
-              {/* PeekrBuzz rows */}
-              {(["es", "pt", "en"] as const).map((lang) => (
-                <tr key={`row-${lang}`} style={{ borderBottom: "1px solid #1f1f1f" }}>
-                  <td
-                    style={{
-                      padding: "6px 10px",
-                      fontSize: 11,
-                      color: "#aaa",
-                      fontWeight: 700,
-                      background: "#161616",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    PeekrBuzz{" "}
-                    <span
-                      style={{
-                        display: "inline-block",
-                        padding: "1px 6px",
-                        borderRadius: 4,
-                        fontSize: 9,
-                        fontWeight: 800,
-                        background:
-                          lang === "es"
-                            ? "rgba(239,68,68,0.2)"
-                            : lang === "pt"
-                            ? "rgba(34,197,94,0.2)"
-                            : "rgba(59,130,246,0.2)",
-                        color:
-                          lang === "es"
-                            ? "#f87171"
-                            : lang === "pt"
-                            ? "#4ade80"
-                            : "#60a5fa",
-                      }}
-                    >
-                      {lang.toUpperCase()}
-                    </span>
-                  </td>
-                  {DAYS_ES.map((_, dayIdx) => {
-                    const day = dayIdx + 1;
-                    const articles = getArticlesForDayLang(day, lang);
-                    const dotsPerDay = lang === "en" ? 1 : 2;
-                    const cells = Array.from({ length: dotsPerDay }, (_, i) => articles[i]);
-                    return (
-                      <td
-                        key={day}
-                        style={{
-                          padding: "2px 2px",
-                          verticalAlign: "top",
-                          borderLeft: "1px solid #1f1f1f",
-                        }}
-                      >
-                        {cells.map((a, i) =>
-                          renderGridCell(a?.title ?? null)
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+              {/* PeekrBuzz ES row */}
+              <tr style={{ borderBottom: "1px solid #1f1f1f" }}>
+                <td style={{ padding: "6px 10px", fontSize: 11, color: "#aaa", fontWeight: 700, background: "#161616", whiteSpace: "nowrap" }}>
+                  PeekrBuzz{" "}
+                  <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 800, background: "rgba(239,68,68,0.2)", color: "#f87171" }}>
+                    ES
+                  </span>
+                </td>
+                {DAYS_ES.map((_, dayIdx) => {
+                  const day = dayIdx + 1;
+                  const art = getArticlesForDayLang(day, "es")[0];
+                  return (
+                    <td key={day} style={{ padding: "2px 2px", verticalAlign: "top", borderLeft: "1px solid #1f1f1f" }}>
+                      {renderGridCell(art?.title ?? null)}
+                    </td>
+                  );
+                })}
+              </tr>
+              {/* Reco row (Thursday only) */}
+              <tr style={{ borderBottom: "1px solid #1f1f1f" }}>
+                <td style={{ padding: "6px 10px", fontSize: 11, color: "#10b981", fontWeight: 700, background: "#161616", whiteSpace: "nowrap" }}>
+                  🎯 Reco Jue
+                </td>
+                {DAYS_ES.map((_, dayIdx) => {
+                  const day = dayIdx + 1;
+                  const opt = day === 4 ? getCarouselForDayTheme(4, "actualidad") : null; // reuse helper, but pull reco
+                  const recoOpt = day === 4 ? carouselOptions.find(c => c.day_slot === 4 && c.theme_type === "reco" && c.status === "approved") : null;
+                  return (
+                    <td key={day} style={{ padding: "2px 2px", verticalAlign: "top", borderLeft: "1px solid #1f1f1f" }}>
+                      {renderGridCell(day === 4 ? (recoOpt?.hook_text ?? null) : null)}
+                    </td>
+                  );
+                })}
+              </tr>
               {/* Carousel theme rows */}
               {THEMES.map((theme) => (
                 <tr key={`row-${theme}`} style={{ borderBottom: "1px solid #1f1f1f" }}>
@@ -1216,32 +1247,32 @@ export default function WeeklyEditorialTab({
               icon: "📸",
               name: "Instagram",
               handle: "@peekr.app",
-              freq: "4 posts diarios",
-              detail: "Actualidad · Historia · Recomendaciones · Dato Peekr",
+              freq: "2 posts diarios + reco jueves",
+              detail: "Actualidad 13:00 UTC · Historia 15:00 UTC · Reco carrusel los jueves 14:00 UTC",
               color: "#e1306c",
             },
             {
               icon: "🧵",
               name: "Threads",
               handle: "@peekr.app",
-              freq: "4 posts diarios",
+              freq: "2 posts diarios + reco jueves",
               detail: "Mismo contenido que IG — publicación simultánea",
-              color: "#000000",
+              color: "#888",
             },
             {
               icon: "📘",
               name: "Facebook",
               handle: "Peekr",
-              freq: "4 posts diarios",
-              detail: "Actualidad · Historia · Recomendaciones · Dato Peekr",
+              freq: "2 posts diarios + reco jueves",
+              detail: "Actualidad · Historia · Reco semanal",
               color: "#1877f2",
             },
             {
               icon: "🦋",
               name: "Bluesky",
               handle: "@peekr.app",
-              freq: "4 posts diarios",
-              detail: "Actualidad · Historia · Recomendaciones · Dato Peekr",
+              freq: "2 posts diarios + reco jueves",
+              detail: "Actualidad · Historia · Reco semanal",
               color: "#0085ff",
             },
             {
@@ -1249,24 +1280,16 @@ export default function WeeklyEditorialTab({
               name: "PeekrBuzz ES",
               handle: "peekr.app/buzz",
               freq: "1 artículo/día · 7 artículos/semana",
-              detail: "Contenido original en español · categorías: actualidad, historia, reco, dato_peekr, awards",
+              detail: "Seleccionados manualmente · traducidos automáticamente a EN y PT",
               color: "#f97316",
             },
             {
               icon: "📰",
-              name: "PeekrBuzz PT",
+              name: "PeekrBuzz EN + PT",
               handle: "peekr.app/buzz",
-              freq: "1 artículo/día · 7 artículos/semana",
-              detail: "Conteúdo original em português · mesmas categorías",
+              freq: "Auto-traducción de los 7 ES seleccionados",
+              detail: "Traducidos por Gemini desde los artículos ES aprobados",
               color: "#4ade80",
-            },
-            {
-              icon: "🌐",
-              name: "PeekrBuzz EN",
-              handle: "peekr.app/buzz",
-              freq: "1 artículo cada 2 días · 3–4 artículos/semana",
-              detail: "Original content in English · same categories",
-              color: "#38bdf8",
             },
             {
               icon: "📧",
@@ -1588,241 +1611,125 @@ export default function WeeklyEditorialTab({
         </div>
       </Modal>
 
-      {/* ── 4. PEEKRBUZZ ARTICLES ─────────────────────────────────────── */}
+      {/* ── 4. PEEKRBUZZ ARTICLES (ES only — EN/PT auto-translated) ──── */}
       <div>
-        <div
-          style={{
-            fontSize: 15,
-            fontWeight: 700,
-            color: "#d0d0d0",
-            marginBottom: 14,
-            paddingLeft: 2,
-          }}
-        >
-          PeekrBuzz — Artículos
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, paddingLeft: 2 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#d0d0d0" }}>
+            PeekrBuzz — Artículos ES
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {translateMsg && (
+              <span style={{ fontSize: 12, color: "#4ade80", fontWeight: 600 }}>{translateMsg}</span>
+            )}
+            <div style={{ fontSize: 11, color: "#666" }}>
+              EN: {enTranslated} · PT: {ptTranslated}
+            </div>
+            <button
+              onClick={handleTranslate}
+              disabled={translating || esCount < ARTICLE_ES_TARGET}
+              style={{
+                background: translating || esCount < ARTICLE_ES_TARGET ? "#2a2a2a" : "rgba(16,185,129,0.15)",
+                border: "1px solid rgba(16,185,129,0.4)",
+                borderRadius: 8,
+                padding: "7px 14px",
+                color: translating || esCount < ARTICLE_ES_TARGET ? "#555" : "#4ade80",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: translating || esCount < ARTICLE_ES_TARGET ? "not-allowed" : "pointer",
+              }}
+              title={esCount < ARTICLE_ES_TARGET ? `Seleccioná ${ARTICLE_ES_TARGET} artículos ES primero` : "Traducir artículos seleccionados a EN y PT"}
+            >
+              {translating ? "⏳ Traduciendo…" : "🌐 Traducir a EN + PT"}
+            </button>
+          </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {(["es", "pt", "en"] as const).map((lang) => {
-            const langArticles = buzzArticles.filter(
-              (a) => a.language === lang
-            );
-            const target = LANG_TARGETS[lang];
-            const selCount = selectedArticleIds[lang].size;
-            const total = langArticles.length;
-            const langOpts = lang === "es" ? esOptions : lang === "pt" ? ptOptions : enOptions;
-            const warnLow = langOpts < target * 2;
 
-            const langColor =
-              lang === "es"
-                ? "#f87171"
-                : lang === "pt"
-                ? "#4ade80"
-                : "#60a5fa";
+        {/* ES Articles section */}
+        <div style={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid #2a2a2a", display: "flex", alignItems: "center", gap: 12, background: "#161616" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#d0d0d0" }}>ES</span>
+            <span style={{ fontSize: 12, color: "#f87171", fontWeight: 700, background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", padding: "2px 8px", borderRadius: 8 }}>
+              {esCount}/{ARTICLE_ES_TARGET} seleccionados
+            </span>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+              <ProgressBar value={esCount} max={ARTICLE_ES_TARGET} color="#f87171" />
+            </div>
+            <span style={{ fontSize: 11, color: "#555" }}>{esOptions} disponibles</span>
+          </div>
 
-            return (
-              <div
-                key={lang}
-                style={{
-                  background: "#1a1a1a",
-                  border: "1px solid #2a2a2a",
-                  borderRadius: 12,
-                  overflow: "hidden",
-                }}
-              >
-                {/* Section header */}
-                <div
-                  style={{
-                    padding: "12px 16px",
-                    borderBottom: "1px solid #2a2a2a",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    background: "#161616",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: "#d0d0d0",
-                    }}
-                  >
-                    {lang.toUpperCase()}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      color: langColor,
-                      fontWeight: 700,
-                      background: `${langColor}22`,
-                      border: `1px solid ${langColor}44`,
-                      padding: "2px 8px",
-                      borderRadius: 8,
-                    }}
-                  >
-                    {selCount}/{target} seleccionados
-                  </span>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
-                    <ProgressBar value={selCount} max={target} />
-                  </div>
-                  <span style={{ fontSize: 11, color: "#555" }}>
-                    {total} disponibles
-                  </span>
-                </div>
+          {esOptions < ARTICLE_ES_TARGET * 2 && (
+            <div style={{ padding: "8px 16px", background: "rgba(251,191,36,0.08)", borderBottom: "1px solid rgba(251,191,36,0.2)", fontSize: 11, color: "#fbbf24" }}>
+              ⚠ Pocas opciones ({esOptions}) — presioná Regenerar para generar más.
+            </div>
+          )}
 
-                {/* Low options warning */}
-                {warnLow && (
-                  <div
-                    style={{
-                      padding: "8px 16px",
-                      background: "rgba(251,191,36,0.08)",
-                      borderBottom: "1px solid rgba(251,191,36,0.2)",
-                      fontSize: 11,
-                      color: "#fbbf24",
-                    }}
-                  >
-                    ⚠ Hay pocas opciones ({langOpts}) — se recomienda tener al menos {target * 2} borradores disponibles para esta lengua.
-                  </div>
-                )}
-
-                {/* Article grid */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, 1fr)",
-                    gap: 12,
-                    padding: 14,
-                  }}
-                >
-                  {langArticles.length === 0 ? (
-                    <div
-                      style={{
-                        gridColumn: "1 / -1",
-                        textAlign: "center",
-                        color: "#555",
-                        fontSize: 13,
-                        padding: 32,
-                      }}
-                    >
-                      No hay artículos para esta semana en {lang.toUpperCase()}
-                    </div>
-                  ) : (
-                    langArticles.map((article) => {
-                      const isSelected = selectedArticleIds[lang].has(article.id);
-                      const isDisabled =
-                        !isSelected &&
-                        selectedArticleIds[lang].size >= target;
-
-                      return (
-                        <div
-                          key={article.id}
-                          onClick={() => !isDisabled && handleArticleToggle(article)}
-                          style={{
-                            background: "#111",
-                            border: `2px solid ${
-                              isSelected
-                                ? "#FA0082"
-                                : "#2a2a2a"
-                            }`,
-                            borderRadius: 10,
-                            padding: "10px 12px",
-                            cursor: isDisabled ? "not-allowed" : "pointer",
-                            opacity: isDisabled ? 0.45 : 1,
-                            position: "relative",
-                            transition: "border-color 0.15s, opacity 0.15s",
-                          }}
-                        >
-                          {isSelected && (
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: 8,
-                                right: 10,
-                                color: "#FA0082",
-                                fontSize: 16,
-                                fontWeight: 900,
-                              }}
-                            >
-                              ✓
-                            </div>
-                          )}
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                              marginBottom: 7,
-                            }}
-                          >
-                            <ThemeBadge theme={article.editorial_theme} />
-                            {article.day_slot && isSelected && (
-                              <span
-                                style={{
-                                  fontSize: 9,
-                                  color: "#FA0082",
-                                  background: "rgba(124,58,237,0.15)",
-                                  padding: "1px 5px",
-                                  borderRadius: 4,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                Día {article.day_slot}
-                              </span>
-                            )}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: "#e0e0e0",
-                              lineHeight: 1.35,
-                              marginBottom: 5,
-                              overflow: "hidden",
-                              display: "-webkit-box",
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: "vertical",
-                            }}
-                          >
-                            {article.title}
-                          </div>
-                          {article.summary && (
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: "#888",
-                                lineHeight: 1.4,
-                                overflow: "hidden",
-                                display: "-webkit-box",
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: "vertical",
-                              }}
-                            >
-                              {article.summary}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, padding: 14 }}>
+            {buzzArticles.filter(a => a.language === "es").length === 0 ? (
+              <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "#555", fontSize: 13, padding: 32 }}>
+                No hay artículos ES para esta semana — presioná Regenerar.
               </div>
-            );
-          })}
+            ) : (
+              buzzArticles.filter(a => a.language === "es").map((article) => {
+                const isSelected = selectedEsIds.has(article.id);
+                const isDisabled = !isSelected && esCount >= ARTICLE_ES_TARGET;
+                return (
+                  <div
+                    key={article.id}
+                    onClick={() => !isDisabled && handleArticleToggle(article)}
+                    style={{
+                      background: "#111",
+                      border: `2px solid ${isSelected ? "#FA0082" : "#2a2a2a"}`,
+                      borderRadius: 10,
+                      padding: "10px 12px",
+                      cursor: isDisabled ? "not-allowed" : "pointer",
+                      opacity: isDisabled ? 0.45 : 1,
+                      position: "relative",
+                      transition: "border-color 0.15s, opacity 0.15s",
+                    }}
+                  >
+                    {isSelected && (
+                      <div style={{ position: "absolute", top: 8, right: 10, color: "#FA0082", fontSize: 16, fontWeight: 900 }}>✓</div>
+                    )}
+                    {article.image_url && (
+                      <img
+                        src={article.image_url}
+                        alt=""
+                        style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 6, marginBottom: 8 }}
+                      />
+                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+                      <ThemeBadge theme={article.editorial_theme} />
+                      {article.day_slot && isSelected && (
+                        <span style={{ fontSize: 9, color: "#FA0082", background: "rgba(124,58,237,0.15)", padding: "1px 5px", borderRadius: 4, fontWeight: 700 }}>
+                          Día {article.day_slot}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#e0e0e0", lineHeight: 1.35, marginBottom: 5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                      {article.title}
+                    </div>
+                    {article.summary && (
+                      <div style={{ fontSize: 11, color: "#888", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        {article.summary}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
 
       {/* ── 5. CAROUSEL OPTIONS ───────────────────────────────────────── */}
       <div>
-        <div
-          style={{
-            fontSize: 15,
-            fontWeight: 700,
-            color: "#d0d0d0",
-            marginBottom: 14,
-            paddingLeft: 2,
-          }}
-        >
-          Opciones de Carousels
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, paddingLeft: 2 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#d0d0d0" }}>
+            Posts Diarios — Carousels
+          </div>
+          <div style={{ fontSize: 12, color: "#666" }}>
+            {actualidadSelected}/7 Actualidad · {historiaSelected}/7 Historia · {recoSelected}/1 Reco
+          </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {THEMES.map((theme) => {
@@ -1977,6 +1884,45 @@ export default function WeeklyEditorialTab({
             );
           })}
         </div>
+
+        {/* ── Reco Jueves section ─────────────────────────────────────── */}
+        <div style={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 12, overflow: "hidden", marginTop: 0 }}>
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid #2a2a2a", display: "flex", alignItems: "center", gap: 12, background: "#161616" }}>
+            <span style={{ fontSize: 16 }}>🎯</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#10b981" }}>Reco del Jueves</span>
+            <span style={{ fontSize: 11, color: "#888", background: "#222", padding: "2px 8px", borderRadius: 8 }}>
+              {recoSelected}/1 seleccionado
+            </span>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+              <ProgressBar value={recoSelected} max={1} color="#10b981" />
+            </div>
+            <span style={{ fontSize: 11, color: "#666" }}>Publica jueves 14:00 UTC</span>
+          </div>
+          <div style={{ padding: "12px 14px" }}>
+            {(() => {
+              const recoOptions = carouselOptions
+                .filter(c => c.theme_type === "reco" && c.day_slot === 4)
+                .sort((a, b) => a.option_index - b.option_index);
+              const selectedRecoId = selectedCarouselMap.get("4-reco");
+              if (recoOptions.length === 0) {
+                return <div style={{ fontSize: 12, color: "#555", textAlign: "center", padding: 20 }}>Sin opciones Reco generadas — presioná Regenerar</div>;
+              }
+              return (
+                <div style={{ display: "flex", gap: 12 }}>
+                  {recoOptions.map(opt => (
+                    <div key={opt.id} style={{ flex: "1 1 0", minWidth: 200 }}>
+                      <CarouselOptionCard
+                        option={opt}
+                        selected={selectedRecoId === opt.id}
+                        onSelect={() => handleCarouselSelect(opt)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
       </div>
 
       {/* ── 6. FOOTER — LISTO BUTTON ─────────────────────────────────── */}
@@ -1991,41 +1937,19 @@ export default function WeeklyEditorialTab({
           gap: 14,
         }}
       >
-        <div
-          style={{ fontSize: 13, fontWeight: 700, color: "#d0d0d0" }}
-        >
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#d0d0d0" }}>
           Checklist de aprobación
         </div>
 
         {/* Checklist items */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: 8,
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
           {[
-            {
-              label: "PeekrBuzz ES",
-              done: esCount >= LANG_TARGETS.es,
-              value: `${esCount}/${LANG_TARGETS.es}`,
-            },
-            {
-              label: "PeekrBuzz PT",
-              done: ptCount >= LANG_TARGETS.pt,
-              value: `${ptCount}/${LANG_TARGETS.pt}`,
-            },
-            {
-              label: "PeekrBuzz EN",
-              done: enCount >= LANG_TARGETS.en,
-              value: `${enCount}/${LANG_TARGETS.en}`,
-            },
-            {
-              label: "Carousels",
-              done: carouselSelectedCount >= carouselTarget,
-              value: `${carouselSelectedCount}/${carouselTarget}`,
-            },
+            { label: "Artículos ES",   done: esCount >= ARTICLE_ES_TARGET,  value: `${esCount}/${ARTICLE_ES_TARGET}` },
+            { label: "Traducción EN",  done: enTranslated > 0,              value: enTranslated > 0 ? "listo" : "falta" },
+            { label: "Traducción PT",  done: ptTranslated > 0,              value: ptTranslated > 0 ? "listo" : "falta" },
+            { label: "Actualidad",     done: actualidadSelected >= 7,       value: `${actualidadSelected}/7` },
+            { label: "Historia",       done: historiaSelected >= 7,         value: `${historiaSelected}/7` },
+            { label: "Reco Jueves",    done: recoSelected >= 1,             value: recoSelected >= 1 ? "listo" : "falta" },
             {
               label: "Newsletter ES",
               done: hasNewsletterEs,

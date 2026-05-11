@@ -18,7 +18,7 @@ type ScheduledArticle = {
 
 type ScheduledCarousel = {
   id: string;
-  theme_type: "actualidad" | "historia" | "reco" | "dato_peekr";
+  theme_type: "actualidad" | "historia" | "reco";
   day_slot: number;
   hook_text: string;
   status: "approved" | "published";
@@ -53,21 +53,19 @@ interface Props {
 
 const DAYS_ES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
-const THEMES = ["actualidad", "historia", "reco", "dato_peekr"] as const;
+const THEMES = ["actualidad", "historia", "reco"] as const;
 type ThemeType = (typeof THEMES)[number];
 
 const THEME_LABELS: Record<ThemeType, string> = {
   actualidad: "📰 Actualidad",
-  historia: "🎬 Historia",
-  reco: "⭐ Recomendaciones",
-  dato_peekr: "📊 Dato Peekr",
+  historia:   "🎬 Historia",
+  reco:       "⭐ Reco (Jueves)",
 };
 
 const THEME_COLORS: Record<ThemeType, string> = {
   actualidad: "#0ea5e9",
-  historia: "#f97316",
-  reco: "#22c55e",
-  dato_peekr: "#a855f7",
+  historia:   "#f59e0b",
+  reco:       "#10b981",
 };
 
 // Default UTC publish times per channel
@@ -78,9 +76,8 @@ const PUBLISH_HOURS: Record<string, number> = {
   buzz_pt: 9,
   buzz_en: 9,
   actualidad: 13,
-  historia: 14,
-  reco: 15,
-  dato_peekr: 16,
+  historia:   15,
+  reco:       14,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
