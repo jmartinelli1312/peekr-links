@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import CarouselSection from "./CarouselSection";
 import CarouselsGeneratedSection from "./CarouselsGeneratedSection";
+import WeekendRecoSection from "./WeekendRecoSection";
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -720,6 +721,12 @@ export default function PeekrbuzzDailyTab({ supabase }: { supabase: SupabaseClie
       {/* ──────────────── SECTION 3 — GENERATED CAROUSELS ─────────────────── */}
       {/* Anchor used by the embedded "Ver abajo ↓" link in each article card. */}
       <section id="carruseles-generados">
+        {/* 3a — Weekend reco carousel (auto-generated Thursdays, manual trigger
+            available). Renders FIRST so the high-impact weekly post sits at the
+            top when an editor scrolls down. */}
+        <WeekendRecoSection supabase={supabase} key={`weekend-${carouselRefreshKey}`} />
+
+        {/* 3b — Cinematic carousels per published daily article. */}
         <CarouselsGeneratedSection
           supabase={supabase}
           articleIds={candidates
