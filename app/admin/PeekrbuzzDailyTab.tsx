@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import CarouselSection from "./CarouselSection";
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -664,6 +665,12 @@ export default function PeekrbuzzDailyTab({ supabase }: { supabase: SupabaseClie
                           </div>
                         )}
                       </div>
+
+                      {isPublished && (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <CarouselSection supabase={supabase} articleId={c.id} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
