@@ -73,6 +73,21 @@ export default function CarouselsGeneratedSection({
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
+  // Detect Web Share API + file sharing support once. iOS Safari 15+ and
+  // Android Chrome modern allow navigator.share({ files }) which opens the OS
+  // share sheet — on mobile that means "Save 10 Images" lands them in Fotos /
+  // Galería directly. Desktop falls back to a ZIP download.
+  const [canShareImages, setCanShareImages] = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("canShare" in navigator)) return;
+    try {
+      const probe = new File([new Blob(["x"], { type: "image/png" })], "probe.png", { type: "image/png" });
+      setCanShareImages(navigator.canShare({ files: [probe] }));
+    } catch {
+      setCanShareImages(false);
+    }
+  }, []);
+
   // ── Load ─────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     if (articleIds.length === 0) {
@@ -221,9 +236,67 @@ export default function CarouselsGeneratedSection({
     }
   }
 
-  async function downloadZip(c: CarouselRow) {
+  /**
+   * Saves the 10 slides to the device. On mobile with Web Share API support
+   * (iOS Safari 15+, Android Chrome modern) opens the OS share sheet so the
+   * user can tap "Save 10 Images" / "Guardar en Fotos" — slides land straight
+   * in the camera roll, ready for TikTok upload. Falls back to the server-side
+   * ZIP route on desktop browsers and old WebViews.
+   */
+  async function saveSlides(c: CarouselRow) {
     setBusyId(c.id); setBusyAction("download"); setError(""); setInfo("");
     try {
+      // ── Mobile path: Web Share API with file array ─────────────────────────
+      if (canShareImages) {
+        // Fetch each slide PNG client-side. URLs are public + long-cached so
+        // after the preview grid loaded them once, these are basically CDN hits.
+        const sortedSlides = c.slides.slice().sort((a, b) => a.n - b.n);
+        const files = await Promise.all(
+          sortedSlides.map(async (s) => {
+            const res = await fetch(buildSlidePreviewUrl(c, s));
+            if (!res.ok) throw new Error(`slide ${s.n}: HTTP ${res.status}`);
+            const blob = await res.blob();
+            return new File(
+              [blob],
+              `peekr-carousel-${c.id}-slide-${String(s.n).padStart(2, "0")}.png`,
+              { type: "image/png" },
+            );
+          }),
+        );
+
+        // Re-check now that we have actual files — some browsers reject the
+        // share if the total size exceeds their limit.
+        if (typeof navigator !== "undefined" && navigator.canShare?.({ files })) {
+          try {
+            await navigator.share({
+              files,
+              title: `Carrusel Peekr ${c.id}`,
+              // Caption goes in clipboard separately so it doesn't bloat the
+              // share-sheet text preview; users can paste it on TikTok manually.
+            });
+            // Try to also push the caption to clipboard for easy paste on
+            // TikTok / IG. Failure is silent — clipboard write may be denied.
+            if (c.caption && typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+              try { await navigator.clipboard.writeText(c.caption); } catch { /* ignore */ }
+            }
+            setInfo(
+              c.caption
+                ? "Compartido. Caption copiado al portapapeles."
+                : "Compartido — elegí Guardar en galería en el menú.",
+            );
+            return;
+          } catch (err) {
+            const name = (err as Error | null)?.name;
+            // User dismissed the share sheet — not an error.
+            if (name === "AbortError") return;
+            // Anything else: log and fall through to ZIP fallback.
+            console.warn("[carousels] Web Share failed, falling back to ZIP:", err);
+          }
+        }
+        // canShare returned false post-fetch → fall through to ZIP.
+      }
+
+      // ── Desktop / unsupported fallback: server-side ZIP ────────────────────
       const res = await authedFetch(
         `/api/admin/peekrbuzz/carousels/download?carousel_id=${c.id}`,
         "GET",
@@ -241,7 +314,6 @@ export default function CarouselsGeneratedSection({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      // Revoke after a tick so the download has time to start.
       setTimeout(() => URL.revokeObjectURL(url), 2000);
       setInfo("ZIP descargado");
     } catch (err) {
@@ -417,11 +489,17 @@ export default function CarouselsGeneratedSection({
               <div className="cg-actions">
                 <button
                   className="cg-btn download"
-                  onClick={() => downloadZip(c)}
+                  onClick={() => saveSlides(c)}
                   disabled={isBusy}
-                  title="Descarga un ZIP con slide-01.png … slide-10.png + caption.txt"
+                  title={
+                    canShareImages
+                      ? "Abre el menú compartir del sistema → tocá 'Guardar imágenes' para mandar los 10 slides a Fotos / Galería"
+                      : "Descarga un ZIP con slide-01.png … slide-10.png + caption.txt"
+                  }
                 >
-                  {isBusy && busyAction === "download" ? "Empaquetando…" : "⬇ Descargar todos (ZIP)"}
+                  {isBusy && busyAction === "download"
+                    ? (canShareImages ? "Preparando…" : "Empaquetando…")
+                    : (canShareImages ? "📥 Guardar en galería" : "⬇ Descargar todos (ZIP)")}
                 </button>
 
                 {c.status === "draft" && (
