@@ -77,14 +77,36 @@ export async function callGeminiJson<T>(
   return parseJsonLoose<T>(raw);
 }
 
-/** Removes ```json … ``` fences if present, then JSON.parses. */
+/**
+ * Tolerant JSON parser. Gemini occasionally emits trailing commas, leading
+ * prose, or markdown fences even with responseMimeType=application/json.
+ * Two-pass: try strict JSON.parse first; on failure, clean common issues
+ * and retry once. If the second pass also fails, log the raw output and
+ * rethrow so the caller can decide whether to retry the LLM call.
+ */
 export function parseJsonLoose<T>(text: string): T {
   let cleaned = text.trim();
   if (cleaned.startsWith("```")) {
     cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
   }
-  // Defensive: some responses still wrap in leading prose
   const firstBrace = cleaned.search(/[\[{]/);
   if (firstBrace > 0) cleaned = cleaned.slice(firstBrace);
-  return JSON.parse(cleaned) as T;
+  // Strip anything after the matched final brace.
+  const lastBrace = Math.max(cleaned.lastIndexOf("}"), cleaned.lastIndexOf("]"));
+  if (lastBrace > 0 && lastBrace < cleaned.length - 1) cleaned = cleaned.slice(0, lastBrace + 1);
+
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    // Second pass: strip trailing commas, fix common quirks.
+    const fixed = cleaned
+      .replace(/,(\s*[}\]])/g, "$1") // trailing commas before } or ]
+      .replace(/\\u[\dA-Fa-f]{4}/g, (m) => m); // keep escape sequences as-is
+    try {
+      return JSON.parse(fixed) as T;
+    } catch (err) {
+      console.error("[parseJsonLoose] raw output (first 500):", cleaned.slice(0, 500));
+      throw err;
+    }
+  }
 }
