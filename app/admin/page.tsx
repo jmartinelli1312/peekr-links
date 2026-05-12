@@ -4,9 +4,7 @@ import { useEffect, useMemo, useState, Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import WeeklyEditorialTab from "./WeeklyEditorialTab";
-import PublicationScheduleTab from "./PublicationScheduleTab";
-import PublishedArchiveTab from "./PublishedArchiveTab";
+import PeekrbuzzDailyTab from "./PeekrbuzzDailyTab";
 import UserGeoTab from "./UserGeoTab";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
@@ -24,7 +22,7 @@ class EditorialErrorBoundary extends Component<
     return { error };
   }
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[WeeklyEditorialTab] runtime error:", error, info);
+    console.error("[PeekrbuzzDailyTab] runtime error:", error, info);
   }
   render() {
     if (this.state.error) {
@@ -39,7 +37,7 @@ class EditorialErrorBoundary extends Component<
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: 8 }}>
-            ⚠ Error al cargar el tab Editorial
+            ⚠ Error al cargar Peekrbuzz Diario
           </div>
           <pre
             style={{
@@ -308,7 +306,7 @@ export default function AdminPage() {
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
-  const [activeTab, setActiveTab] = useState<"pending" | "metrics" | "published" | "editorial">("pending");
+  const [activeTab, setActiveTab] = useState<"metrics" | "editorial">("metrics");
   const [pendingCounts, setPendingCounts] = useState({ articles: 0, carousels: 0, creators: 0, newsletters: 0 });
   const [pendingArticles, setPendingArticles] = useState<PendingArticle[]>([]);
   const [pendingCarousels, setPendingCarousels] = useState<PendingCarousel[]>([]);
@@ -1439,28 +1437,6 @@ export default function AdminPage() {
             {/* Tab navigation */}
             <div className="admin-tabs">
               <button
-                className={`admin-tab${activeTab === "editorial" ? " active" : ""}`}
-                onClick={() => setActiveTab("editorial")}
-                style={{ fontWeight: 700, color: activeTab === "editorial" ? "#FA0082" : "#FA0082" }}
-              >
-                📋 Editorial
-              </button>
-              <button
-                className={`admin-tab${activeTab === "pending" ? " active" : ""}`}
-                onClick={() => setActiveTab("pending")}
-              >
-                Cronograma
-                {pendingCounts.creators > 0 && (
-                  <span className="admin-badge">{pendingCounts.creators}</span>
-                )}
-              </button>
-              <button
-                className={`admin-tab${activeTab === "published" ? " active" : ""}`}
-                onClick={() => setActiveTab("published")}
-              >
-                Publicados
-              </button>
-              <button
                 className={`admin-tab${activeTab === "metrics" ? " active" : ""}`}
                 onClick={() => setActiveTab("metrics")}
                 style={{
@@ -1471,15 +1447,13 @@ export default function AdminPage() {
               >
                 📊 Métricas
               </button>
-            </div>
-
-            {/* ===================== TAB: PENDIENTES (cronograma) ===================== */}
-            <div style={{ display: activeTab === "pending" ? "block" : "none" }}>
-              <PublicationScheduleTab
-                supabase={supabase}
-                onApproveCreator={approveCreator}
-                onRejectCreator={rejectCreator}
-              />
+              <button
+                className={`admin-tab${activeTab === "editorial" ? " active" : ""}`}
+                onClick={() => setActiveTab("editorial")}
+                style={{ fontWeight: 700, color: activeTab === "editorial" ? "#FA0082" : "#FA0082" }}
+              >
+                📋 Editorial
+              </button>
             </div>
 
             {/* ===================== TAB: METRICAS ===================== */}
@@ -1755,15 +1729,10 @@ export default function AdminPage() {
               </section>
             </div>
 
-            {/* ===================== TAB: PUBLICADOS ===================== */}
-            {activeTab === "published" && (
-              <PublishedArchiveTab supabase={supabase} />
-            )}
-
-            {/* ===================== TAB: EDITORIAL ===================== */}
+            {/* ===================== TAB: EDITORIAL (newsletter + daily articles) ===================== */}
             {activeTab === "editorial" && (
               <EditorialErrorBoundary>
-                <WeeklyEditorialTab supabase={supabase} />
+                <PeekrbuzzDailyTab supabase={supabase} />
               </EditorialErrorBoundary>
             )}
           </>

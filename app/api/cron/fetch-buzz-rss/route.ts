@@ -113,9 +113,19 @@ interface FeedSource {
 }
 
 const FEEDS: FeedSource[] = [
+  // ES — cinema + general entertainment
   { url: "https://cinemascomics.com/feed", language: "es", source_name: "CinemasComics" },
+  { url: "https://sensacine.com/rss/noticias.xml", language: "es", source_name: "SensaCine" },
+  { url: "https://www.espinof.com/index.xml", language: "es", source_name: "Espinof" },
+  // ES — TV / series
+  { url: "https://www.eldiario.es/vertele/rss/", language: "es", source_name: "Vertele" },
+  // PT
   { url: "https://cinepop.com.br/feed", language: "pt", source_name: "CinePop" },
 ];
+
+// Drop signals older than this many hours — keeps the candidate pool fresh so
+// the daily AI selector only sees recent news, not last week's leftover items.
+const MAX_SIGNAL_AGE_HOURS = 36;
 
 export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) {
@@ -140,21 +150,41 @@ export async function GET(request: NextRequest) {
 
     // Collect all parsed items with their feed metadata
     const allItems: Array<RssItem & { language: string; source_name: string }> = [];
-    for (const result of feedResults) {
+    const feedDiagnostics: Array<{ source: string; ok: boolean; count?: number; error?: string }> = [];
+    for (let i = 0; i < feedResults.length; i++) {
+      const result = feedResults[i];
+      const feedMeta = FEEDS[i];
       if (result.status === "fulfilled") {
         const { feed, items } = result.value;
+        feedDiagnostics.push({ source: feed.source_name, ok: true, count: items.length });
         for (const item of items) {
           allItems.push({ ...item, language: feed.language, source_name: feed.source_name });
         }
+      } else {
+        feedDiagnostics.push({
+          source: feedMeta.source_name,
+          ok: false,
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        });
       }
     }
 
-    if (allItems.length === 0) {
-      return NextResponse.json({ ok: true, inserted: 0, skipped: 0 });
+    // Drop items older than MAX_SIGNAL_AGE_HOURS. A stale "signal" pool would
+    // dilute the daily AI selector with last week's news. Items with an
+    // unparseable / fallback timestamp (set to "now" upstream) pass through.
+    const freshnessThreshold = Date.now() - MAX_SIGNAL_AGE_HOURS * 3_600_000;
+    const freshItems = allItems.filter((i) => {
+      const ts = new Date(i.published_at).getTime();
+      return !Number.isFinite(ts) || ts >= freshnessThreshold;
+    });
+    const stale = allItems.length - freshItems.length;
+
+    if (freshItems.length === 0) {
+      return NextResponse.json({ ok: true, inserted: 0, skipped: 0, stale, feeds: feedDiagnostics });
     }
 
     // Fetch existing source_urls to deduplicate
-    const candidateUrls = allItems.map((i) => i.source_url);
+    const candidateUrls = freshItems.map((i) => i.source_url);
     const { data: existing, error: fetchError } = await admin
       .from("peekrbuzz_articles")
       .select("source_url")
@@ -169,12 +199,12 @@ export async function GET(request: NextRequest) {
 
     const existingUrls = new Set((existing ?? []).map((r: { source_url: string }) => r.source_url));
 
-    const newItems = allItems.filter((i) => !existingUrls.has(i.source_url));
+    const newItems = freshItems.filter((i) => !existingUrls.has(i.source_url));
     let inserted = 0;
-    const skipped = allItems.length - newItems.length;
+    const skipped = freshItems.length - newItems.length;
 
     if (newItems.length === 0) {
-      return NextResponse.json({ ok: true, inserted: 0, skipped });
+      return NextResponse.json({ ok: true, inserted: 0, skipped, stale, feeds: feedDiagnostics });
     }
 
     // Track slugs generated in this batch to avoid within-batch collisions
@@ -212,6 +242,8 @@ export async function GET(request: NextRequest) {
         category: "movies",
         is_published: false,
         review_status: "pending_review",
+        // New daily lifecycle: every scraped row enters as a signal awaiting AI selection.
+        article_status: "signal",
       };
     });
 
@@ -232,7 +264,7 @@ export async function GET(request: NextRequest) {
       inserted += count ?? chunk.length;
     }
 
-    return NextResponse.json({ ok: true, inserted, skipped });
+    return NextResponse.json({ ok: true, inserted, skipped, stale, feeds: feedDiagnostics });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[fetch-buzz-rss] Unhandled error:", message);
