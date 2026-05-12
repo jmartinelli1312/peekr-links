@@ -1,6 +1,7 @@
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { PostHogProvider } from "./components/PostHogProvider";
+import SiteFooter from "./components/site-footer";
 
 const SITE = "https://www.peekr.app";
 
@@ -164,6 +165,7 @@ export default function RootLayout({
         }}
       >
         <PostHogProvider>{children}</PostHogProvider>
+        <SiteFooter />
         <Analytics />
       </body>
     </html>
