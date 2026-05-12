@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import WeeklyEditorialTab from "./WeeklyEditorialTab";
+import PeekrbuzzDailyTab from "./PeekrbuzzDailyTab";
 import PublicationScheduleTab from "./PublicationScheduleTab";
 import PublishedArchiveTab from "./PublishedArchiveTab";
 import UserGeoTab from "./UserGeoTab";
@@ -24,7 +24,7 @@ class EditorialErrorBoundary extends Component<
     return { error };
   }
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[WeeklyEditorialTab] runtime error:", error, info);
+    console.error("[PeekrbuzzDailyTab] runtime error:", error, info);
   }
   render() {
     if (this.state.error) {
@@ -39,7 +39,7 @@ class EditorialErrorBoundary extends Component<
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: 8 }}>
-            ⚠ Error al cargar el tab Editorial
+            ⚠ Error al cargar Peekrbuzz Diario
           </div>
           <pre
             style={{
@@ -1443,7 +1443,7 @@ export default function AdminPage() {
                 onClick={() => setActiveTab("editorial")}
                 style={{ fontWeight: 700, color: activeTab === "editorial" ? "#FA0082" : "#FA0082" }}
               >
-                📋 Editorial
+                📋 Peekrbuzz
               </button>
               <button
                 className={`admin-tab${activeTab === "pending" ? " active" : ""}`}
@@ -1760,10 +1760,10 @@ export default function AdminPage() {
               <PublishedArchiveTab supabase={supabase} />
             )}
 
-            {/* ===================== TAB: EDITORIAL ===================== */}
+            {/* ===================== TAB: PEEKRBUZZ DIARIO ===================== */}
             {activeTab === "editorial" && (
               <EditorialErrorBoundary>
-                <WeeklyEditorialTab supabase={supabase} />
+                <PeekrbuzzDailyTab supabase={supabase} />
               </EditorialErrorBoundary>
             )}
           </>
