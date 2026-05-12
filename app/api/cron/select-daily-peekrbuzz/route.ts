@@ -86,25 +86,10 @@ export async function GET(request: NextRequest) {
 
   const admin = getSupabaseAdmin();
 
-  // ── 1. Idempotency check ────────────────────────────────────────────────────
-  const { count: existingCount } = await admin
-    .from("peekrbuzz_articles")
-    .select("*", { count: "exact", head: true })
-    .eq("candidate_for_date", targetDate)
-    .in("article_status", ["daily_candidate", "selected", "published"]);
-
-  if ((existingCount ?? 0) >= TARGET_DAILY_CANDIDATES && !force) {
-    return NextResponse.json({
-      ok: true,
-      target_date: targetDate,
-      skipped: true,
-      reason: `${existingCount} candidates already exist for ${targetDate}. Pass ?force=1 to regenerate.`,
-    });
-  }
-
-  // When force-regenerating, clear out the previous batch of daily_candidate
-  // rows for this date so slug collisions can't happen. Selected/published
-  // rows are preserved (we never overwrite a decision the editor already made).
+  // ── 1. Existing-candidate accounting (fill-mode) ────────────────────────────
+  // We always top up to TARGET_DAILY_CANDIDATES. With `force=1`, drop the
+  // current daily_candidate rows first (preserves selected/published rows the
+  // editor already touched). Without force, just fill the gap if any.
   if (force) {
     await admin
       .from("peekrbuzz_articles")
@@ -113,6 +98,40 @@ export async function GET(request: NextRequest) {
       .eq("article_status", "daily_candidate")
       .eq("language", "es");
   }
+
+  // Existing rows for this date (any non-rejected status) — count toward the
+  // target so a partial regen tops up exactly the missing slots.
+  const { data: existingForDate } = await admin
+    .from("peekrbuzz_articles")
+    .select("rss_signal_id, article_status")
+    .eq("candidate_for_date", targetDate)
+    .eq("language", "es")
+    .in("article_status", ["daily_candidate", "selected", "published"]);
+
+  const existingRows = (existingForDate ?? []) as Array<{
+    rss_signal_id: number | null;
+    article_status: string;
+  }>;
+  const existingCount = existingRows.length;
+  const slotsToFill = Math.max(0, TARGET_DAILY_CANDIDATES - existingCount);
+
+  if (slotsToFill === 0) {
+    return NextResponse.json({
+      ok: true,
+      target_date: targetDate,
+      skipped: true,
+      reason: `${existingCount} candidates already exist for ${targetDate}. Pass ?force=1 to regenerate.`,
+    });
+  }
+
+  // Signals already represented in today's candidates (any status). Excluded so
+  // partial regens never resurface a signal the editor already saw/rejected/
+  // approved earlier today.
+  const excludedSignalIds = new Set<number>(
+    existingRows
+      .map((r) => r.rss_signal_id)
+      .filter((id): id is number => typeof id === "number"),
+  );
 
   // ── 2. Fetch fresh signals (ES) ─────────────────────────────────────────────
   const sinceIso = hoursAgoIso(SIGNAL_LOOKBACK_HOURS);
@@ -148,7 +167,19 @@ export async function GET(request: NextRequest) {
     published_at: string | null;
     language: string;
   };
-  const signalsTyped = signals as SignalRow[];
+  // Drop any signal already represented by a candidate for this date so
+  // partial regens never resurface the same article.
+  const signalsTyped = (signals as SignalRow[]).filter((s) => !excludedSignalIds.has(s.id));
+
+  if (signalsTyped.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      target_date: targetDate,
+      candidates_inserted: 0,
+      reason: `All ${signals.length} fresh signals are already in today's candidate pool.`,
+    });
+  }
+
   const signalById = new Map(signalsTyped.map((s) => [s.id, s]));
 
   // ── 3. Gemini batch scoring ─────────────────────────────────────────────────
@@ -226,14 +257,41 @@ export async function GET(request: NextRequest) {
     .sort((a, b) => b.combined - a.combined);
 
   // Diversity: don't let two candidates share the same primary entity.
+  // Also seed the seen-set with primary entities of existing-for-date rows so
+  // a partial regen doesn't pick a new candidate that duplicates one the
+  // editor already approved/has on screen.
   const seenEntityKeys = new Set<string>();
+  if (existingRows.length > 0) {
+    const existingSignalIds = existingRows
+      .map((r) => r.rss_signal_id)
+      .filter((id): id is number => typeof id === "number");
+    if (existingSignalIds.length > 0) {
+      const { data: existingFull } = await admin
+        .from("peekrbuzz_articles")
+        .select("entity_matches")
+        .in("rss_signal_id", existingSignalIds)
+        .eq("candidate_for_date", targetDate)
+        .eq("language", "es");
+      for (const row of (existingFull ?? []) as Array<{ entity_matches: unknown }>) {
+        const em = row.entity_matches as {
+          titles?: Array<{ tmdb_id: number }>;
+          people?: Array<{ tmdb_id: number }>;
+        } | null;
+        const firstTitle = em?.titles?.[0];
+        const firstPerson = em?.people?.[0];
+        if (firstTitle) seenEntityKeys.add(`title:${firstTitle.tmdb_id}`);
+        else if (firstPerson) seenEntityKeys.add(`person:${firstPerson.tmdb_id}`);
+      }
+    }
+  }
+
   const finalFour: typeof finalists = [];
   for (const f of finalists) {
     const primaryKey = `${f.matches[0].type}:${f.matches[0].tmdb_id}`;
     if (seenEntityKeys.has(primaryKey)) continue;
     seenEntityKeys.add(primaryKey);
     finalFour.push(f);
-    if (finalFour.length >= TARGET_DAILY_CANDIDATES) break;
+    if (finalFour.length >= slotsToFill) break;
   }
 
   if (finalFour.length === 0) {
@@ -241,7 +299,7 @@ export async function GET(request: NextRequest) {
       ok: true,
       target_date: targetDate,
       candidates_inserted: 0,
-      reason: "Diversity filter rejected all finalists (shouldn't happen).",
+      reason: "Diversity filter rejected all finalists (no new entities available).",
     });
   }
 
@@ -340,6 +398,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     target_date: targetDate,
+    existing_before: existingCount,
+    slots_to_fill: slotsToFill,
     signals_scanned: signalsTyped.length,
     scored_count: scored.length,
     shortlisted: shortlist.length,

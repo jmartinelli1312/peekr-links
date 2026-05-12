@@ -5,7 +5,6 @@ import type { ErrorInfo, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import PeekrbuzzDailyTab from "./PeekrbuzzDailyTab";
-import PublishedArchiveTab from "./PublishedArchiveTab";
 import UserGeoTab from "./UserGeoTab";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
@@ -307,7 +306,7 @@ export default function AdminPage() {
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
-  const [activeTab, setActiveTab] = useState<"metrics" | "published" | "editorial">("editorial");
+  const [activeTab, setActiveTab] = useState<"metrics" | "editorial">("metrics");
   const [pendingCounts, setPendingCounts] = useState({ articles: 0, carousels: 0, creators: 0, newsletters: 0 });
   const [pendingArticles, setPendingArticles] = useState<PendingArticle[]>([]);
   const [pendingCarousels, setPendingCarousels] = useState<PendingCarousel[]>([]);
@@ -1438,19 +1437,6 @@ export default function AdminPage() {
             {/* Tab navigation */}
             <div className="admin-tabs">
               <button
-                className={`admin-tab${activeTab === "editorial" ? " active" : ""}`}
-                onClick={() => setActiveTab("editorial")}
-                style={{ fontWeight: 700, color: activeTab === "editorial" ? "#FA0082" : "#FA0082" }}
-              >
-                📋 Peekrbuzz
-              </button>
-              <button
-                className={`admin-tab${activeTab === "published" ? " active" : ""}`}
-                onClick={() => setActiveTab("published")}
-              >
-                Publicados
-              </button>
-              <button
                 className={`admin-tab${activeTab === "metrics" ? " active" : ""}`}
                 onClick={() => setActiveTab("metrics")}
                 style={{
@@ -1460,6 +1446,13 @@ export default function AdminPage() {
                 }}
               >
                 📊 Métricas
+              </button>
+              <button
+                className={`admin-tab${activeTab === "editorial" ? " active" : ""}`}
+                onClick={() => setActiveTab("editorial")}
+                style={{ fontWeight: 700, color: activeTab === "editorial" ? "#FA0082" : "#FA0082" }}
+              >
+                📋 Editorial
               </button>
             </div>
 
@@ -1736,12 +1729,7 @@ export default function AdminPage() {
               </section>
             </div>
 
-            {/* ===================== TAB: PUBLICADOS ===================== */}
-            {activeTab === "published" && (
-              <PublishedArchiveTab supabase={supabase} />
-            )}
-
-            {/* ===================== TAB: PEEKRBUZZ DIARIO ===================== */}
+            {/* ===================== TAB: EDITORIAL (newsletter + daily articles) ===================== */}
             {activeTab === "editorial" && (
               <EditorialErrorBoundary>
                 <PeekrbuzzDailyTab supabase={supabase} />
