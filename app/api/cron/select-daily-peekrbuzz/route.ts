@@ -194,7 +194,7 @@ export async function GET(request: NextRequest) {
   try {
     scored = await callGeminiJson<ScoredSignal[]>(buildScoringPrompt(scoringInput), geminiKey, {
       temperature: 0.4,
-      maxOutputTokens: 4096,
+      maxOutputTokens: 8192,
     });
   } catch (err) {
     const msg = err instanceof GeminiError ? err.message : (err instanceof Error ? err.message : String(err));
@@ -318,7 +318,7 @@ export async function GET(request: NextRequest) {
         });
         const rewrite = await callGeminiJson<RewriteResult>(prompt, geminiKey, {
           temperature: 0.7,
-          maxOutputTokens: 1500,
+          maxOutputTokens: 2500,
         });
         return { ok: true as const, finalist: f, rewrite };
       } catch (err) {

@@ -239,7 +239,7 @@ async function translateCandidate(
     });
     const value = await callGeminiJson<TranslateOutput>(prompt, geminiKey, {
       temperature: 0.6,
-      maxOutputTokens: 1500,
+      maxOutputTokens: 2500,
     });
     if (!value?.title || !value?.body_html) {
       return { ok: false, error: "Gemini returned incomplete payload" };

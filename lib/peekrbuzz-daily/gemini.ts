@@ -16,6 +16,8 @@ interface GeminiOptions {
   maxOutputTokens?: number;
   /** Set to true to request JSON output. Adds responseMimeType. */
   json?: boolean;
+  /** Gemini 2.5 thinking budget — set to 0 to disable thinking for predictable token usage. */
+  thinkingBudget?: number;
 }
 
 export class GeminiError extends Error {
@@ -40,6 +42,10 @@ export async function callGemini(
       temperature: options.temperature ?? 0.6,
       maxOutputTokens: options.maxOutputTokens ?? 2048,
       ...(options.json ? { responseMimeType: "application/json" } : {}),
+      // Gemini 2.5 Flash defaults to thinking enabled, which consumes the
+      // maxOutputTokens budget before any visible output is emitted. For
+      // structured-data tasks we want all tokens used for the JSON itself.
+      thinkingConfig: { thinkingBudget: options.thinkingBudget ?? 0 },
     },
   };
 
