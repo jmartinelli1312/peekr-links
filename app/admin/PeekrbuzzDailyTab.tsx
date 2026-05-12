@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import CarouselSection from "./CarouselSection";
+import CarouselsGeneratedSection from "./CarouselsGeneratedSection";
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -116,6 +117,11 @@ export default function PeekrbuzzDailyTab({ supabase }: { supabase: SupabaseClie
   const [newsletter, setNewsletter] = useState<NewsletterEdition | null>(null);
   const [newsletterBusy, setNewsletterBusy] = useState<null | "sending" | "testing">(null);
   const [testEmail, setTestEmail] = useState<string>("");
+
+  // Bumped by any carousel action so both the embedded per-card status pill and
+  // the dedicated section below re-fetch their state in sync.
+  const [carouselRefreshKey, setCarouselRefreshKey] = useState<number>(0);
+  const bumpCarouselRefresh = useCallback(() => setCarouselRefreshKey((n) => n + 1), []);
 
   // ── Newsletter loader ───────────────────────────────────────────────────────
   const loadNewsletter = useCallback(async () => {
@@ -668,7 +674,12 @@ export default function PeekrbuzzDailyTab({ supabase }: { supabase: SupabaseClie
 
                       {isPublished && (
                         <div onClick={(e) => e.stopPropagation()}>
-                          <CarouselSection supabase={supabase} articleId={c.id} />
+                          <CarouselSection
+                            supabase={supabase}
+                            articleId={c.id}
+                            refreshKey={carouselRefreshKey}
+                            onChanged={bumpCarouselRefresh}
+                          />
                         </div>
                       )}
                     </div>
@@ -704,6 +715,19 @@ export default function PeekrbuzzDailyTab({ supabase }: { supabase: SupabaseClie
             )}
           </>
         )}
+      </section>
+
+      {/* ──────────────── SECTION 3 — GENERATED CAROUSELS ─────────────────── */}
+      {/* Anchor used by the embedded "Ver abajo ↓" link in each article card. */}
+      <section id="carruseles-generados">
+        <CarouselsGeneratedSection
+          supabase={supabase}
+          articleIds={candidates
+            .filter((c) => c.article_status === "published")
+            .map((c) => c.id)}
+          key={`carousels-${carouselRefreshKey}`}
+          onChanged={bumpCarouselRefresh}
+        />
       </section>
     </div>
   );
