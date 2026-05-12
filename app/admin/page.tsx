@@ -5,7 +5,6 @@ import type { ErrorInfo, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import PeekrbuzzDailyTab from "./PeekrbuzzDailyTab";
-import PublicationScheduleTab from "./PublicationScheduleTab";
 import PublishedArchiveTab from "./PublishedArchiveTab";
 import UserGeoTab from "./UserGeoTab";
 
@@ -308,7 +307,7 @@ export default function AdminPage() {
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
-  const [activeTab, setActiveTab] = useState<"pending" | "metrics" | "published" | "editorial">("pending");
+  const [activeTab, setActiveTab] = useState<"metrics" | "published" | "editorial">("editorial");
   const [pendingCounts, setPendingCounts] = useState({ articles: 0, carousels: 0, creators: 0, newsletters: 0 });
   const [pendingArticles, setPendingArticles] = useState<PendingArticle[]>([]);
   const [pendingCarousels, setPendingCarousels] = useState<PendingCarousel[]>([]);
@@ -1446,15 +1445,6 @@ export default function AdminPage() {
                 📋 Peekrbuzz
               </button>
               <button
-                className={`admin-tab${activeTab === "pending" ? " active" : ""}`}
-                onClick={() => setActiveTab("pending")}
-              >
-                Cronograma
-                {pendingCounts.creators > 0 && (
-                  <span className="admin-badge">{pendingCounts.creators}</span>
-                )}
-              </button>
-              <button
                 className={`admin-tab${activeTab === "published" ? " active" : ""}`}
                 onClick={() => setActiveTab("published")}
               >
@@ -1471,15 +1461,6 @@ export default function AdminPage() {
               >
                 📊 Métricas
               </button>
-            </div>
-
-            {/* ===================== TAB: PENDIENTES (cronograma) ===================== */}
-            <div style={{ display: activeTab === "pending" ? "block" : "none" }}>
-              <PublicationScheduleTab
-                supabase={supabase}
-                onApproveCreator={approveCreator}
-                onRejectCreator={rejectCreator}
-              />
             </div>
 
             {/* ===================== TAB: METRICAS ===================== */}
