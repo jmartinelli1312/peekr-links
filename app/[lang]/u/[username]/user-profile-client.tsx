@@ -8,7 +8,7 @@ const BRAND = "#FA0082";
 const POSTER = "https://image.tmdb.org/t/p/w342";
 
 type Lang = "en" | "es" | "pt";
-type TabKey = "watched" | "peeklists" | "likes" | "sneakpeeks";
+type TabKey = "watched" | "reviews" | "peeklists" | "likes" | "sneakpeeks";
 
 type ProfileRow = {
   id: string;
@@ -48,6 +48,16 @@ type SneakPeekRow = {
   created_at: string;
 };
 
+type ReviewRow = {
+  tmdb_id: number;
+  media_type: string;
+  title: string;
+  poster_path: string | null;
+  rating: number;
+  comment: string;
+  created_at: string;
+};
+
 type PeeklistRow = {
   id: string | number;
   title: string | null;
@@ -61,6 +71,7 @@ type Texts = {
   watched: string;
   peeklists: string;
   likes: string;
+  reviews: string;
   sneakpeeks: string;
   followers: string;
   following: string;
@@ -72,11 +83,13 @@ type Texts = {
   emptyWatched: string;
   emptyPeeklists: string;
   emptyLikes: string;
+  emptyReviews: string;
   emptySneakpeeks: string;
   creator: string;
   creatorBadge: string;
   settings: string;
   openInApp: string;
+  seeMoreInApp: string;
 };
 
 function slugify(text: string) {
@@ -135,6 +148,7 @@ type Props = {
   initialSneakPeeks: SneakPeekRow[];
   initialPeeklistsCreated: (PeeklistRow & { type: "created" })[];
   initialPeeklistsFollowing: (PeeklistRow & { type: "following" })[];
+  initialReviews?: ReviewRow[];
 };
 
 export default function UserProfileClient({
@@ -149,6 +163,7 @@ export default function UserProfileClient({
   initialSneakPeeks,
   initialPeeklistsCreated,
   initialPeeklistsFollowing,
+  initialReviews,
 }: Props) {
   // ── State — seeded from server props ─────────────────────────────────────
   const [profile] = useState<ProfileRow>(initialProfile);
@@ -160,6 +175,7 @@ export default function UserProfileClient({
   const [sneakPeeks] = useState<SneakPeekRow[]>(initialSneakPeeks);
   const [peeklistsCreated] = useState(initialPeeklistsCreated);
   const [peeklistsFollowing] = useState(initialPeeklistsFollowing);
+  const [reviews] = useState<ReviewRow[]>(initialReviews ?? []);
 
   // ── Auth-dependent state (determined client-side after mount) ─────────────
   const [meId, setMeId] = useState<string | null>(null);
@@ -305,6 +321,7 @@ export default function UserProfileClient({
   // ── Tabs ──────────────────────────────────────────────────────────────────
   const tabs: { key: TabKey; label: string }[] = [
     { key: "watched", label: t.watched },
+    { key: "reviews", label: t.reviews },
     { key: "likes", label: t.likes },
     { key: "peeklists", label: t.peeklists },
     ...(isCreator ? [{ key: "sneakpeeks" as TabKey, label: t.sneakpeeks }] : []),
@@ -590,6 +607,118 @@ export default function UserProfileClient({
           .poster-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
           .sp-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
         }
+
+        /* ── Reviews tab ── */
+        .reviews-list { display: grid; gap: 12px; }
+
+        .review-card {
+          display: flex;
+          gap: 14px;
+          padding: 14px;
+          border-radius: 14px;
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.08);
+          text-decoration: none;
+          color: white;
+          align-items: flex-start;
+        }
+        .review-card:hover { background: rgba(255,255,255,0.07); }
+
+        .review-poster, .review-poster-fallback {
+          width: 70px;
+          height: 105px;
+          border-radius: 10px;
+          object-fit: cover;
+          flex-shrink: 0;
+          background: rgba(255,255,255,0.08);
+          display: block;
+        }
+
+        .review-body { flex: 1; min-width: 0; }
+
+        .review-title-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .review-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: white;
+          line-height: 1.3;
+        }
+
+        .review-rating-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          background: rgba(250,0,130,0.15);
+          color: ${BRAND};
+          font-size: 12px;
+          font-weight: 800;
+          padding: 2px 8px;
+          border-radius: 999px;
+        }
+
+        .review-comment {
+          margin-top: 8px;
+          color: rgba(255,255,255,0.82);
+          font-size: 14px;
+          line-height: 1.55;
+          word-break: break-word;
+          display: -webkit-box;
+          -webkit-line-clamp: 4;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .review-date {
+          margin-top: 6px;
+          color: rgba(255,255,255,0.45);
+          font-size: 12px;
+        }
+
+        .see-more-cta {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 4px;
+          padding: 14px 16px;
+          border-radius: 14px;
+          background: linear-gradient(135deg, ${BRAND} 0%, rgba(250,0,130,0.7) 100%);
+          color: white;
+          font-weight: 800;
+          font-size: 14px;
+          text-decoration: none;
+        }
+
+        /* ── Mobile sticky open-in-app banner ── */
+        .mobile-app-banner {
+          display: none;
+          position: fixed;
+          bottom: 16px;
+          left: 16px;
+          right: 16px;
+          padding: 12px 16px;
+          background: ${BRAND};
+          color: white;
+          border-radius: 14px;
+          box-shadow: 0 8px 24px rgba(250,0,130,0.4);
+          text-decoration: none;
+          font-weight: 800;
+          font-size: 15px;
+          z-index: 100;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        @media (max-width: 768px) {
+          .mobile-app-banner { display: flex; }
+        }
       `}</style>
 
       <div className="user-page">
@@ -713,6 +842,64 @@ export default function UserProfileClient({
             )
           )}
 
+          {/* REVIEWS */}
+          {currentTab === "reviews" && (
+            !canViewContent ? (
+              <div className="private-state">{t.privateAccountMsg}</div>
+            ) : reviews.length === 0 ? (
+              <div className="empty-state">{t.emptyReviews}</div>
+            ) : (
+              <div className="reviews-list">
+                {reviews.slice(0, 5).map((rv) => (
+                  <Link
+                    key={`review-${rv.tmdb_id}`}
+                    href={titleHref(
+                      { tmdb_id: rv.tmdb_id, media_type: rv.media_type, title: rv.title },
+                      lang
+                    )}
+                    className="review-card"
+                  >
+                    {rv.poster_path ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`${POSTER}${rv.poster_path}`}
+                        alt={rv.title}
+                        className="review-poster"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="review-poster-fallback" />
+                    )}
+                    <div className="review-body">
+                      <div className="review-title-row">
+                        <span className="review-title">{rv.title}</span>
+                        <span className="review-rating-pill">
+                          ⭐ {rv.rating.toFixed(1)}
+                        </span>
+                      </div>
+                      {rv.comment && <div className="review-comment">{rv.comment}</div>}
+                      <div className="review-date">
+                        {new Date(rv.created_at).toLocaleDateString(
+                          lang === "es" ? "es-ES" : lang === "pt" ? "pt-BR" : "en-US",
+                          { year: "numeric", month: "short", day: "numeric" }
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+
+                {reviews.length > 5 && (
+                  <a
+                    href={`/go?u=${encodeURIComponent(profile.username ?? username)}`}
+                    className="see-more-cta"
+                  >
+                    {t.seeMoreInApp} →
+                  </a>
+                )}
+              </div>
+            )
+          )}
+
           {/* LIKES */}
           {currentTab === "likes" && (
             liked.length === 0 ? (
@@ -806,6 +993,14 @@ export default function UserProfileClient({
 
         </div>
       </div>
+
+      {/* Mobile sticky "open in app" banner — deep link to native app */}
+      <a
+        href={`/go?u=${encodeURIComponent(profile.username ?? username)}`}
+        className="mobile-app-banner"
+      >
+        {t.openInApp} →
+      </a>
     </>
   );
 }

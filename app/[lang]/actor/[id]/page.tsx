@@ -345,9 +345,18 @@ export async function generateMetadata({ params }: PageProps) {
   const slug = slugify(actor.name);
   const canonicalPath = `/${lang}/actor/${numericId}-${slug}`;
 
+  const castCount = actor.combined_credits?.cast?.length ?? 0;
   const creditCount =
-    (actor.combined_credits?.cast?.length ?? 0) +
-    (actor.combined_credits?.crew?.length ?? 0);
+    castCount + (actor.combined_credits?.crew?.length ?? 0);
+
+  // Indexing policy: misma filosofía que titles. Cada actor cacheado emitía
+  // 3 URLs en sitemap (es/en/pt) sin ningún filtro, llenando GSC de páginas
+  // "Discovered - currently not indexed". Sólo indexamos actores con
+  // filmografía mínima: al menos 5 créditos de cast (no contamos crew para
+  // no inflar con técnicos de un episodio). Cuando Peekr tenga ratings sobre
+  // sus títulos, podremos endurecer este gate a "aparece en algún título
+  // con rating Peekr".
+  const indexable = castCount >= 5;
 
   const seoTitle = t.seoTitle(actor.name);
   const description =
@@ -359,6 +368,11 @@ export async function generateMetadata({ params }: PageProps) {
   return {
     title: seoTitle,
     description,
+    robots: {
+      index: indexable,
+      follow: true,
+      googleBot: { index: indexable, follow: true },
+    },
     alternates: {
       canonical: `${SITE}${canonicalPath}`,
       languages: {

@@ -1,4 +1,4 @@
-export const revalidate = 21600; // 6h — listing de artículos
+export const revalidate = 86400; // 24h — listing de artículos
 
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";

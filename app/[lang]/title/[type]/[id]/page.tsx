@@ -1,7 +1,7 @@
 // 24h: los datos de TMDB casi no cambian. Ratings/noindex se actualizan
 // igual durante el próximo crawl. Con baja cantidad de usuarios el TTL
 // de 1h generaba miles de rebuilds diarios por Googlebot sin beneficio real.
-export const revalidate = 86400;
+export const revalidate = 604800; // 7 days — TMDB rarely changes, ratings catch up next crawl
 
 import Image from "next/image";
 import Link from "next/link";
@@ -417,6 +417,37 @@ const getPeekrRatingsCount = cache(async function getPeekrRatingsCountCached(
   return typeof data === "number" ? data : 0;
 });
 
+// Lee títulos traducidos desde titles_cache para emitir hreflang con el slug
+// correcto por idioma. El sitemap usa esta misma tabla, así sitemap y meta
+// `<link rel="alternate" hreflang>` quedan consistentes y Google deja de
+// crawlear URLs con slug del idioma equivocado (que terminaban en 308).
+const getTitleSlugsByLang = cache(async function getTitleSlugsByLangCached(
+  tmdbId: number,
+  mediaType: string
+): Promise<{ es: string | null; en: string | null; pt: string | null }> {
+  const { data, error } = await supabase
+    .from("titles_cache")
+    .select("title_es,title_en,title_pt")
+    .eq("tmdb_id", tmdbId)
+    .eq("media_type", mediaType)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { es: null, en: null, pt: null };
+  }
+
+  const row = data as {
+    title_es: string | null;
+    title_en: string | null;
+    title_pt: string | null;
+  };
+  return {
+    es: row.title_es,
+    en: row.title_en,
+    pt: row.title_pt,
+  };
+});
+
 async function getCredits(type: string, id: number, lang: string) {
   return tmdbFetch<TmdbCreditsResponse>(`/${type}/${id}/credits`, lang);
 }
@@ -662,6 +693,19 @@ export async function generateMetadata({ params }: PageProps) {
   const ratingsCount = await getPeekrRatingsCount(numericId, type);
   const indexable = ratingsCount > 0;
 
+  // hreflang con slug correcto por idioma. Cada `/es|en|pt/title/...` apunta
+  // a su par traducido usando el slug propio de cada idioma. El sitemap ya lo
+  // hacía así; ahora la metadata coincide y dejamos de mandar a Google a URLs
+  // con el slug equivocado (que respondían 308 al canónico).
+  const cachedTitles = await getTitleSlugsByLang(numericId, type);
+  const slugByLang = {
+    es: slugify(cachedTitles.es || title),
+    en: slugify(cachedTitles.en || title),
+    pt: slugify(cachedTitles.pt || title),
+  } as const;
+  const buildHref = (l: "es" | "en" | "pt") =>
+    `${SITE}/${l}/title/${type}/${numericId}-${slugByLang[l] || slug}`;
+
   return {
     title: `${title} | Peekr`,
     description,
@@ -673,10 +717,10 @@ export async function generateMetadata({ params }: PageProps) {
     alternates: {
       canonical: `${SITE}${canonicalPath}`,
       languages: {
-        es: `${SITE}/es/title/${type}/${numericId}-${slug}`,
-        en: `${SITE}/en/title/${type}/${numericId}-${slug}`,
-        pt: `${SITE}/pt/title/${type}/${numericId}-${slug}`,
-        "x-default": `${SITE}/es/title/${type}/${numericId}-${slug}`,
+        es: buildHref("es"),
+        en: buildHref("en"),
+        pt: buildHref("pt"),
+        "x-default": buildHref("es"),
       },
     },
     // Apple Smart App Banner — iOS Safari shows a native "Open in Peekr"

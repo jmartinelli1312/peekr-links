@@ -90,6 +90,7 @@ export default async function UserProfilePage({
       watched: "Watched",
       peeklists: "Peeklists",
       likes: "Likes",
+      reviews: "Reviews",
       sneakpeeks: "SneakPeeks",
       followers: "Followers",
       following: "Following",
@@ -101,17 +102,20 @@ export default async function UserProfilePage({
       emptyWatched: "No watched titles yet.",
       emptyPeeklists: "No Peeklists yet.",
       emptyLikes: "No liked titles yet.",
+      emptyReviews: "No reviews yet.",
       emptySneakpeeks: "No SneakPeeks yet.",
       creator: "Creator",
       creatorBadge: "Creator",
       settings: "Settings",
       openInApp: "Open in app",
+      seeMoreInApp: "See more reviews in the app",
     },
     es: {
       userNotFound: "Usuario no encontrado",
       watched: "Vistos",
       peeklists: "Peeklists",
       likes: "Likes",
+      reviews: "Reviews",
       sneakpeeks: "SneakPeeks",
       followers: "Seguidores",
       following: "Siguiendo",
@@ -123,17 +127,20 @@ export default async function UserProfilePage({
       emptyWatched: "Todavía no hay títulos vistos.",
       emptyPeeklists: "Todavía no hay Peeklists.",
       emptyLikes: "Aún no hay títulos con me gusta.",
+      emptyReviews: "Aún no hay reviews.",
       emptySneakpeeks: "Todavía no hay SneakPeeks.",
       creator: "Creador",
       creatorBadge: "Creador",
       settings: "Settings",
       openInApp: "Abrir en app",
+      seeMoreInApp: "Ver más reviews en la app",
     },
     pt: {
       userNotFound: "Usuário não encontrado",
       watched: "Assistidos",
       peeklists: "Peeklists",
       likes: "Curtidas",
+      reviews: "Reviews",
       sneakpeeks: "SneakPeeks",
       followers: "Seguidores",
       following: "Seguindo",
@@ -145,11 +152,13 @@ export default async function UserProfilePage({
       emptyWatched: "Ainda não há títulos assistidos.",
       emptyPeeklists: "Ainda não há Peeklists.",
       emptyLikes: "Ainda sem curtidas.",
+      emptyReviews: "Ainda sem reviews.",
       emptySneakpeeks: "Ainda não há SneakPeeks.",
       creator: "Criador",
       creatorBadge: "Criador",
       settings: "Settings",
       openInApp: "Abrir no app",
+      seeMoreInApp: "Ver mais reviews no app",
     },
   }[lang];
 
@@ -243,6 +252,17 @@ export default async function UserProfilePage({
     visibility?: string | null;
     cover_url?: string | null;
     type: "following";
+  }> = [];
+
+  // Reviews = comments + rating on same title (matches Flutter behavior).
+  let reviewsData: Array<{
+    tmdb_id: number;
+    media_type: string;
+    title: string;
+    poster_path: string | null;
+    rating: number;
+    comment: string;
+    created_at: string;
   }> = [];
 
   if (!isPrivate) {
@@ -345,6 +365,118 @@ export default async function UserProfilePage({
       .map((row) => row.peeklists)
       .filter((pl): pl is NonNullable<typeof pl> => pl != null)
       .map((item) => ({ ...item, type: "following" as const }));
+
+    // Reviews: comments by this user that have a rating on the same title.
+    // Matches Flutter `fetchUserReviews` behavior.
+    const { data: rawComments } = await supabase
+      .from("comments")
+      .select("tmdb_id, comment, created_at")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    const comments =
+      (rawComments as Array<{
+        tmdb_id: number;
+        comment: string;
+        created_at: string;
+      }> | null) ?? [];
+
+    if (comments.length > 0) {
+      const commentedTmdbIds = Array.from(
+        new Set(comments.map((c) => c.tmdb_id))
+      );
+
+      // Fetch ratings for those titles
+      const { data: ratingsRaw } = await supabase
+        .from("user_title_activities")
+        .select("tmdb_id, media_type, rating, title, poster_path")
+        .eq("user_id", uid)
+        .in("tmdb_id", commentedTmdbIds)
+        .not("rating", "is", null);
+
+      const ratingsByTmdb = new Map<
+        number,
+        {
+          media_type: string;
+          rating: number;
+          title: string | null;
+          poster_path: string | null;
+        }
+      >();
+
+      for (const r of (ratingsRaw as Array<{
+        tmdb_id: number;
+        media_type: string | null;
+        rating: number | null;
+        title: string | null;
+        poster_path: string | null;
+      }> | null) ?? []) {
+        const rating = typeof r.rating === "number" ? r.rating : 0;
+        if (rating <= 0) continue;
+        const existing = ratingsByTmdb.get(r.tmdb_id);
+        if (!existing || rating > existing.rating) {
+          ratingsByTmdb.set(r.tmdb_id, {
+            media_type: r.media_type === "tv" ? "tv" : "movie",
+            rating,
+            title: r.title,
+            poster_path: r.poster_path,
+          });
+        }
+      }
+
+      // Fetch cache for fallback titles/posters
+      const ratedIds = Array.from(ratingsByTmdb.keys());
+      const cacheByTmdb = new Map<
+        number,
+        { poster_path: string | null; title: string | null }
+      >();
+
+      if (ratedIds.length > 0) {
+        const { data: cacheRows } = await supabase
+          .from("titles_cache")
+          .select("tmdb_id, poster_path, title_es, title_en, title_pt")
+          .in("tmdb_id", ratedIds);
+
+        for (const c of (cacheRows as Array<{
+          tmdb_id: number;
+          poster_path: string | null;
+          title_es: string | null;
+          title_en: string | null;
+          title_pt: string | null;
+        }> | null) ?? []) {
+          const title =
+            lang === "es"
+              ? c.title_es || c.title_en || c.title_pt
+              : lang === "pt"
+                ? c.title_pt || c.title_en || c.title_es
+                : c.title_en || c.title_es || c.title_pt;
+          cacheByTmdb.set(c.tmdb_id, {
+            poster_path: c.poster_path,
+            title: title ?? null,
+          });
+        }
+      }
+
+      // Merge — only the most recent comment per title that has a rating
+      const seen = new Set<number>();
+      for (const c of comments) {
+        if (seen.has(c.tmdb_id)) continue;
+        const rating = ratingsByTmdb.get(c.tmdb_id);
+        if (!rating) continue;
+        seen.add(c.tmdb_id);
+        const cache = cacheByTmdb.get(c.tmdb_id);
+        reviewsData.push({
+          tmdb_id: c.tmdb_id,
+          media_type: rating.media_type,
+          title: rating.title || cache?.title || "",
+          poster_path: rating.poster_path || cache?.poster_path || null,
+          rating: rating.rating,
+          comment: c.comment,
+          created_at: c.created_at,
+        });
+      }
+    }
   }
 
   return (
@@ -360,6 +492,7 @@ export default async function UserProfilePage({
       initialSneakPeeks={sneakPeeksData}
       initialPeeklistsCreated={peeklistsCreatedData}
       initialPeeklistsFollowing={peeklistsFollowingData}
+      initialReviews={reviewsData}
     />
   );
 }

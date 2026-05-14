@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  compress: true,
+
   async redirects() {
     return [
       // Non-www → www (canonical domain)
@@ -97,6 +100,26 @@ const nextConfig: NextConfig = {
           {
             key: "Cache-Control",
             value: "public, max-age=300, must-revalidate",
+          },
+        ],
+      },
+      // Sitemap: cache aggressively to reduce regeneration
+      {
+        source: "/sitemap.xml",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400",
+          },
+        ],
+      },
+      // Robots.txt: cache long
+      {
+        source: "/robots.txt",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, s-maxage=604800",
           },
         ],
       },

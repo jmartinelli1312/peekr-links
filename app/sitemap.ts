@@ -1,4 +1,4 @@
-export const revalidate = 86400; // 24h — sitemap no necesita refresh horario
+export const revalidate = 604800; // 7d — sitemap raramente cambia
 
 import type { MetadataRoute } from "next";
 import { supabase } from "@/lib/supabase";
@@ -7,10 +7,10 @@ const SITE = "https://www.peekr.app";
 const LANGS = ["es", "en", "pt"] as const;
 type Lang = (typeof LANGS)[number];
 
-const MAX_EDITORIAL_COLLECTIONS = 500;
-const MAX_BUZZ_ARTICLES = 500;
-const MAX_TITLE_URLS = 2000;
-const MAX_ACTOR_URLS = 1000;
+const MAX_EDITORIAL_COLLECTIONS = 200;
+const MAX_BUZZ_ARTICLES = 300;
+const MAX_TITLE_URLS = 1000;
+const MAX_ACTOR_URLS = 500;
 
 type EditorialCollectionRow = {
   slug: string;

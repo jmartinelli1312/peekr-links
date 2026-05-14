@@ -1,4 +1,4 @@
-export const revalidate = 86400; // 24h
+export const revalidate = 604800; // 7 days — peeklists rarely change
 
 import Link from "next/link";
 import { notFound } from "next/navigation";

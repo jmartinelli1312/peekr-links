@@ -25,6 +25,42 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "meta-externalagent",
         disallow: ["/"],
       },
+      // Aggressive crawlers — block to reduce DB load
+      {
+        userAgent: "AhrefsBot",
+        disallow: ["/"],
+      },
+      {
+        userAgent: "SemrushBot",
+        disallow: ["/"],
+      },
+      {
+        userAgent: "DotBot",
+        disallow: ["/"],
+      },
+      {
+        userAgent: "MJ12bot",
+        disallow: ["/"],
+      },
+      {
+        userAgent: "PetalBot",
+        disallow: ["/"],
+      },
+      {
+        userAgent: "Bytespider",
+        disallow: ["/"],
+      },
+      // Throttle Google/Bing on heavy paths via crawl-delay
+      {
+        userAgent: "Googlebot",
+        allow: ["/"],
+        crawlDelay: 2,
+      },
+      {
+        userAgent: "bingbot",
+        allow: ["/"],
+        crawlDelay: 2,
+      },
       {
         userAgent: "*",
         allow: [
