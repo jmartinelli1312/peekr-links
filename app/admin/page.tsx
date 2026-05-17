@@ -187,16 +187,29 @@ type PublishedCarousel = {
   scheduled_for?: string | null;
 };
 
+// Argentina is UTC-3 year-round (no DST), so 00:00 ART = 03:00 UTC of the
+// same calendar date. The dashboard uses ART calendar cuts everywhere so
+// the "Today / Last 7d / Last 30d" pills line up with the DAU/WAU/MAU RPC.
+
+// 00:00 ART of today, expressed as an ISO timestamp (UTC).
 function startOfTodayIso() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+  const todayArt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date()); // → "YYYY-MM-DD"
+  return `${todayArt}T03:00:00.000Z`;
 }
 
+// 00:00 ART of N days ago (so "last 7 days" = today + 6 prior calendar
+// days), matching `admin_metrics_engagement`'s 7-day / 30-day windows.
 function daysAgoIso(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString();
+  // Take today-ART midnight, subtract (days - 1) full days. days=7 → 6 days
+  // back. days=30 → 29 days back. days=1 (today only) → 0 days back.
+  const startToday = new Date(startOfTodayIso());
+  startToday.setUTCDate(startToday.getUTCDate() - (days - 1));
+  return startToday.toISOString();
 }
 
 function formatNumber(value: number) {
@@ -491,9 +504,7 @@ export default function AdminPage() {
         const [
           authRes,
           totalUsersRes,
-          newUsersTodayRes,
-          newUsers7dRes,
-          newUsers30dRes,
+          engagementRes,
           onboardingCompletedRes,
 
           totalRatingsRes,
@@ -510,8 +521,6 @@ export default function AdminPage() {
           totalEditorialCollectionsRes,
           publishedEditorialCollectionsRes,
 
-          activity30dRes,
-
           recentUsersRes,
           recentRatingsRes,
           recentWatchlistRes,
@@ -521,20 +530,13 @@ export default function AdminPage() {
 
           supabase.from("profiles").select("*", { count: "exact", head: true }),
 
-          supabase
-            .from("profiles")
-            .select("*", { count: "exact", head: true })
-            .gte("created_at", todayIso),
-
-          supabase
-            .from("profiles")
-            .select("*", { count: "exact", head: true })
-            .gte("created_at", sevenIso),
-
-          supabase
-            .from("profiles")
-            .select("*", { count: "exact", head: true })
-            .gte("created_at", thirtyIso),
+          // Single source of truth for DAU/WAU/MAU + new-user counts.
+          // Returns Argentina-calendar cuts and a union of every activity
+          // signal (signups, ratings, comments, activity_feed). See
+          // migration `admin_metrics_engagement_argentina_tz`.
+          supabase.rpc("admin_metrics_engagement", {
+            p_tz: "America/Argentina/Buenos_Aires",
+          }),
 
           supabase
             .from("profiles")
@@ -596,11 +598,6 @@ export default function AdminPage() {
             .eq("is_published", true),
 
           supabase
-            .from("user_title_activities")
-            .select("user_id, watched_at")
-            .gte("watched_at", thirtyIso),
-
-          supabase
             .from("profiles")
             .select("id, username, display_name, created_at")
             .order("created_at", { ascending: false })
@@ -657,9 +654,7 @@ export default function AdminPage() {
 
         const queryErrors = [
           totalUsersRes.error,
-          newUsersTodayRes.error,
-          newUsers7dRes.error,
-          newUsers30dRes.error,
+          engagementRes.error,
           onboardingCompletedRes.error,
           totalRatingsRes.error,
           ratingsTodayRes.error,
@@ -672,7 +667,6 @@ export default function AdminPage() {
           publishedBuzzRes.error,
           totalEditorialCollectionsRes.error,
           publishedEditorialCollectionsRes.error,
-          activity30dRes.error,
           recentUsersRes.error,
           recentRatingsRes.error,
           recentWatchlistRes.error,
@@ -686,39 +680,27 @@ export default function AdminPage() {
           setError(queryErrors);
         }
 
-        const activityRows =
-          (activity30dRes.data as Array<{
-            user_id: string;
-            watched_at?: string | null;
-          }> | null) ?? [];
-
-        const dauSet = new Set<string>();
-        const wauSet = new Set<string>();
-        const mauSet = new Set<string>();
-
-        const now = Date.now();
-        const oneDayMs = 1 * 24 * 60 * 60 * 1000;
-        const sevenDayMs = 7 * 24 * 60 * 60 * 1000;
-        const thirtyDayMs = 30 * 24 * 60 * 60 * 1000;
-
-        for (const row of activityRows) {
-          if (!row.user_id || !row.watched_at) continue;
-          const ts = new Date(row.watched_at).getTime();
-          const diff = now - ts;
-
-          if (diff <= oneDayMs) dauSet.add(row.user_id);
-          if (diff <= sevenDayMs) wauSet.add(row.user_id);
-          if (diff <= thirtyDayMs) mauSet.add(row.user_id);
-        }
+        // DAU / WAU / MAU + new-user counts come from a single RPC that
+        // already applies Argentina-time calendar cuts and unions every
+        // activity signal (signups, ratings, comments, activity_feed).
+        // This is what makes MAU >= installs of the same period.
+        const engagement = (engagementRes.data as {
+          dau?: number;
+          wau?: number;
+          mau?: number;
+          new_users_today?: number;
+          new_users_7d?: number;
+          new_users_30d?: number;
+        } | null) ?? {};
 
         setMetrics({
           totalUsers: totalUsersRes.count ?? 0,
-          newUsersToday: newUsersTodayRes.count ?? 0,
-          newUsers7d: newUsers7dRes.count ?? 0,
-          newUsers30d: newUsers30dRes.count ?? 0,
-          dau: dauSet.size,
-          wau: wauSet.size,
-          mau: mauSet.size,
+          newUsersToday: engagement.new_users_today ?? 0,
+          newUsers7d: engagement.new_users_7d ?? 0,
+          newUsers30d: engagement.new_users_30d ?? 0,
+          dau: engagement.dau ?? 0,
+          wau: engagement.wau ?? 0,
+          mau: engagement.mau ?? 0,
           totalRatings: totalRatingsRes.count ?? 0,
           ratingsToday: ratingsTodayRes.count ?? 0,
           ratings7d: ratings7dRes.count ?? 0,
