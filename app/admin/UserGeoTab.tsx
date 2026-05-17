@@ -50,31 +50,58 @@ const PLATFORM_LABEL: Record<string, string> = {
 
 type Preset = "today" | "yesterday" | "7d" | "30d" | "custom";
 
-function toDateStr(d: Date) {
-  return d.toISOString().split("T")[0];
+// All date strings here are Argentina-calendar dates (UTC-3, no DST).
+// Matches the `admin_metrics_engagement` RPC so the geo card's
+// "Nuevos usuarios" count equals the top KPIs for the same preset.
+
+function toDateStr(d: Date): string {
+  // YYYY-MM-DD of `d` evaluated in Argentina time.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
 function todayStr() {
   return toDateStr(new Date());
 }
 
+// Subtract whole calendar days from an ART date string.
+// Anchors at 03:00 UTC (= 00:00 ART) of the input date so the math is
+// timezone-stable.
+function artDateMinusDays(yyyyMmDd: string, days: number): string {
+  const d = new Date(`${yyyyMmDd}T03:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() - days);
+  return toDateStr(d);
+}
+
 function presetRange(p: Preset): { from: string; to: string } {
-  const now = new Date();
-  if (p === "today") return { from: todayStr(), to: todayStr() };
+  const today = todayStr();
+  if (p === "today") return { from: today, to: today };
   if (p === "yesterday") {
-    const y = new Date(now);
-    y.setDate(y.getDate() - 1);
-    return { from: toDateStr(y), to: toDateStr(y) };
+    const y = artDateMinusDays(today, 1);
+    return { from: y, to: y };
   }
   if (p === "7d") {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 6);
-    return { from: toDateStr(d), to: todayStr() };
+    return { from: artDateMinusDays(today, 6), to: today };
   }
   // 30d
-  const d = new Date(now);
-  d.setDate(d.getDate() - 29);
-  return { from: toDateStr(d), to: todayStr() };
+  return { from: artDateMinusDays(today, 29), to: today };
+}
+
+// Convert ART-calendar date strings into the UTC ISO range to use against
+// `created_at`. ART midnight = 03:00 UTC of the same date, so we anchor at
+// 03:00 UTC of `from` (inclusive) and at 03:00 UTC of `to + 1 day` (exclusive).
+function artRangeToUtcIso(range: { from: string; to: string }): {
+  fromTs: string;
+  toTsExclusive: string;
+} {
+  const fromTs = `${range.from}T03:00:00.000Z`;
+  const endAnchor = new Date(`${range.to}T03:00:00.000Z`);
+  endAnchor.setUTCDate(endAnchor.getUTCDate() + 1);
+  return { fromTs, toTsExclusive: endAnchor.toISOString() };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -260,15 +287,17 @@ export default function UserGeoTab({ supabase }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const fromTs = range.from + "T00:00:00.000Z";
-      const toTs = range.to + "T23:59:59.999Z";
+      // ART calendar bounds → UTC range: [from 03:00 UTC, to+1 03:00 UTC).
+      // Matches the boundaries used by `admin_metrics_engagement(tz=ART)`
+      // so the "new users" count here equals the top KPIs for any preset.
+      const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
 
       // New users in date range
       const { data: newData, error: e1 } = await supabase
         .from("profiles")
         .select("id, country_code, platform, created_at")
         .gte("created_at", fromTs)
-        .lte("created_at", toTs)
+        .lt("created_at", toTsExclusive)
         .order("created_at", { ascending: false });
       if (e1) throw e1;
 
