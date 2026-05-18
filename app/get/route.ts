@@ -7,8 +7,10 @@ import { NextRequest, NextResponse } from "next/server";
 // peekr.app/get?utm_source=ig_bio&utm_campaign=launch  → UTM params pass through
 const IOS_URL =
   "https://apps.apple.com/app/id6756285989";
+// `pli=1` (Play Identity Login) tells Play to open with the user's signed-in
+// account so the install/update flow doesn't bounce them through a login.
 const ANDROID_URL =
-  "https://play.google.com/store/apps/details?id=com.peekr.peekr";
+  "https://play.google.com/store/apps/details?id=com.peekr.peekr&pli=1";
 const FALLBACK_URL = "https://peekr.app";
 
 export const runtime = "edge";
