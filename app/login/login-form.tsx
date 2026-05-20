@@ -268,7 +268,7 @@ export default function LoginForm({
             </div>
 
             <div className="login-aux">
-              <Link href="#">{t.forgotPassword}</Link>
+              <Link href="/forgot-password">{t.forgotPassword}</Link>
             </div>
 
             {error ? <div className="login-error">{error}</div> : null}

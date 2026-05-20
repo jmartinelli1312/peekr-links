@@ -18,6 +18,10 @@ const RESERVED_SEGMENTS = new Set([
   // "/my-peeklists" as a vanity username and serve /u/[username],
   // which then shows "User not found".
   "my-peeklists", "my-watchlist",
+  // Password recovery flow — same reason: keep them out of the vanity
+  // username rewrite so /forgot-password and /reset-password resolve
+  // to the actual pages instead of /u/forgot-password.
+  "forgot-password", "reset-password",
 ]);
 
 function hasLangPrefix(pathname: string) {

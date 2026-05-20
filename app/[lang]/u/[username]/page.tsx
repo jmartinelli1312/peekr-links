@@ -390,6 +390,48 @@ export default async function UserProfilePage({
       .filter((pl): pl is NonNullable<typeof pl> => pl != null)
       .map((item) => ({ ...item, type: "following" as const }));
 
+    // Thumbnail fallback: peeklists without a cover_url get the first
+    // item's poster as cover. One bulk SELECT covers every peeklist that
+    // needs it; we just take the lowest-position row per peeklist_id.
+    const needCoverIds = [
+      ...peeklistsCreatedData,
+      ...peeklistsFollowingData,
+    ]
+      .filter((p) => !p.cover_url)
+      .map((p) => String(p.id));
+    if (needCoverIds.length > 0) {
+      const { data: itemRows } = await supabase
+        .from("peeklist_items")
+        .select("peeklist_id, tmdb_id, media_type, poster_path, position")
+        .in("peeklist_id", needCoverIds)
+        .order("position", { ascending: true });
+
+      const firstByPeeklist = new Map<
+        string,
+        { poster_path: string | null }
+      >();
+      for (const r of (itemRows as Array<{
+        peeklist_id: string;
+        poster_path: string | null;
+      }> | null) ?? []) {
+        if (!firstByPeeklist.has(r.peeklist_id)) {
+          firstByPeeklist.set(r.peeklist_id, r);
+        }
+      }
+
+      function hydrate(p: { id: string | number; cover_url?: string | null }) {
+        if (p.cover_url) return;
+        const first = firstByPeeklist.get(String(p.id));
+        if (first?.poster_path) {
+          // w500 is enough for a 74×54 thumbnail and keeps the payload
+          // light; the viewer detail page uses w1280 for the hero image.
+          p.cover_url = `https://image.tmdb.org/t/p/w500${first.poster_path}`;
+        }
+      }
+      peeklistsCreatedData.forEach(hydrate);
+      peeklistsFollowingData.forEach(hydrate);
+    }
+
     // Reviews: comments by this user that have a rating on the same title.
     // Matches Flutter `fetchUserReviews` behavior.
     const { data: rawComments } = await supabase
