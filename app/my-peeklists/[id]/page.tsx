@@ -9,6 +9,134 @@ import BackButton from "@/components/BackButton";
 const BRAND = "#FA0082";
 const POSTER = "https://image.tmdb.org/t/p/w185";
 
+type Lang = "es" | "en" | "pt";
+
+const I18N: Record<Lang, {
+  loading: string;
+  back: string;
+  notAvailable: string;
+  notOwner: string;
+  backToMine: string;
+  top5Banner: string;
+  details: string;
+  titleField: string;
+  descriptionField: string;
+  publicLabel: string;
+  privateLabel: string;
+  top5Hint: string;
+  saveChanges: string;
+  saving: string;
+  saved: string;
+  changesSaved: string;
+  titleEmpty: string;
+  itemsHeader: (n: number) => string;
+  noItems: string;
+  movie: string;
+  tv: string;
+  remove: string;
+  addTitle: string;
+  searchPlaceholder: string;
+  searching: string;
+  noResults: string;
+  addBtn: string;
+  alreadyAdded: string;
+  top5Full: string;
+}> = {
+  es: {
+    loading: "Cargando…",
+    back: "Volver",
+    notAvailable: "Peeklist no disponible.",
+    notOwner: "No sos el dueño de esta peeklist.",
+    backToMine: "← Mis peeklists",
+    top5Banner: "Lista Top 5 — título bloqueado, máximo 5 títulos",
+    details: "Detalles",
+    titleField: "Título",
+    descriptionField: "Descripción",
+    publicLabel: "Pública",
+    privateLabel: "Privada",
+    top5Hint: "Los títulos del Top 5 se gestionan automáticamente.",
+    saveChanges: "Guardar cambios",
+    saving: "Guardando…",
+    saved: "Guardado ✓",
+    changesSaved: "Cambios guardados.",
+    titleEmpty: "El título no puede estar vacío",
+    itemsHeader: (n: number) => `Títulos (${n})`,
+    noItems: "Todavía no hay títulos. Agregá uno abajo.",
+    movie: "Película",
+    tv: "Serie",
+    remove: "Quitar",
+    addTitle: "Agregar un título",
+    searchPlaceholder: "Buscar películas o series…",
+    searching: "Buscando…",
+    noResults: "Sin resultados.",
+    addBtn: "+ Agregar",
+    alreadyAdded: "Agregada",
+    top5Full: "Tu Top 5 está completo. Quitá un título antes de agregar otro.",
+  },
+  en: {
+    loading: "Loading…",
+    back: "Back",
+    notAvailable: "Peeklist not available.",
+    notOwner: "You don't own this peeklist.",
+    backToMine: "← My peeklists",
+    top5Banner: "Top 5 list — title locked, max 5 items",
+    details: "Details",
+    titleField: "Title",
+    descriptionField: "Description",
+    publicLabel: "Public",
+    privateLabel: "Private",
+    top5Hint: "Top 5 titles are managed automatically.",
+    saveChanges: "Save changes",
+    saving: "Saving…",
+    saved: "Saved ✓",
+    changesSaved: "Changes saved.",
+    titleEmpty: "Title can't be empty",
+    itemsHeader: (n: number) => `Items (${n})`,
+    noItems: "No items yet. Add some below.",
+    movie: "Movie",
+    tv: "TV",
+    remove: "Remove",
+    addTitle: "Add a title",
+    searchPlaceholder: "Search movies or shows…",
+    searching: "Searching…",
+    noResults: "No results.",
+    addBtn: "+ Add",
+    alreadyAdded: "Added",
+    top5Full: "Top 5 list is full. Remove an item before adding another.",
+  },
+  pt: {
+    loading: "Carregando…",
+    back: "Voltar",
+    notAvailable: "Peeklist indisponível.",
+    notOwner: "Você não é o dono desta peeklist.",
+    backToMine: "← Minhas peeklists",
+    top5Banner: "Lista Top 5 — título bloqueado, máximo de 5 títulos",
+    details: "Detalhes",
+    titleField: "Título",
+    descriptionField: "Descrição",
+    publicLabel: "Pública",
+    privateLabel: "Privada",
+    top5Hint: "Os títulos do Top 5 são gerenciados automaticamente.",
+    saveChanges: "Salvar alterações",
+    saving: "Salvando…",
+    saved: "Salvo ✓",
+    changesSaved: "Alterações salvas.",
+    titleEmpty: "O título não pode estar vazio",
+    itemsHeader: (n: number) => `Títulos (${n})`,
+    noItems: "Ainda não há títulos. Adicione um abaixo.",
+    movie: "Filme",
+    tv: "Série",
+    remove: "Remover",
+    addTitle: "Adicionar um título",
+    searchPlaceholder: "Buscar filmes ou séries…",
+    searching: "Buscando…",
+    noResults: "Sem resultados.",
+    addBtn: "+ Adicionar",
+    alreadyAdded: "Adicionado",
+    top5Full: "Seu Top 5 está cheio. Remova um título antes de adicionar outro.",
+  },
+};
+
 type Peeklist = {
   id: string;
   title: string | null;
@@ -50,6 +178,8 @@ export default function MyPeeklistEditorPage({
   const [userId, setUserId] = useState<string | null>(null);
   const [peeklist, setPeeklist] = useState<Peeklist | null>(null);
   const [items, setItems] = useState<PeeklistItem[]>([]);
+  const [lang, setLang] = useState<Lang>("es");
+  const t = I18N[lang];
 
   // Metadata edit state
   const [title, setTitle] = useState("");
@@ -163,6 +293,20 @@ export default function MyPeeklistEditorPage({
         return;
       }
       setUserId(user.id);
+      // Resolve the user's preferred language from profiles — same source of
+      // truth the mobile app writes to. Falls back to "es" (LATAM-first).
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("language")
+        .eq("id", user.id)
+        .maybeSingle();
+      const raw = (prof?.language as string | null) ?? "es";
+      const normalized: Lang = raw.startsWith("en")
+        ? "en"
+        : raw.startsWith("pt")
+          ? "pt"
+          : "es";
+      setLang(normalized);
       await loadAll(user.id);
       setLoading(false);
     })();
@@ -181,7 +325,7 @@ export default function MyPeeklistEditorPage({
     debounce.current = setTimeout(async () => {
       try {
         const r = await fetch(
-          `/api/search?tab=titles&lang=es&q=${encodeURIComponent(q)}`
+          `/api/search?tab=titles&lang=${lang}&q=${encodeURIComponent(q)}`
         );
         const j = await r.json();
         const items: TmdbResult[] = (j.results ?? []).filter(
@@ -198,22 +342,22 @@ export default function MyPeeklistEditorPage({
     return () => {
       if (debounce.current) clearTimeout(debounce.current);
     };
-  }, [query]);
+  }, [query, lang]);
 
   async function saveMetadata() {
     if (!peeklist) return;
     setSavingMeta(true);
     setError(null);
     try {
-      const t = title.trim();
-      if (!t) {
-        setError("Title can't be empty");
+      const newTitle = title.trim();
+      if (!newTitle) {
+        setError(t.titleEmpty);
         return;
       }
       const { error: e } = await supabase
         .from("peeklists")
         .update({
-          title: t,
+          title: newTitle,
           description: description.trim() || null,
           visibility,
         })
@@ -223,7 +367,7 @@ export default function MyPeeklistEditorPage({
         prev
           ? {
               ...prev,
-              title: t,
+              title: newTitle,
               description: description.trim() || null,
               visibility,
             }
@@ -297,14 +441,14 @@ export default function MyPeeklistEditorPage({
     setItems((prev) => prev.filter((it) => it.id !== itemId));
   }
 
-  if (loading) return <Center>Loading…</Center>;
+  if (loading) return <Center>{t.loading}</Center>;
   if (!peeklist) {
     return (
       <Center>
         <div style={{ textAlign: "center" }}>
-          <p>{error || "Peeklist not available."}</p>
+          <p>{error || t.notAvailable}</p>
           <Link href="/my-peeklists" style={{ color: BRAND }}>
-            ← Back to my peeklists
+            {t.backToMine}
           </Link>
         </div>
       </Center>
@@ -317,23 +461,21 @@ export default function MyPeeklistEditorPage({
     <main className="page">
       <div className="container">
         <BackButton
-          label="Back"
+          label={t.back}
           fallbackHref="/my-peeklists"
           className="back"
         />
 
         <h1>{peeklist.title || "Untitled"}</h1>
-        {isTop5 && (
-          <div className="badge">Top 5 list — title locked, max 5 items</div>
-        )}
+        {isTop5 && <div className="badge">{t.top5Banner}</div>}
 
         {error && <div className="error">{error}</div>}
 
         {/* Metadata editor */}
         <section className="card">
-          <h2>Details</h2>
+          <h2>{t.details}</h2>
           <label className="lbl">
-            Title
+            {t.titleField}
             <input
               type="text"
               value={title}
@@ -341,14 +483,10 @@ export default function MyPeeklistEditorPage({
               maxLength={80}
               disabled={isTop5}
             />
-            {isTop5 && (
-              <span className="hint">
-                Top 5 titles are managed automatically.
-              </span>
-            )}
+            {isTop5 && <span className="hint">{t.top5Hint}</span>}
           </label>
           <label className="lbl">
-            Description
+            {t.descriptionField}
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -365,7 +503,7 @@ export default function MyPeeklistEditorPage({
                   checked={visibility === "public"}
                   onChange={() => setVisibility("public")}
                 />
-                <span>Public</span>
+                <span>{t.publicLabel}</span>
               </label>
               <label>
                 <input
@@ -374,30 +512,26 @@ export default function MyPeeklistEditorPage({
                   checked={visibility === "private"}
                   onChange={() => setVisibility("private")}
                 />
-                <span>Private</span>
+                <span>{t.privateLabel}</span>
               </label>
             </div>
           )}
           <div className="saverow">
             <button onClick={saveMetadata} disabled={savingMeta}>
               {savingMeta
-                ? "Saving…"
+                ? t.saving
                 : savedFlash
-                  ? "Saved ✓"
-                  : "Save changes"}
+                  ? t.saved
+                  : t.saveChanges}
             </button>
-            {savedFlash && (
-              <span className="savedMsg">Changes saved.</span>
-            )}
+            {savedFlash && <span className="savedMsg">{t.changesSaved}</span>}
           </div>
         </section>
 
         {/* Items list */}
         <section className="card">
-          <h2>Items ({items.length})</h2>
-          {items.length === 0 && (
-            <p className="empty">No items yet. Add some below.</p>
-          )}
+          <h2>{t.itemsHeader(items.length)}</h2>
+          {items.length === 0 && <p className="empty">{t.noItems}</p>}
           <ul className="items">
             {items.map((it) => (
               <li key={it.id} className="item">
@@ -418,14 +552,14 @@ export default function MyPeeklistEditorPage({
                     {it.title || `TMDB ${it.tmdb_id}`}
                   </div>
                   <div className="muted">
-                    {it.media_type === "tv" ? "TV" : "Movie"}
+                    {it.media_type === "tv" ? t.tv : t.movie}
                     {it.position ? ` · #${it.position}` : ""}
                   </div>
                 </div>
                 <button
                   className="del"
                   onClick={() => removeItem(it.id)}
-                  title="Remove"
+                  title={t.remove}
                 >
                   ✕
                 </button>
@@ -437,15 +571,15 @@ export default function MyPeeklistEditorPage({
         {/* TMDB search to add new items */}
         {!isTop5 || items.length < 5 ? (
           <section className="card">
-            <h2>Add a title</h2>
+            <h2>{t.addTitle}</h2>
             <input
               type="text"
-              placeholder="Search movies or shows…"
+              placeholder={t.searchPlaceholder}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="search"
             />
-            {searching && <p className="muted">Searching…</p>}
+            {searching && <p className="muted">{t.searching}</p>}
             {!searching && results.length > 0 && (
               <ul className="results">
                 {results.map((r) => {
@@ -478,13 +612,13 @@ export default function MyPeeklistEditorPage({
                             <span className="year">({year})</span>
                           ) : null}
                         </div>
-                        <div className="muted">{isTv ? "TV" : "Movie"}</div>
+                        <div className="muted">{isTv ? t.tv : t.movie}</div>
                       </div>
                       {already ? (
-                        <span className="added">Added</span>
+                        <span className="added">{t.alreadyAdded}</span>
                       ) : (
                         <button onClick={() => addItem(r)} className="add">
-                          + Add
+                          {t.addBtn}
                         </button>
                       )}
                     </li>
@@ -493,14 +627,12 @@ export default function MyPeeklistEditorPage({
               </ul>
             )}
             {!searching && query.trim() && results.length === 0 && (
-              <p className="empty">No results.</p>
+              <p className="empty">{t.noResults}</p>
             )}
           </section>
         ) : (
           <section className="card">
-            <p className="muted">
-              Top 5 list is full. Remove an item before adding another.
-            </p>
+            <p className="muted">{t.top5Full}</p>
           </section>
         )}
       </div>

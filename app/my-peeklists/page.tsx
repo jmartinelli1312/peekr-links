@@ -7,6 +7,108 @@ import { supabase } from "@/lib/supabase";
 
 const BRAND = "#FA0082";
 
+type Lang = "es" | "en" | "pt";
+
+const I18N: Record<Lang, {
+  loading: string;
+  title: string;
+  subtitle: string;
+  createNew: string;
+  titleLabel: string;
+  titlePlaceholder: string;
+  descriptionLabel: string;
+  descriptionPlaceholder: string;
+  publicLabel: string;
+  privateLabel: string;
+  titleRequired: string;
+  createBtn: string;
+  creating: string;
+  totalLists: (n: number) => string;
+  noLists: string;
+  itemsCount: (n: number) => string;
+  top5Badge: string;
+  visPublic: string;
+  visPrivate: string;
+  confirmDelete: (t: string) => string;
+  untitled: string;
+}> = {
+  es: {
+    loading: "Cargando…",
+    title: "Mis Peeklists",
+    subtitle:
+      "Curá tus propias listas desde la web. Las públicas aparecen en tu perfil y en Explore.",
+    createNew: "Crear nueva",
+    titleLabel: "Título",
+    titlePlaceholder: "Mis thrillers favoritos",
+    descriptionLabel: "Descripción (opcional)",
+    descriptionPlaceholder: "¿De qué trata esta lista?",
+    publicLabel: "Pública",
+    privateLabel: "Privada",
+    titleRequired: "El título es obligatorio",
+    createBtn: "Crear peeklist",
+    creating: "Creando…",
+    totalLists: (n: number) => `${n} lista${n === 1 ? "" : "s"}`,
+    noLists: "Aún no tenés peeklists. Creá la primera arriba.",
+    itemsCount: (n: number) => `${n} título${n === 1 ? "" : "s"}`,
+    top5Badge: "Top 5",
+    visPublic: "Pública",
+    visPrivate: "Privada",
+    confirmDelete: (t: string) =>
+      `¿Eliminar "${t}"? Esta acción no se puede deshacer.`,
+    untitled: "Sin título",
+  },
+  en: {
+    loading: "Loading…",
+    title: "My Peeklists",
+    subtitle:
+      "Curate your own lists from the web. Public lists show up on your profile and in Explore.",
+    createNew: "Create new",
+    titleLabel: "Title",
+    titlePlaceholder: "My favorite thrillers",
+    descriptionLabel: "Description (optional)",
+    descriptionPlaceholder: "What's in this list?",
+    publicLabel: "Public",
+    privateLabel: "Private",
+    titleRequired: "Title is required",
+    createBtn: "Create peeklist",
+    creating: "Creating…",
+    totalLists: (n: number) => `${n} list${n === 1 ? "" : "s"}`,
+    noLists: "No peeklists yet. Create your first above.",
+    itemsCount: (n: number) => `${n} item${n === 1 ? "" : "s"}`,
+    top5Badge: "Top 5",
+    visPublic: "Public",
+    visPrivate: "Private",
+    confirmDelete: (t: string) =>
+      `Delete "${t}"? This cannot be undone.`,
+    untitled: "Untitled",
+  },
+  pt: {
+    loading: "Carregando…",
+    title: "Minhas Peeklists",
+    subtitle:
+      "Crie suas próprias listas pela web. As públicas aparecem no seu perfil e em Explore.",
+    createNew: "Criar nova",
+    titleLabel: "Título",
+    titlePlaceholder: "Meus thrillers favoritos",
+    descriptionLabel: "Descrição (opcional)",
+    descriptionPlaceholder: "Do que trata esta lista?",
+    publicLabel: "Pública",
+    privateLabel: "Privada",
+    titleRequired: "O título é obrigatório",
+    createBtn: "Criar peeklist",
+    creating: "Criando…",
+    totalLists: (n: number) => `${n} lista${n === 1 ? "" : "s"}`,
+    noLists: "Ainda não há peeklists. Crie a primeira acima.",
+    itemsCount: (n: number) => `${n} título${n === 1 ? "" : "s"}`,
+    top5Badge: "Top 5",
+    visPublic: "Pública",
+    visPrivate: "Privada",
+    confirmDelete: (t: string) =>
+      `Excluir "${t}"? Esta ação não pode ser desfeita.`,
+    untitled: "Sem título",
+  },
+};
+
 type Peeklist = {
   id: string;
   title: string | null;
@@ -25,6 +127,8 @@ export default function MyPeeklistsPage() {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [peeklists, setPeeklists] = useState<Peeklist[]>([]);
+  const [lang, setLang] = useState<Lang>("es");
+  const t = I18N[lang];
 
   // Form state
   const [newTitle, setNewTitle] = useState("");
@@ -83,6 +187,20 @@ export default function MyPeeklistsPage() {
         return;
       }
       setUserId(user.id);
+      // Read the user's preferred app language to localize the index. Same
+      // source of truth as mobile (profiles.language).
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("language")
+        .eq("id", user.id)
+        .maybeSingle();
+      const raw = (prof?.language as string | null) ?? "es";
+      const normalized: Lang = raw.startsWith("en")
+        ? "en"
+        : raw.startsWith("pt")
+          ? "pt"
+          : "es";
+      setLang(normalized);
       await loadPeeklists(user.id);
       setLoading(false);
     })();
@@ -93,7 +211,7 @@ export default function MyPeeklistsPage() {
     if (!userId) return;
     const title = newTitle.trim();
     if (!title) {
-      setError("Title is required");
+      setError(t.titleRequired);
       return;
     }
     setCreating(true);
@@ -123,11 +241,7 @@ export default function MyPeeklistsPage() {
   }
 
   async function handleDelete(id: string, title: string | null) {
-    if (
-      !confirm(
-        `Delete "${title || "Untitled"}"? This cannot be undone.`
-      )
-    ) {
+    if (!confirm(t.confirmDelete(title || t.untitled))) {
       return;
     }
     setError(null);
@@ -143,42 +257,39 @@ export default function MyPeeklistsPage() {
   }
 
   if (loading) {
-    return <Center>Loading…</Center>;
+    return <Center>{t.loading}</Center>;
   }
 
   return (
     <main className="page">
       <div className="container">
         <header className="hdr">
-          <h1>My Peeklists</h1>
-          <p className="sub">
-            Curate your own lists from the web. Public lists show up on your
-            profile and in Explore.
-          </p>
+          <h1>{t.title}</h1>
+          <p className="sub">{t.subtitle}</p>
         </header>
 
         {error && <div className="error">{error}</div>}
 
         <section className="card">
-          <h2>Create new</h2>
+          <h2>{t.createNew}</h2>
           <form onSubmit={handleCreate} className="form">
             <label className="lbl">
-              Title
+              {t.titleLabel}
               <input
                 type="text"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="My favorite thrillers"
+                placeholder={t.titlePlaceholder}
                 maxLength={80}
                 disabled={creating}
               />
             </label>
             <label className="lbl">
-              Description (optional)
+              {t.descriptionLabel}
               <textarea
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
-                placeholder="What's in this list?"
+                placeholder={t.descriptionPlaceholder}
                 maxLength={500}
                 rows={3}
                 disabled={creating}
@@ -193,7 +304,7 @@ export default function MyPeeklistsPage() {
                   onChange={() => setNewVisibility("public")}
                   disabled={creating}
                 />
-                <span>Public</span>
+                <span>{t.publicLabel}</span>
               </label>
               <label>
                 <input
@@ -203,20 +314,20 @@ export default function MyPeeklistsPage() {
                   onChange={() => setNewVisibility("private")}
                   disabled={creating}
                 />
-                <span>Private</span>
+                <span>{t.privateLabel}</span>
               </label>
             </div>
             <button type="submit" disabled={creating || !newTitle.trim()}>
-              {creating ? "Creating…" : "Create peeklist"}
+              {creating ? t.creating : t.createBtn}
             </button>
           </form>
         </section>
 
         <section className="list">
-          <h2>{peeklists.length} list{peeklists.length === 1 ? "" : "s"}</h2>
+          <h2>{t.totalLists(peeklists.length)}</h2>
 
           {peeklists.length === 0 && (
-            <p className="empty">No peeklists yet. Create your first above.</p>
+            <p className="empty">{t.noLists}</p>
           )}
 
           <ul>
@@ -236,12 +347,13 @@ export default function MyPeeklistsPage() {
                       {!cover && <span>📋</span>}
                     </div>
                     <div className="meta">
-                      <div className="title">{p.title || "Untitled"}</div>
+                      <div className="title">{p.title || t.untitled}</div>
                       <div className="muted">
-                        {p.item_count ?? 0} item
-                        {p.item_count === 1 ? "" : "s"} ·{" "}
-                        {p.visibility === "private" ? "Private" : "Public"}
-                        {p.list_type === "top5" ? " · Top 5" : ""}
+                        {t.itemsCount(p.item_count ?? 0)} ·{" "}
+                        {p.visibility === "private"
+                          ? t.visPrivate
+                          : t.visPublic}
+                        {p.list_type === "top5" ? ` · ${t.top5Badge}` : ""}
                       </div>
                       {p.description && (
                         <div className="desc">{p.description}</div>
