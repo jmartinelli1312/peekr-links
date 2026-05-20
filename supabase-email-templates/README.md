@@ -21,6 +21,19 @@ según `{{ .Data.language }}` (que viene de `auth.users.raw_user_meta_data.langu
 | Password reset | `reset-password.subject.txt`, `reset-password.html` | `supabase.auth.resetPasswordForEmail()` |
 | Magic link | `magic-link.subject.txt`, `magic-link.html` | Magic link sign-in (no usado hoy pero queda armado) |
 | Change email | `change-email.subject.txt`, `change-email.html` | Cuando el user cambia su email |
+| Reauthentication / Password changed notice | `reauthentication.subject.txt`, `reauthentication.html` | Notificación informativa cuando se cambia la contraseña (sin CTA — solo aviso) |
+
+## Si en el Dashboard NO ves un slot "Reauthentication"
+
+Algunos proyectos de Supabase no exponen ese template como editable. En ese caso el email "Your password has been set" lo manda Supabase Auth como **security notification automática** y NO es brandeable vía template.
+
+Las dos opciones para ese caso:
+
+1. **Send Email Hook (Auth Hook)**: configurar una edge function en `Authentication → Hooks` que intercepta TODO el envío de emails y renderea HTML custom. Es lo más potente pero requiere SMTP custom (Resend / SendGrid).
+
+2. **Custom SMTP**: en `Authentication → SMTP Settings`, configurar un proveedor propio. Eso permite controlar el subject/from y abre la puerta a templates más ricos vía X-Headers.
+
+Por ahora, si Supabase manda el "password changed" sin que vos puedas editarlo, queda como el único email no-branded de la suite. Aceptable como trade-off.
 
 ## Brand
 
