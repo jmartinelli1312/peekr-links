@@ -38,6 +38,9 @@ type PeeklistItemRow = {
   tmdb_id: number;
   title?: string | null;
   poster_path?: string | null;
+  // Hydrated from the TMDB enrichment fetch — used by the cover fallback
+  // cascade on the viewer page when the peeklist has no cover_url set.
+  backdrop_path?: string | null;
   media_type?: string | null;
   position?: number | null;
 };
@@ -116,9 +119,15 @@ async function getPeeklistItems(id: string, lang: Lang) {
     const apiLang =
       lang === "es" ? "es-ES" : lang === "pt" ? "pt-BR" : "en-US";
 
+    // Hydrate the first few items unconditionally so we have `backdrop_path`
+    // available for the cover fallback even when the peeklist_items row
+    // already had a title. Items past index 4 only get hydrated when they
+    // need a title (legacy mobile-inserted rows often have title=NULL).
     const hydrated = await Promise.all(
-      items.map(async (item) => {
-        if (item.title && item.title.trim().length > 0) {
+      items.map(async (item, idx) => {
+        const needsTitle = !item.title || item.title.trim().length === 0;
+        const needsBackdrop = idx < 2; // first two are candidates for cover
+        if (!needsTitle && !needsBackdrop) {
           return item;
         }
 
@@ -138,6 +147,7 @@ async function getPeeklistItems(id: string, lang: Lang) {
             ...item,
             title: json.title || json.name || item.title || "Untitled",
             poster_path: item.poster_path || json.poster_path || null,
+            backdrop_path: json.backdrop_path || null,
           };
         } catch {
           return {
@@ -267,26 +277,29 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
   const isTop5 = peeklist.list_type === "top5";
   const displayTitle = isTop5 ? t.myTop5 : peeklist.title || t.untitled;
 
-  // Cover fallback: if neither cover_url nor custom_cover_url was set by the
-  // creator, use the backdrop of the first item (titles_cache).
+  // Cover fallback cascade when the creator didn't set cover_url:
+  //   1. backdrop of item #1 (best — wide aspect)
+  //   2. backdrop of item #2
+  //   3. poster of item #1 (narrow but always present)
+  //   4. poster of item #2
+  //   5. gradient
+  // `backdrop_path` is hydrated for the first two items inside
+  // `getPeeklistItems` via the TMDB enrichment fetch.
   let effectiveCover: string | null = peeklist.cover_url ?? null;
-  if (!effectiveCover && items.length > 0) {
+  if (!effectiveCover) {
     const first = items[0];
-    const mt = first.media_type === "tv" ? "tv" : "movie";
-    try {
-      const { data } = await supabase
-        .from("titles_cache")
-        .select("backdrop_path")
-        .eq("tmdb_id", first.tmdb_id)
-        .eq("media_type", mt)
-        .maybeSingle();
-      const path = (data as { backdrop_path?: string | null } | null)
-        ?.backdrop_path;
-      if (path) {
-        effectiveCover = `https://image.tmdb.org/t/p/w1280${path}`;
-      }
-    } catch {
-      // Fallback to the no-cover gradient if the lookup fails.
+    const second = items[1];
+    const BACKDROP = "https://image.tmdb.org/t/p/w1280";
+    const POSTER = "https://image.tmdb.org/t/p/w780";
+
+    if (first?.backdrop_path) {
+      effectiveCover = `${BACKDROP}${first.backdrop_path}`;
+    } else if (second?.backdrop_path) {
+      effectiveCover = `${BACKDROP}${second.backdrop_path}`;
+    } else if (first?.poster_path) {
+      effectiveCover = `${POSTER}${first.poster_path}`;
+    } else if (second?.poster_path) {
+      effectiveCover = `${POSTER}${second.poster_path}`;
     }
   }
 
