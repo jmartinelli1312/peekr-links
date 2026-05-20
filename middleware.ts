@@ -13,6 +13,11 @@ const RESERVED_SEGMENTS = new Set([
   "contact", "download-app", "explore", "title", "actor",
   "activity", "peeklist", "user", "u", "api", "sitemap.xml",
   "robots.txt", "apple-app-site-association", ".well-known", "sneak-peek",
+  // Authenticated creator-side routes added in the F1+ web migration.
+  // Without these, the username-rewrite below would interpret
+  // "/my-peeklists" as a vanity username and serve /u/[username],
+  // which then shows "User not found".
+  "my-peeklists", "my-watchlist",
 ]);
 
 function hasLangPrefix(pathname: string) {

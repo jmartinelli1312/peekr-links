@@ -3,6 +3,7 @@ export const revalidate = 604800; // 7 days — peeklists rarely change
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import BackButton from "@/components/BackButton";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -285,6 +286,14 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
           text-decoration: none;
           font-size: 14px;
           font-weight: 700;
+          background: transparent;
+          border: 0;
+          padding: 0;
+          cursor: pointer;
+          font-family: inherit;
+        }
+        .peeklist-back:hover {
+          color: white;
         }
 
         .peeklist-hero {
@@ -465,9 +474,12 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
       `}</style>
 
       <div className="peeklist-page">
-        <Link href="/lists" className="peeklist-back">
-          ← {t.backToLists}
-        </Link>
+        <BackButton
+          label={t.backToLists}
+          fallbackHref={`/${lang}/lists`}
+          className="peeklist-back"
+        />
+
 
         <section className="peeklist-hero">
           <div className="peeklist-cover-wrap">

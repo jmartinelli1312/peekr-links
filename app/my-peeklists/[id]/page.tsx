@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import BackButton from "@/components/BackButton";
 
 const BRAND = "#FA0082";
 const POSTER = "https://image.tmdb.org/t/p/w185";
@@ -55,6 +56,7 @@ export default function MyPeeklistEditorPage({
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [savingMeta, setSavingMeta] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
 
   // Search state
   const [query, setQuery] = useState("");
@@ -174,6 +176,11 @@ export default function MyPeeklistEditorPage({
             }
           : prev
       );
+      // Flash a "Saved ✓" confirmation for 2.5s so the user has unambiguous
+      // feedback the change persisted. Previously the button just spun and
+      // went back to "Save changes" with no visible signal of success.
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 2500);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -256,9 +263,11 @@ export default function MyPeeklistEditorPage({
   return (
     <main className="page">
       <div className="container">
-        <Link href="/my-peeklists" className="back">
-          ← My peeklists
-        </Link>
+        <BackButton
+          label="Back"
+          fallbackHref="/my-peeklists"
+          className="back"
+        />
 
         <h1>{peeklist.title || "Untitled"}</h1>
         {isTop5 && (
@@ -316,9 +325,18 @@ export default function MyPeeklistEditorPage({
               </label>
             </div>
           )}
-          <button onClick={saveMetadata} disabled={savingMeta}>
-            {savingMeta ? "Saving…" : "Save changes"}
-          </button>
+          <div className="saverow">
+            <button onClick={saveMetadata} disabled={savingMeta}>
+              {savingMeta
+                ? "Saving…"
+                : savedFlash
+                  ? "Saved ✓"
+                  : "Save changes"}
+            </button>
+            {savedFlash && (
+              <span className="savedMsg">Changes saved.</span>
+            )}
+          </div>
         </section>
 
         {/* Items list */}
@@ -452,6 +470,24 @@ export default function MyPeeklistEditorPage({
           font-weight: 700;
           display: inline-block;
           margin-bottom: 14px;
+          background: transparent;
+          border: 0;
+          padding: 0;
+          cursor: pointer;
+          font-family: inherit;
+        }
+        .back:hover {
+          opacity: 0.85;
+        }
+        .saverow {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .savedMsg {
+          color: #4ade80;
+          font-size: 13px;
+          font-weight: 600;
         }
         h1 {
           font-size: 26px;
