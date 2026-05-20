@@ -109,6 +109,7 @@ export default async function UserProfilePage({
       settings: "Settings",
       openInApp: "Open in app",
       seeMoreInApp: "See more reviews in the app",
+      edit: "Edit",
     },
     es: {
       userNotFound: "Usuario no encontrado",
@@ -134,6 +135,7 @@ export default async function UserProfilePage({
       settings: "Settings",
       openInApp: "Abrir en app",
       seeMoreInApp: "Ver más reseñas en la app",
+      edit: "Editar",
     },
     pt: {
       userNotFound: "Usuário não encontrado",
@@ -159,6 +161,7 @@ export default async function UserProfilePage({
       settings: "Settings",
       openInApp: "Abrir no app",
       seeMoreInApp: "Ver mais resenhas no app",
+      edit: "Editar",
     },
   }[lang];
 

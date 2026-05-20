@@ -82,6 +82,7 @@ type Texts = {
   privateAccountMsg: string;
   emptyWatched: string;
   emptyPeeklists: string;
+  edit: string;
   emptyLikes: string;
   emptyReviews: string;
   emptySneakpeeks: string;
@@ -528,13 +529,43 @@ export default function UserProfileClient({
         .peeklist-row {
           display: flex;
           align-items: center;
-          gap: 14px;
-          padding: 14px;
+          gap: 10px;
+          padding: 10px 14px;
           border-radius: 16px;
           background: rgba(255,255,255,0.05);
           border: 1px solid rgba(255,255,255,0.08);
-          text-decoration: none;
           color: white;
+        }
+
+        .peeklist-row-main {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          text-decoration: none;
+          color: inherit;
+        }
+
+        .peeklist-edit {
+          flex-shrink: 0;
+          padding: 6px 12px;
+          border-radius: 999px;
+          background: ${BRAND};
+          color: white;
+          font-size: 12px;
+          font-weight: 700;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+
+        .peeklist-edit:hover {
+          opacity: 0.9;
+        }
+
+        .peeklist-chev {
+          color: rgba(255,255,255,0.55);
+          flex-shrink: 0;
         }
 
         .peeklist-thumb, .peeklist-thumb-fallback {
@@ -942,23 +973,50 @@ export default function UserProfileClient({
               <div className="empty-state">{t.emptyPeeklists}</div>
             ) : (
               <div className="peeklists-list">
-                {allPeeklists.map((pl) => (
-                  <Link key={`${pl.type}-${pl.id}`} href={`/peeklist/${pl.id}`} className="peeklist-row">
-                    {pl.cover_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={pl.cover_url} alt={pl.title || "Peeklist"} className="peeklist-thumb" />
-                    ) : (
-                      <div className="peeklist-thumb-fallback" />
-                    )}
-                    <div style={{ flex: 1 }}>
-                      <div className="peeklist-title">{pl.title || "Untitled"}</div>
-                      <div className="peeklist-sub">
-                        {pl.type === "created" ? t.creator : t.following}
-                      </div>
+                {allPeeklists.map((pl) => {
+                  // Show the edit shortcut only when the viewer owns this
+                  // specific peeklist (i.e., it appears under "created", not
+                  // "following", and we're on our own profile).
+                  const canEdit =
+                    isOwnProfile && pl.type === "created";
+                  return (
+                    <div key={`${pl.type}-${pl.id}`} className="peeklist-row">
+                      <Link
+                        href={`/peeklist/${pl.id}`}
+                        className="peeklist-row-main"
+                      >
+                        {pl.cover_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={pl.cover_url}
+                            alt={pl.title || "Peeklist"}
+                            className="peeklist-thumb"
+                          />
+                        ) : (
+                          <div className="peeklist-thumb-fallback" />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="peeklist-title">
+                            {pl.title || "Untitled"}
+                          </div>
+                          <div className="peeklist-sub">
+                            {pl.type === "created" ? t.creator : t.following}
+                          </div>
+                        </div>
+                      </Link>
+                      {canEdit ? (
+                        <Link
+                          href={`/my-peeklists/${pl.id}`}
+                          className="peeklist-edit"
+                        >
+                          {t.edit}
+                        </Link>
+                      ) : (
+                        <div className="peeklist-chev">›</div>
+                      )}
                     </div>
-                    <div style={{ color: "rgba(255,255,255,0.55)" }}>›</div>
-                  </Link>
-                ))}
+                  );
+                })}
               </div>
             )
           )}
