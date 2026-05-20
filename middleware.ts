@@ -62,6 +62,32 @@ export function middleware(request: NextRequest) {
   }
 
   // ─────────────────────────────────────────────────────────────
+  // Defensive: Supabase Auth password-recovery links arrive with a
+  // ?code= or ?type=recovery query param on whatever URL the project's
+  // Site URL points to. If that landing URL doesn't have a handler the
+  // user gets stuck on the home page with no way to set a new password.
+  // Bounce them to /reset-password preserving the query string so the
+  // SDK can finish the exchange there.
+  //
+  // The same handling is also covered properly by adding
+  // https://www.peekr.app/reset-password to the project's Redirect URLs
+  // allowlist — this middleware is just a safety net.
+  // ─────────────────────────────────────────────────────────────
+  const looksLikeRecoveryLanding =
+    (searchParams.has("code") || searchParams.get("type") === "recovery") &&
+    pathname !== "/reset-password" &&
+    pathname !== "/forgot-password" &&
+    pathname !== "/login" &&
+    !pathname.startsWith("/api") &&
+    !pathname.startsWith("/_next");
+  if (looksLikeRecoveryLanding) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/reset-password";
+    // searchParams (code/type/etc.) are preserved by clone.
+    return NextResponse.redirect(url, 302);
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // Calculamos la URL final ANTES de redireccionar, para poder
   // combinar host + lang + index.html en UN solo 308. Antes esto
   // generaba redirect chains de 2 hops que GSC marcaba como
