@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 const BRAND = "#FA0082";
@@ -185,7 +186,40 @@ export default function UserProfileClient({
   const [isRequested, setIsRequested] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  const [currentTab, setCurrentTab] = useState<TabKey>("watched");
+  // Tab persistence: read `?tab=` on mount so router.back() from the
+  // editor lands on the same tab the user was browsing (e.g. peeklists).
+  // We also sync the URL whenever the tab changes via router.replace so
+  // we don't pollute history with a back entry per tab click.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const initialTab: TabKey = (() => {
+    const q = (searchParams.get("tab") || "").toLowerCase();
+    if (
+      q === "watched" ||
+      q === "reviews" ||
+      q === "peeklists" ||
+      q === "likes" ||
+      q === "sneakpeeks"
+    ) {
+      return q as TabKey;
+    }
+    return "watched";
+  })();
+  const [currentTab, setCurrentTabState] = useState<TabKey>(initialTab);
+
+  function setCurrentTab(next: TabKey) {
+    setCurrentTabState(next);
+    // Keep the URL in sync without pushing extra history entries.
+    const sp = new URLSearchParams(Array.from(searchParams.entries()));
+    if (next === "watched") {
+      sp.delete("tab");
+    } else {
+      sp.set("tab", next);
+    }
+    const qs = sp.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  }
 
   const uid = profile.id;
   const isPrivate = profile.is_private === true;
@@ -982,7 +1016,7 @@ export default function UserProfileClient({
                   return (
                     <div key={`${pl.type}-${pl.id}`} className="peeklist-row">
                       <Link
-                        href={`/peeklist/${pl.id}`}
+                        href={`/${lang}/peeklist/${pl.id}`}
                         className="peeklist-row-main"
                       >
                         {pl.cover_url ? (

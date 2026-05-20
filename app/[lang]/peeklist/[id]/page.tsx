@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BackButton from "@/components/BackButton";
+import OwnerEditButton from "@/components/OwnerEditButton";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -163,6 +164,7 @@ function getStrings(lang: Lang) {
         "A curated Peeklist built to discover movies and series on Peekr.",
       public: "Public",
       private: "Private",
+      edit: "Edit",
     },
     es: {
       creator: "Creador",
@@ -175,6 +177,7 @@ function getStrings(lang: Lang) {
         "Una Peeklist curada para descubrir películas y series en Peekr.",
       public: "Pública",
       private: "Privada",
+      edit: "Editar",
     },
     pt: {
       creator: "Criador",
@@ -187,6 +190,7 @@ function getStrings(lang: Lang) {
         "Uma Peeklist curada para descobrir filmes e séries no Peekr.",
       public: "Pública",
       private: "Privada",
+      edit: "Editar",
     },
   }[lang];
 }
@@ -404,6 +408,27 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
           background: ${BRAND};
           color: white;
         }
+        .btn-secondary {
+          text-decoration: none;
+          border-radius: 16px;
+          padding: 14px 18px;
+          font-weight: 800;
+          font-size: 15px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255,255,255,0.08);
+          color: white;
+          border: 1px solid rgba(255,255,255,0.18);
+        }
+        .btn-secondary:hover {
+          background: rgba(255,255,255,0.14);
+        }
+        .hero-actions {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
 
         .section h2 {
           margin: 0 0 18px 0;
@@ -533,6 +558,12 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
               <Link href="/download-app" className="btn-primary">
                 {t.openInApp}
               </Link>
+              <OwnerEditButton
+                peeklistId={String(peeklist.id)}
+                ownerId={peeklist.created_by}
+                label={t.edit}
+                className="btn-secondary"
+              />
             </div>
           </div>
         </section>
