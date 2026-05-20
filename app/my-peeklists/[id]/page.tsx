@@ -97,7 +97,60 @@ export default function MyPeeklistEditorPage({
     setTitle(pl.title || "");
     setDescription(pl.description || "");
     setVisibility(pl.visibility === "private" ? "private" : "public");
-    setItems((iRes.data ?? []) as PeeklistItem[]);
+
+    // peeklist_items.title / .poster_path can be NULL for rows inserted by
+    // the mobile app (which historically only persisted tmdb_id+media_type).
+    // Hydrate the missing values from titles_cache in a single round-trip
+    // so the editor doesn't show "TMDB 12345" for legacy rows.
+    const itemsLoaded = (iRes.data ?? []) as PeeklistItem[];
+    const missingIds = itemsLoaded
+      .filter((it) => !it.title || !it.poster_path)
+      .map((it) => it.tmdb_id);
+
+    if (missingIds.length > 0) {
+      const { data: cacheRows } = await supabase
+        .from("titles_cache")
+        .select(
+          "tmdb_id, media_type, title_es, title_en, title_pt, poster_path"
+        )
+        .in("tmdb_id", missingIds);
+
+      // Key by `${tmdb_id}-${media_type}` because a few TMDB IDs collide
+      // across movie/tv namespaces.
+      const byKey = new Map<
+        string,
+        {
+          title_es: string | null;
+          title_en: string | null;
+          title_pt: string | null;
+          poster_path: string | null;
+        }
+      >();
+      for (const c of (cacheRows ?? []) as Array<{
+        tmdb_id: number;
+        media_type: string;
+        title_es: string | null;
+        title_en: string | null;
+        title_pt: string | null;
+        poster_path: string | null;
+      }>) {
+        byKey.set(`${c.tmdb_id}-${c.media_type}`, c);
+      }
+
+      for (const it of itemsLoaded) {
+        const c = byKey.get(`${it.tmdb_id}-${it.media_type}`);
+        if (!c) continue;
+        if (!it.title) {
+          it.title =
+            c.title_es || c.title_en || c.title_pt || null;
+        }
+        if (!it.poster_path) {
+          it.poster_path = c.poster_path || null;
+        }
+      }
+    }
+
+    setItems(itemsLoaded);
   }, [id]);
 
   useEffect(() => {
