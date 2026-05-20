@@ -1,0 +1,1 @@
+{{ if eq .Data.language "pt" }}Confirme seu novo email no Peekr{{ else if eq .Data.language "en" }}Confirm your new Peekr email{{ else }}Confirmá tu nuevo email en Peekr{{ end }}

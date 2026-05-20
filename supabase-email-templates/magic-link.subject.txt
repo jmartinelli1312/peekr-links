@@ -1,0 +1,1 @@
+{{ if eq .Data.language "pt" }}Seu link para entrar no Peekr{{ else if eq .Data.language "en" }}Your Peekr sign-in link{{ else }}Tu enlace para entrar a Peekr{{ end }}
