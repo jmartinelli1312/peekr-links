@@ -110,6 +110,9 @@ export default async function UserProfilePage({
       openInApp: "Open in app",
       seeMoreInApp: "See more reviews in the app",
       edit: "Edit",
+      translatedTag: "Translated",
+      showOriginal: "Show original",
+      showTranslation: "Show translation",
     },
     es: {
       userNotFound: "Usuario no encontrado",
@@ -136,6 +139,9 @@ export default async function UserProfilePage({
       openInApp: "Abrir en app",
       seeMoreInApp: "Ver más reseñas en la app",
       edit: "Editar",
+      translatedTag: "Traducido",
+      showOriginal: "Ver original",
+      showTranslation: "Ver traducción",
     },
     pt: {
       userNotFound: "Usuário não encontrado",
@@ -162,6 +168,9 @@ export default async function UserProfilePage({
       openInApp: "Abrir no app",
       seeMoreInApp: "Ver mais resenhas no app",
       edit: "Editar",
+      translatedTag: "Traduzido",
+      showOriginal: "Ver original",
+      showTranslation: "Ver tradução",
     },
   }[lang];
 
@@ -264,7 +273,12 @@ export default async function UserProfilePage({
     title: string;
     poster_path: string | null;
     rating: number;
+    // comment_id + comment_language are needed client-side so we can
+    // request Gemini translations from the translate_comments edge function
+    // for comments not in the viewer's language.
+    comment_id: number;
     comment: string;
+    comment_language: string | null;
     created_at: string;
   }> = [];
 
@@ -373,15 +387,17 @@ export default async function UserProfilePage({
     // Matches Flutter `fetchUserReviews` behavior.
     const { data: rawComments } = await supabase
       .from("comments")
-      .select("tmdb_id, comment, created_at")
+      .select("id, tmdb_id, comment, language, created_at")
       .eq("user_id", uid)
       .order("created_at", { ascending: false })
       .limit(50);
 
     const comments =
       (rawComments as Array<{
+        id: number;
         tmdb_id: number;
         comment: string;
+        language: string | null;
         created_at: string;
       }> | null) ?? [];
 
@@ -475,7 +491,9 @@ export default async function UserProfilePage({
           title: rating.title || cache?.title || "",
           poster_path: rating.poster_path || cache?.poster_path || null,
           rating: rating.rating,
+          comment_id: c.id,
           comment: c.comment,
+          comment_language: c.language,
           created_at: c.created_at,
         });
       }

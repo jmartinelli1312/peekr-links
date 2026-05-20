@@ -55,7 +55,12 @@ type ReviewRow = {
   title: string;
   poster_path: string | null;
   rating: number;
+  // comment_id + comment_language drive the Gemini auto-translation flow.
+  // comment_language can be null (legacy rows where the source lang wasn't
+  // captured at write time) — those are treated as "translate if cached".
+  comment_id: number;
   comment: string;
+  comment_language: string | null;
   created_at: string;
 };
 
@@ -92,6 +97,9 @@ type Texts = {
   settings: string;
   openInApp: string;
   seeMoreInApp: string;
+  translatedTag: string;
+  showOriginal: string;
+  showTranslation: string;
 };
 
 function slugify(text: string) {
@@ -178,6 +186,12 @@ export default function UserProfileClient({
   const [peeklistsCreated] = useState(initialPeeklistsCreated);
   const [peeklistsFollowing] = useState(initialPeeklistsFollowing);
   const [reviews] = useState<ReviewRow[]>(initialReviews ?? []);
+  // Map of comment_id → Gemini-translated text in the viewer's language.
+  // Populated lazily after mount via comment_translations cache + the
+  // translate_comments edge function. UI shows translated copy by default
+  // for foreign comments and lets the user toggle to the original.
+  const [translations, setTranslations] = useState<Record<number, string>>({});
+  const [showOriginal, setShowOriginal] = useState<Set<number>>(new Set());
 
   // ── Auth-dependent state (determined client-side after mount) ─────────────
   const [meId, setMeId] = useState<string | null>(null);
@@ -308,6 +322,93 @@ export default function UserProfileClient({
     return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
+
+  // ── Auto-translate foreign reviews ────────────────────────────────────────
+  // Mirrors the mobile flow: identify reviews whose language differs from
+  // the viewer's (or is NULL/unknown), check the comment_translations
+  // cache, and fall back to the translate_comments edge function for any
+  // misses. Cached translations are reused across visits.
+  useEffect(() => {
+    let cancelled = false;
+    async function translateForeignReviews() {
+      // Build the list of comments to translate.
+      const foreign = reviews.filter((rv) => {
+        if (!rv.comment || !rv.comment.trim()) return false;
+        const cl = rv.comment_language;
+        // NULL language → edge function detects it. Foreign-lang ≠ viewer.
+        if (cl == null || cl === "") return true;
+        return cl !== lang;
+      });
+      if (foreign.length === 0) return;
+
+      const foreignIds = foreign.map((rv) => rv.comment_id);
+
+      // Step 1: cache hits from comment_translations.
+      const cached: Record<number, string> = {};
+      try {
+        const { data: cacheRows } = await supabase
+          .from("comment_translations")
+          .select("comment_id, text")
+          .eq("language", lang)
+          .in("comment_id", foreignIds);
+        for (const r of (cacheRows as Array<{
+          comment_id: number;
+          text: string | null;
+        }> | null) ?? []) {
+          if (r.text && r.text.trim()) {
+            cached[r.comment_id] = r.text;
+          }
+        }
+      } catch {
+        // non-fatal — fall through to edge function
+      }
+
+      if (!cancelled && Object.keys(cached).length > 0) {
+        setTranslations((prev) => ({ ...prev, ...cached }));
+      }
+
+      // Step 2: edge function for whatever's still missing.
+      const missing = foreignIds.filter((id) => !(id in cached));
+      if (missing.length === 0 || cancelled) return;
+
+      try {
+        const { data } = await supabase.functions.invoke(
+          "translate_comments",
+          { body: { comment_ids: missing, target_lang: lang } }
+        );
+        if (cancelled) return;
+        const raw = (data as { translations?: Record<string, string> } | null)
+          ?.translations;
+        if (raw && typeof raw === "object") {
+          const fresh: Record<number, string> = {};
+          for (const [k, v] of Object.entries(raw)) {
+            const id = Number(k);
+            if (Number.isFinite(id) && typeof v === "string" && v.trim()) {
+              fresh[id] = v;
+            }
+          }
+          if (!cancelled && Object.keys(fresh).length > 0) {
+            setTranslations((prev) => ({ ...prev, ...fresh }));
+          }
+        }
+      } catch {
+        // Silent: keep showing original text if translation fails.
+      }
+    }
+    translateForeignReviews();
+    return () => {
+      cancelled = true;
+    };
+  }, [reviews, lang]);
+
+  function toggleShowOriginal(commentId: number) {
+    setShowOriginal((prev) => {
+      const next = new Set(prev);
+      if (next.has(commentId)) next.delete(commentId);
+      else next.add(commentId);
+      return next;
+    });
+  }
 
   // ── Follow counts refresher ───────────────────────────────────────────────
   async function refreshFollowStats() {
@@ -745,6 +846,22 @@ export default function UserProfileClient({
           font-size: 12px;
         }
 
+        .review-translate-toggle {
+          margin-top: 6px;
+          background: transparent;
+          border: 0;
+          padding: 0;
+          color: ${BRAND};
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          font-family: inherit;
+          align-self: flex-start;
+        }
+        .review-translate-toggle:hover {
+          opacity: 0.85;
+        }
+
         .see-more-cta {
           display: flex;
           align-items: center;
@@ -915,43 +1032,86 @@ export default function UserProfileClient({
               <div className="empty-state">{t.emptyReviews}</div>
             ) : (
               <div className="reviews-list">
-                {reviews.slice(0, 5).map((rv) => (
-                  <Link
-                    key={`review-${rv.tmdb_id}`}
-                    href={titleHref(
-                      { tmdb_id: rv.tmdb_id, media_type: rv.media_type, title: rv.title },
-                      lang
-                    )}
-                    className="review-card"
-                  >
-                    {rv.poster_path ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={`${POSTER}${rv.poster_path}`}
-                        alt={rv.title}
-                        className="review-poster"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="review-poster-fallback" />
-                    )}
-                    <div className="review-body">
-                      <div className="review-title-row">
-                        <span className="review-title">{rv.title}</span>
-                        <span className="review-rating-pill">
-                          ⭐ {rv.rating.toFixed(1)}
-                        </span>
-                      </div>
-                      {rv.comment && <div className="review-comment">{rv.comment}</div>}
-                      <div className="review-date">
-                        {new Date(rv.created_at).toLocaleDateString(
-                          lang === "es" ? "es-ES" : lang === "pt" ? "pt-BR" : "en-US",
-                          { year: "numeric", month: "short", day: "numeric" }
+                {reviews.slice(0, 5).map((rv) => {
+                  // Pick the text to display:
+                  // - If we have a translation AND the user hasn't toggled
+                  //   "show original", show the translation.
+                  // - Otherwise show the original.
+                  const translated = translations[rv.comment_id];
+                  const hasTranslation =
+                    !!translated && translated.trim() !== rv.comment.trim();
+                  const showingOriginal = showOriginal.has(rv.comment_id);
+                  const displayText =
+                    hasTranslation && !showingOriginal
+                      ? translated
+                      : rv.comment;
+
+                  return (
+                    <Link
+                      key={`review-${rv.tmdb_id}`}
+                      href={titleHref(
+                        {
+                          tmdb_id: rv.tmdb_id,
+                          media_type: rv.media_type,
+                          title: rv.title,
+                        },
+                        lang
+                      )}
+                      className="review-card"
+                    >
+                      {rv.poster_path ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`${POSTER}${rv.poster_path}`}
+                          alt={rv.title}
+                          className="review-poster"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="review-poster-fallback" />
+                      )}
+                      <div className="review-body">
+                        <div className="review-title-row">
+                          <span className="review-title">{rv.title}</span>
+                          <span className="review-rating-pill">
+                            ⭐ {rv.rating.toFixed(1)}
+                          </span>
+                        </div>
+                        {displayText && (
+                          <div className="review-comment">{displayText}</div>
                         )}
+                        {hasTranslation && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              // Inside a Link wrapper — preventDefault
+                              // stops Next from navigating when the user
+                              // taps the toggle.
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleShowOriginal(rv.comment_id);
+                            }}
+                            className="review-translate-toggle"
+                          >
+                            {showingOriginal
+                              ? t.showTranslation
+                              : `${t.translatedTag} · ${t.showOriginal}`}
+                          </button>
+                        )}
+                        <div className="review-date">
+                          {new Date(rv.created_at).toLocaleDateString(
+                            lang === "es"
+                              ? "es-ES"
+                              : lang === "pt"
+                                ? "pt-BR"
+                                : "en-US",
+                            { year: "numeric", month: "short", day: "numeric" }
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
 
                 {reviews.length > 5 && (
                   <a
