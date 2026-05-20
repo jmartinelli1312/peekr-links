@@ -1200,7 +1200,7 @@ export default function UserProfileClient({
                       </Link>
                       {canEdit ? (
                         <Link
-                          href={`/my-peeklists/${pl.id}`}
+                          href={`/${lang}/my-peeklists/${pl.id}`}
                           className="peeklist-edit"
                         >
                           {t.edit}

@@ -16,11 +16,13 @@ export default function OwnerEditButton({
   peeklistId,
   ownerId,
   label,
+  lang,
   className,
 }: {
   peeklistId: string;
   ownerId: string | null | undefined;
   label: string;
+  lang: string;
   className?: string;
 }) {
   const [isOwner, setIsOwner] = useState(false);
@@ -43,7 +45,10 @@ export default function OwnerEditButton({
   if (!isOwner) return null;
 
   return (
-    <Link href={`/my-peeklists/${peeklistId}`} className={className}>
+    <Link
+      href={`/${lang}/my-peeklists/${peeklistId}`}
+      className={className}
+    >
       {label}
     </Link>
   );

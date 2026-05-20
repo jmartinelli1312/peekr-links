@@ -168,17 +168,24 @@ type TmdbResult = {
 export default function MyPeeklistEditorPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; lang: string }>;
 }) {
   const router = useRouter();
-  const { id } = use(params);
+  const { id, lang: rawLang } = use(params);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [peeklist, setPeeklist] = useState<Peeklist | null>(null);
   const [items, setItems] = useState<PeeklistItem[]>([]);
-  const [lang, setLang] = useState<Lang>("es");
+  // Language comes from the URL segment (/es/my-peeklists/...,
+  // /pt/my-peeklists/...). This way the user's choice in the header
+  // bar persists into the editor without any extra storage.
+  const lang: Lang = rawLang.startsWith("en")
+    ? "en"
+    : rawLang.startsWith("pt")
+      ? "pt"
+      : "es";
   const t = I18N[lang];
 
   // Metadata edit state
@@ -293,20 +300,6 @@ export default function MyPeeklistEditorPage({
         return;
       }
       setUserId(user.id);
-      // Resolve the user's preferred language from profiles — same source of
-      // truth the mobile app writes to. Falls back to "es" (LATAM-first).
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("language")
-        .eq("id", user.id)
-        .maybeSingle();
-      const raw = (prof?.language as string | null) ?? "es";
-      const normalized: Lang = raw.startsWith("en")
-        ? "en"
-        : raw.startsWith("pt")
-          ? "pt"
-          : "es";
-      setLang(normalized);
       await loadAll(user.id);
       setLoading(false);
     })();
@@ -447,7 +440,7 @@ export default function MyPeeklistEditorPage({
       <Center>
         <div style={{ textAlign: "center" }}>
           <p>{error || t.notAvailable}</p>
-          <Link href="/my-peeklists" style={{ color: BRAND }}>
+          <Link href={`/${lang}/my-peeklists`} style={{ color: BRAND }}>
             {t.backToMine}
           </Link>
         </div>
@@ -462,7 +455,7 @@ export default function MyPeeklistEditorPage({
       <div className="container">
         <BackButton
           label={t.back}
-          fallbackHref="/my-peeklists"
+          fallbackHref={`/${lang}/my-peeklists`}
           className="back"
         />
 

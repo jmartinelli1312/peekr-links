@@ -82,7 +82,9 @@ export function middleware(request: NextRequest) {
       finalPath.startsWith("/buzz/") ||
       finalPath.startsWith("/explore") ||
       finalPath.startsWith("/activity") ||
-      finalPath.startsWith("/download-app");
+      finalPath.startsWith("/download-app") ||
+      finalPath === "/my-peeklists" ||
+      finalPath.startsWith("/my-peeklists/");
 
     if (shouldRedirectForLang) {
       finalPath = `/${lang}${finalPath}`;

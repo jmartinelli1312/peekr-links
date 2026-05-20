@@ -562,6 +562,7 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
                 peeklistId={String(peeklist.id)}
                 ownerId={peeklist.created_by}
                 label={t.edit}
+                lang={lang}
                 className="btn-secondary"
               />
             </div>

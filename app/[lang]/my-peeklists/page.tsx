@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -122,13 +122,23 @@ type Peeklist = {
   item_count?: number;
 };
 
-export default function MyPeeklistsPage() {
+export default function MyPeeklistsPage({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}) {
   const router = useRouter();
+  const { lang: rawLang } = use(params);
+  // Language is the URL segment — same as the rest of the [lang] tree.
+  const lang: Lang = rawLang.startsWith("en")
+    ? "en"
+    : rawLang.startsWith("pt")
+      ? "pt"
+      : "es";
+  const t = I18N[lang];
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [peeklists, setPeeklists] = useState<Peeklist[]>([]);
-  const [lang, setLang] = useState<Lang>("es");
-  const t = I18N[lang];
 
   // Form state
   const [newTitle, setNewTitle] = useState("");
@@ -187,20 +197,6 @@ export default function MyPeeklistsPage() {
         return;
       }
       setUserId(user.id);
-      // Read the user's preferred app language to localize the index. Same
-      // source of truth as mobile (profiles.language).
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("language")
-        .eq("id", user.id)
-        .maybeSingle();
-      const raw = (prof?.language as string | null) ?? "es";
-      const normalized: Lang = raw.startsWith("en")
-        ? "en"
-        : raw.startsWith("pt")
-          ? "pt"
-          : "es";
-      setLang(normalized);
       await loadPeeklists(user.id);
       setLoading(false);
     })();
@@ -233,7 +229,7 @@ export default function MyPeeklistsPage() {
       setNewDesc("");
       setNewVisibility("public");
       // Send the user straight to the editor for the new peeklist.
-      router.push(`/my-peeklists/${data!.id}`);
+      router.push(`/${lang}/my-peeklists/${data!.id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
       setCreating(false);
@@ -335,7 +331,7 @@ export default function MyPeeklistsPage() {
               const cover = p.custom_cover_url || p.cover_url;
               return (
                 <li key={p.id} className="row">
-                  <Link href={`/my-peeklists/${p.id}`} className="rowLink">
+                  <Link href={`/${lang}/my-peeklists/${p.id}`} className="rowLink">
                     <div
                       className="cover"
                       style={
