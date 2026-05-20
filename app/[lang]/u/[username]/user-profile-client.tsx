@@ -132,7 +132,10 @@ function titleHref(
       : lang === "pt"
       ? (item.title_pt ?? item.title_es ?? item.title_en ?? item.title ?? "title")
       : (item.title_en ?? item.title ?? "title");
-  return `/title/${type}/${item.tmdb_id}-${slugify(rawTitle)}`;
+  // Include the lang prefix so /pt/u/... → /pt/title/... preserves the
+  // user's language choice. Without it the middleware fell back to
+  // accept-language and silently switched some users back to ES.
+  return `/${lang}/title/${type}/${item.tmdb_id}-${slugify(rawTitle)}`;
 }
 
 function dedupePeeklists(items: PeeklistRow[]) {

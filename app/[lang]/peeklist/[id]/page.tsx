@@ -62,14 +62,20 @@ function slugify(text: string) {
     .slice(0, 80);
 }
 
-function titleHref(item: {
-  tmdb_id: number;
-  media_type?: string | null;
-  title?: string | null;
-}) {
+function titleHref(
+  item: {
+    tmdb_id: number;
+    media_type?: string | null;
+    title?: string | null;
+  },
+  lang: Lang
+) {
   const type = item.media_type === "tv" ? "tv" : "movie";
   const rawTitle = item.title || "title";
-  return `/title/${type}/${item.tmdb_id}-${slugify(rawTitle)}`;
+  // Include the lang prefix so navigation from /pt/peeklist/... lands on
+  // /pt/title/... instead of going through the middleware's default
+  // accept-language fallback (which silently switched users back to ES).
+  return `/${lang}/title/${type}/${item.tmdb_id}-${slugify(rawTitle)}`;
 }
 
 async function getPeeklist(id: string) {
@@ -312,7 +318,7 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
     itemListElement: items.map((item, index) => ({
       "@type": "ListItem",
       position: index + 1,
-      url: `${SITE}${titleHref(item)}`,
+      url: `${SITE}${titleHref(item, lang)}`,
       name: item.title || "Title",
     })),
   };
@@ -595,7 +601,7 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
 
                 <div className="creator-text">
                   {t.creator}:{" "}
-                  <Link href={`/u/${creator.username}`}>
+                  <Link href={`/${lang}/u/${creator.username}`}>
                     {creator.display_name || `@${creator.username}`}
                   </Link>
                 </div>
@@ -627,7 +633,7 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
               {items.map((item, index) => (
                 <Link
                   key={`${item.tmdb_id}-${index}`}
-                  href={titleHref(item)}
+                  href={titleHref(item, lang)}
                   className="title-card"
                 >
                   {item.poster_path ? (
