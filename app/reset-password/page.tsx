@@ -29,10 +29,19 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    // Wait for either the SDK to surface the recovery session OR for an
-    // existing session that the user might already have. The SDK fires
-    // an auth event once it parses the hash fragment from the URL.
+    // Supabase Auth can send the recovery link in three different shapes
+    // depending on the project's flow type, so handle all of them:
+    //
+    //   1. PKCE        → ?code=...                 (default in SDK v2)
+    //   2. OTP/Magic   → ?token_hash=...&type=recovery
+    //   3. Legacy hash → #access_token=...&type=recovery
+    //
+    // The third one is auto-parsed by the SDK and shows up as a
+    // PASSWORD_RECOVERY event. The first two we have to process
+    // ourselves before calling updateUser, otherwise there's no session
+    // and the password save fails with "Auth session missing".
     let mounted = true;
+
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       if (event === "PASSWORD_RECOVERY") {
@@ -41,13 +50,54 @@ export default function ResetPasswordPage() {
         setReady(true);
       }
     });
-    // Fallback: if the SDK already had a session when this mounts.
+
     (async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (mounted && session) setReady(true);
+      try {
+        const url = new URL(window.location.href);
+
+        // (1) PKCE
+        const code = url.searchParams.get("code");
+        if (code) {
+          const { error: e } = await supabase.auth.exchangeCodeForSession(
+            code
+          );
+          if (!mounted) return;
+          if (e) {
+            setError(e.message);
+            return;
+          }
+          setReady(true);
+          return;
+        }
+
+        // (2) OTP token_hash
+        const tokenHash = url.searchParams.get("token_hash");
+        const type = url.searchParams.get("type");
+        if (tokenHash && type === "recovery") {
+          const { error: e } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: "recovery",
+          });
+          if (!mounted) return;
+          if (e) {
+            setError(e.message);
+            return;
+          }
+          setReady(true);
+          return;
+        }
+
+        // (3) Fallback to any session the SDK already parsed (legacy hash
+        // flow or a previously authenticated tab).
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (mounted && session) setReady(true);
+      } catch (err: unknown) {
+        if (mounted) setError(err instanceof Error ? err.message : String(err));
+      }
     })();
+
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
