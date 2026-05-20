@@ -41,6 +41,7 @@ const I18N: Record<Lang, {
   addBtn: string;
   alreadyAdded: string;
   top5Full: string;
+  myTop5Title: string;
 }> = {
   es: {
     loading: "Cargando…",
@@ -72,6 +73,7 @@ const I18N: Record<Lang, {
     addBtn: "+ Agregar",
     alreadyAdded: "Agregada",
     top5Full: "Tu Top 5 está completo. Quitá un título antes de agregar otro.",
+    myTop5Title: "Mi top 5",
   },
   en: {
     loading: "Loading…",
@@ -103,6 +105,7 @@ const I18N: Record<Lang, {
     addBtn: "+ Add",
     alreadyAdded: "Added",
     top5Full: "Top 5 list is full. Remove an item before adding another.",
+    myTop5Title: "My top 5",
   },
   pt: {
     loading: "Carregando…",
@@ -134,6 +137,7 @@ const I18N: Record<Lang, {
     addBtn: "+ Adicionar",
     alreadyAdded: "Adicionado",
     top5Full: "Seu Top 5 está cheio. Remova um título antes de adicionar outro.",
+    myTop5Title: "Meu top 5",
   },
 };
 
@@ -459,7 +463,9 @@ export default function MyPeeklistEditorPage({
           className="back"
         />
 
-        <h1>{peeklist.title || "Untitled"}</h1>
+        {/* Top 5 lists always render with the canonical "My top 5" copy,
+            same as the public viewer and the mobile app. */}
+        <h1>{isTop5 ? t.myTop5Title : peeklist.title || "Untitled"}</h1>
         {isTop5 && <div className="badge">{t.top5Banner}</div>}
 
         {error && <div className="error">{error}</div>}

@@ -31,6 +31,7 @@ const I18N: Record<Lang, {
   visPrivate: string;
   confirmDelete: (t: string) => string;
   untitled: string;
+  myTop5Title: string;
 }> = {
   es: {
     loading: "Cargando…",
@@ -56,6 +57,7 @@ const I18N: Record<Lang, {
     confirmDelete: (t: string) =>
       `¿Eliminar "${t}"? Esta acción no se puede deshacer.`,
     untitled: "Sin título",
+    myTop5Title: "Mi top 5",
   },
   en: {
     loading: "Loading…",
@@ -81,6 +83,7 @@ const I18N: Record<Lang, {
     confirmDelete: (t: string) =>
       `Delete "${t}"? This cannot be undone.`,
     untitled: "Untitled",
+    myTop5Title: "My top 5",
   },
   pt: {
     loading: "Carregando…",
@@ -106,6 +109,7 @@ const I18N: Record<Lang, {
     confirmDelete: (t: string) =>
       `Excluir "${t}"? Esta ação não pode ser desfeita.`,
     untitled: "Sem título",
+    myTop5Title: "Meu top 5",
   },
 };
 
@@ -343,7 +347,11 @@ export default function MyPeeklistsPage({
                       {!cover && <span>📋</span>}
                     </div>
                     <div className="meta">
-                      <div className="title">{p.title || t.untitled}</div>
+                      <div className="title">
+                        {p.list_type === "top5"
+                          ? t.myTop5Title
+                          : p.title || t.untitled}
+                      </div>
                       <div className="muted">
                         {t.itemsCount(p.item_count ?? 0)} ·{" "}
                         {p.visibility === "private"

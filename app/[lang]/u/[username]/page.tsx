@@ -113,6 +113,7 @@ export default async function UserProfilePage({
       translatedTag: "Translated",
       showOriginal: "Show original",
       showTranslation: "Show translation",
+      myTop5: "My top 5",
     },
     es: {
       userNotFound: "Usuario no encontrado",
@@ -142,6 +143,7 @@ export default async function UserProfilePage({
       translatedTag: "Traducido",
       showOriginal: "Ver original",
       showTranslation: "Ver traducción",
+      myTop5: "Mi top 5",
     },
     pt: {
       userNotFound: "Usuário não encontrado",
@@ -171,6 +173,7 @@ export default async function UserProfilePage({
       translatedTag: "Traduzido",
       showOriginal: "Ver original",
       showTranslation: "Ver tradução",
+      myTop5: "Meu top 5",
     },
   }[lang];
 
@@ -255,6 +258,7 @@ export default async function UserProfilePage({
     title: string | null;
     visibility?: string | null;
     cover_url?: string | null;
+    list_type?: string | null;
     type: "created";
   }> = [];
 
@@ -262,6 +266,7 @@ export default async function UserProfilePage({
     id: string | number;
     title: string | null;
     visibility?: string | null;
+    list_type?: string | null;
     cover_url?: string | null;
     type: "following";
   }> = [];
@@ -315,13 +320,13 @@ export default async function UserProfilePage({
         // peeklists: USING(true)
         supabase
           .from("peeklists")
-          .select("id,title,visibility,cover_url")
+          .select("id,title,visibility,cover_url,list_type")
           .eq("created_by", uid),
 
         // peeklist_follows: USING(true)
         supabase
           .from("peeklist_follows")
-          .select("peeklists(id,title,visibility,cover_url)")
+          .select("peeklists(id,title,visibility,cover_url,list_type)")
           .eq("user_id", uid),
       ]);
 
@@ -366,6 +371,7 @@ export default async function UserProfilePage({
         title: string | null;
         visibility?: string | null;
         cover_url?: string | null;
+        list_type?: string | null;
       }> | null) ?? []
     ).map((item) => ({ ...item, type: "created" as const }));
 
@@ -376,6 +382,7 @@ export default async function UserProfilePage({
           title: string | null;
           visibility?: string | null;
           cover_url?: string | null;
+          list_type?: string | null;
         } | null;
       }> | null) ?? []
     )

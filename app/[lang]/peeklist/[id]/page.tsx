@@ -25,6 +25,7 @@ type PeeklistRow = {
   visibility?: string | null;
   created_by?: string | null;
   description?: string | null;
+  list_type?: string | null;
 };
 
 type ProfileRow = {
@@ -72,7 +73,9 @@ async function getPeeklist(id: string) {
   try {
     const { data } = await supabase
       .from("peeklists")
-      .select("id,title,cover_url,visibility,created_by,description")
+      .select(
+        "id,title,cover_url,visibility,created_by,description,list_type"
+      )
       .eq("id", id)
       .maybeSingle();
 
@@ -165,6 +168,7 @@ function getStrings(lang: Lang) {
       public: "Public",
       private: "Private",
       edit: "Edit",
+      myTop5: "My top 5",
     },
     es: {
       creator: "Creador",
@@ -178,6 +182,7 @@ function getStrings(lang: Lang) {
       public: "Pública",
       private: "Privada",
       edit: "Editar",
+      myTop5: "Mi top 5",
     },
     pt: {
       creator: "Criador",
@@ -191,6 +196,7 @@ function getStrings(lang: Lang) {
       public: "Pública",
       private: "Privada",
       edit: "Editar",
+      myTop5: "Meu top 5",
     },
   }[lang];
 }
@@ -255,10 +261,39 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
   getPeeklistItems(id, lang),
 ]);
 
+  // Top 5 lists always render with the canonical "My top 5" copy, just like
+  // the mobile app does. The DB `title` column is a free-form field but we
+  // intentionally override it for the top5 list_type so the UI is uniform.
+  const isTop5 = peeklist.list_type === "top5";
+  const displayTitle = isTop5 ? t.myTop5 : peeklist.title || t.untitled;
+
+  // Cover fallback: if neither cover_url nor custom_cover_url was set by the
+  // creator, use the backdrop of the first item (titles_cache).
+  let effectiveCover: string | null = peeklist.cover_url ?? null;
+  if (!effectiveCover && items.length > 0) {
+    const first = items[0];
+    const mt = first.media_type === "tv" ? "tv" : "movie";
+    try {
+      const { data } = await supabase
+        .from("titles_cache")
+        .select("backdrop_path")
+        .eq("tmdb_id", first.tmdb_id)
+        .eq("media_type", mt)
+        .maybeSingle();
+      const path = (data as { backdrop_path?: string | null } | null)
+        ?.backdrop_path;
+      if (path) {
+        effectiveCover = `https://image.tmdb.org/t/p/w1280${path}`;
+      }
+    } catch {
+      // Fallback to the no-cover gradient if the lookup fails.
+    }
+  }
+
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: peeklist.title || t.untitled,
+    name: displayTitle,
     itemListOrder: "https://schema.org/ItemListOrderAscending",
     numberOfItems: items.length,
     itemListElement: items.map((item, index) => ({
@@ -508,10 +543,10 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
 
         <section className="peeklist-hero">
           <div className="peeklist-cover-wrap">
-            {peeklist.cover_url ? (
+            {effectiveCover ? (
               <img
-                src={peeklist.cover_url}
-                alt={peeklist.title || t.untitled}
+                src={effectiveCover}
+                alt={displayTitle}
                 className="peeklist-cover"
               />
             ) : (
@@ -520,7 +555,7 @@ export default async function PeeklistDetailPage({ params }: PageProps) {
           </div>
 
           <div className="peeklist-copy">
-            <h1>{peeklist.title || t.untitled}</h1>
+            <h1>{displayTitle}</h1>
 
             <p>{peeklist.description || t.noDescription}</p>
 

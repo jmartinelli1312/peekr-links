@@ -69,6 +69,7 @@ type PeeklistRow = {
   title: string | null;
   visibility?: string | null;
   cover_url?: string | null;
+  list_type?: string | null;
   type?: "created" | "following";
 };
 
@@ -100,6 +101,7 @@ type Texts = {
   translatedTag: string;
   showOriginal: string;
   showTranslation: string;
+  myTop5: string;
 };
 
 function slugify(text: string) {
@@ -1183,7 +1185,11 @@ export default function UserProfileClient({
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={pl.cover_url}
-                            alt={pl.title || "Peeklist"}
+                            alt={
+                              pl.list_type === "top5"
+                                ? t.myTop5
+                                : pl.title || "Peeklist"
+                            }
                             className="peeklist-thumb"
                           />
                         ) : (
@@ -1191,7 +1197,9 @@ export default function UserProfileClient({
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div className="peeklist-title">
-                            {pl.title || "Untitled"}
+                            {pl.list_type === "top5"
+                              ? t.myTop5
+                              : pl.title || "Untitled"}
                           </div>
                           <div className="peeklist-sub">
                             {pl.type === "created" ? t.creator : t.following}
