@@ -218,11 +218,14 @@ async function getCreatorPeeklists(): Promise<CreatorPeeklistItem[]> {
       .map((c) => [c.id, c])
   );
 
-  // 2. Get their public peeklists ordered by followers
+  // 2. Get their public peeklists ordered by followers.
+  // Exclude "My Top 5" lists (list_type='top5'): they're public per RLS
+  // but should only surface on the owner's profile, not on discovery rails.
   const { data: lists } = await admin
     .from("peeklists")
     .select("id, title, cover_url, custom_cover_url, created_by, follower_count")
     .eq("visibility", "public")
+    .neq("list_type", "top5")
     .in("created_by", creatorIds)
     .order("follower_count", { ascending: false })
     .limit(30);

@@ -165,9 +165,12 @@ async function getTrendingOnPeekr() {
 }
 
 async function getPeeklists(): Promise<PeeklistItem[]> {
+  // Exclude "My Top 5" lists — they're public per RLS but should only
+  // surface on the owner's profile, never on the public explore grid.
   const { data } = await supabase
     .from("peeklists")
     .select("id,title,cover_url")
+    .neq("list_type", "top5")
     .limit(12);
 
   return (data as PeeklistItem[] | null) ?? [];
