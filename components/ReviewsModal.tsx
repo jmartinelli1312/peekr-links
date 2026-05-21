@@ -7,9 +7,15 @@ import { supabase } from "@/lib/supabase";
 import type { ReviewItem, ReplyItem } from "@/app/api/reviews/route";
 
 // Shape stored in component state — the API ReviewItem plus the
-// viewer's like state + reply visibility for inline composer.
-type ReviewLocal = ReviewItem & { _liked?: boolean; replies: ReplyLocal[] };
+// viewer's like state for the composer. We must Omit "replies" from
+// ReviewItem before redefining it to ReplyLocal[]; a plain intersection
+// keeps the original ReplyItem[] declaration and TS rejects accesses to
+// the local _liked field on each reply.
 type ReplyLocal = ReplyItem & { _liked?: boolean };
+type ReviewLocal = Omit<ReviewItem, "replies"> & {
+  _liked?: boolean;
+  replies: ReplyLocal[];
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Rating badge  — Peekr scale is 1-10, NOT stars
