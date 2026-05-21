@@ -10,13 +10,6 @@ interface Props {
   supabase: SupabaseClient;
 }
 
-type UserRow = {
-  id: string;
-  country_code: string | null;
-  platform: string | null;
-  created_at: string;
-};
-
 type SliceData = { label: string; count: number; pct: number; color: string };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -271,9 +264,16 @@ export default function UserGeoTab({ supabase }: Props) {
   const [customFrom, setCustomFrom] = useState(toDateStr(new Date()));
   const [customTo, setCustomTo] = useState(toDateStr(new Date()));
 
-  // Data state
-  const [newUsers, setNewUsers] = useState<UserRow[]>([]);
-  const [allUsers, setAllUsers] = useState<UserRow[]>([]);
+  // Data state — pre-aggregated maps from the SECURITY DEFINER RPC.
+  // We switched away from fetching raw profile rows because PostgREST's
+  // 1000-row cap was clipping the global tab at 1000 users even though
+  // the real total is ~1.3k+.
+  const [newByCountry, setNewByCountry] = useState<Record<string, number>>({});
+  const [newByPlatform, setNewByPlatform] = useState<Record<string, number>>({});
+  const [allByCountry, setAllByCountry] = useState<Record<string, number>>({});
+  const [allByPlatform, setAllByPlatform] = useState<Record<string, number>>({});
+  const [newTotal, setNewTotal] = useState(0);
+  const [allTotal, setAllTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -292,23 +292,27 @@ export default function UserGeoTab({ supabase }: Props) {
       // so the "new users" count here equals the top KPIs for any preset.
       const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
 
-      // New users in date range
-      const { data: newData, error: e1 } = await supabase
-        .from("profiles")
-        .select("id, country_code, platform, created_at")
-        .gte("created_at", fromTs)
-        .lt("created_at", toTsExclusive)
-        .order("created_at", { ascending: false });
-      if (e1) throw e1;
+      const { data, error } = await supabase.rpc("admin_user_geo_breakdown", {
+        p_from: fromTs,
+        p_to_exclusive: toTsExclusive,
+      });
+      if (error) throw error;
 
-      // All users (global)
-      const { data: allData, error: e2 } = await supabase
-        .from("profiles")
-        .select("id, country_code, platform, created_at");
-      if (e2) throw e2;
+      const r = (data as {
+        new_by_country?: Record<string, number>;
+        new_by_platform?: Record<string, number>;
+        new_total?: number;
+        all_by_country?: Record<string, number>;
+        all_by_platform?: Record<string, number>;
+        all_total?: number;
+      } | null) ?? {};
 
-      setNewUsers((newData ?? []) as UserRow[]);
-      setAllUsers((allData ?? []) as UserRow[]);
+      setNewByCountry(r.new_by_country ?? {});
+      setNewByPlatform(r.new_by_platform ?? {});
+      setNewTotal(r.new_total ?? 0);
+      setAllByCountry(r.all_by_country ?? {});
+      setAllByPlatform(r.all_by_platform ?? {});
+      setAllTotal(r.all_total ?? 0);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -321,37 +325,27 @@ export default function UserGeoTab({ supabase }: Props) {
   }, [fetchData]);
 
   // ── Build derived stats ────────────────────────────────────────────────────
-
-  function countBy(rows: UserRow[], key: "country_code" | "platform") {
-    const counts: Record<string, number> = {};
-    for (const r of rows) {
-      const raw = r[key];
-      const val = key === "country_code"
-        ? (raw?.toUpperCase() ?? "Desconocido")
-        : (raw ?? "Sin dato");
-      counts[val] = (counts[val] ?? 0) + 1;
-    }
-    return counts;
-  }
+  // RPC already returns pre-aggregated maps keyed by country / platform, so
+  // we just feed them to buildSlices directly.
 
   const newCountrySlices = useMemo(() =>
-    buildSlices(countBy(newUsers, "country_code"), k => COUNTRY_NAMES[k] ?? k, 10),
-    [newUsers] // eslint-disable-line react-hooks/exhaustive-deps
+    buildSlices(newByCountry, k => COUNTRY_NAMES[k] ?? k, 10),
+    [newByCountry] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const newPlatformSlices = useMemo(() =>
-    buildSlices(countBy(newUsers, "platform"), k => PLATFORM_LABEL[k] ?? k, 5),
-    [newUsers] // eslint-disable-line react-hooks/exhaustive-deps
+    buildSlices(newByPlatform, k => PLATFORM_LABEL[k] ?? k, 5),
+    [newByPlatform] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const allCountrySlices = useMemo(() =>
-    buildSlices(countBy(allUsers, "country_code"), k => COUNTRY_NAMES[k] ?? k, 12),
-    [allUsers] // eslint-disable-line react-hooks/exhaustive-deps
+    buildSlices(allByCountry, k => COUNTRY_NAMES[k] ?? k, 12),
+    [allByCountry] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const allPlatformSlices = useMemo(() =>
-    buildSlices(countBy(allUsers, "platform"), k => PLATFORM_LABEL[k] ?? k, 5),
-    [allUsers] // eslint-disable-line react-hooks/exhaustive-deps
+    buildSlices(allByPlatform, k => PLATFORM_LABEL[k] ?? k, 5),
+    [allByPlatform] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // ── Render helpers ──────────────────────────────────────────────────────────
@@ -450,13 +444,13 @@ export default function UserGeoTab({ supabase }: Props) {
             fontWeight: 800,
             color: "#a855f7",
             marginLeft: "auto",
-          }}>{newUsers.length}</span>
+          }}>{newTotal}</span>
         </div>
         <p className="section-note" style={{ marginBottom: 20 }}>
           Usuarios registrados en el período seleccionado, por país y plataforma.
         </p>
 
-        {newUsers.length === 0 && !loading ? (
+        {newTotal === 0 && !loading ? (
           <div style={{ color: "#ffffff44", fontSize: 13, padding: "20px 0" }}>
             Sin nuevos usuarios en este período.
           </div>
@@ -492,7 +486,7 @@ export default function UserGeoTab({ supabase }: Props) {
             fontWeight: 800,
             color: "#a855f7",
             marginLeft: "auto",
-          }}>{allUsers.length}</span>
+          }}>{allTotal}</span>
         </div>
         <p className="section-note" style={{ marginBottom: 20 }}>
           Distribución geográfica y de plataforma del 100% de la base de usuarios.
