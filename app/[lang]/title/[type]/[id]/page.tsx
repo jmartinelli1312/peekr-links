@@ -12,6 +12,7 @@ import TitleTabs from "./title-tabs";
 import ReviewsModal from "@/components/ReviewsModal";
 import WatchedButton from "@/components/title-actions/WatchedButton";
 import TitleLikeButton from "@/components/title-actions/TitleLikeButton";
+import BookmarkButton from "@/components/title-actions/BookmarkButton";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB = "https://api.themoviedb.org/3";
@@ -1600,6 +1601,14 @@ export default async function TitlePage({ params }: PageProps) {
             <TitleLikeButton
               tmdbId={numericId}
               mediaType={type}
+              lang={lang}
+            />
+            <BookmarkButton
+              tmdbId={numericId}
+              mediaType={type}
+              title={title}
+              posterPath={base.poster_path ?? null}
+              backdropPath={base.backdrop_path ?? null}
               lang={lang}
             />
             <ReviewsModal
