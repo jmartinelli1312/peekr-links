@@ -3,6 +3,20 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
+// Reply nested under a top-level review. Same shape as ReviewItem but
+// without the rating (replies don't carry a title rating).
+export type ReplyItem = {
+  id: number;
+  parent_id: number;
+  comment: string;
+  created_at: string;
+  like_count: number;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  is_creator: boolean;
+};
+
 export type ReviewItem = {
   id: number;
   comment: string;
@@ -13,6 +27,7 @@ export type ReviewItem = {
   display_name: string | null;
   avatar_url: string | null;
   is_creator: boolean;
+  replies: ReplyItem[];
 };
 
 type RawComment = {
@@ -21,6 +36,7 @@ type RawComment = {
   comment: string;
   created_at: string;
   like_count: number;
+  parent_id: number | null;
 };
 
 type RawProfile = {
@@ -30,7 +46,6 @@ type RawProfile = {
   avatar_url: string | null;
 };
 
-// Rating lookup: by user_id so it works even when activity_id is NULL on comments
 type RawActivity = {
   user_id: string;
   rating: number | null;
@@ -48,28 +63,48 @@ export async function GET(req: NextRequest) {
 
   const supabase = getSupabaseAdmin();
 
-  // 1. Fetch comments for this title
-  const { data: comments, error: commentsError } = await supabase
+  // 1. Top-level reviews (parent_id IS NULL). We fetch these first, ordered
+  //    by like_count then date — same as before. Up to 100.
+  const { data: tops, error: topsErr } = await supabase
     .from("comments")
-    .select("id, user_id, comment, created_at, like_count")
+    .select("id, user_id, comment, created_at, like_count, parent_id")
     .eq("tmdb_id", tmdb_id)
+    .is("parent_id", null)
     .not("comment", "is", null)
     .neq("comment", "")
     .order("like_count", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(100);
 
-  if (commentsError) {
-    return NextResponse.json({ error: commentsError.message }, { status: 500 });
+  if (topsErr) {
+    return NextResponse.json({ error: topsErr.message }, { status: 500 });
   }
-  if (!comments || comments.length === 0) {
+  if (!tops || tops.length === 0) {
     return NextResponse.json({ reviews: [], total: 0 });
   }
 
-  const rows = comments as RawComment[];
-  const userIds = [...new Set(rows.map((r) => r.user_id))];
+  const topRows = tops as RawComment[];
+  const topIds = topRows.map((r) => r.id);
 
-  // 2. Fetch profiles in batch
+  // 2. Replies for these top-level reviews (one round trip).
+  const { data: replyRows } = await supabase
+    .from("comments")
+    .select("id, user_id, comment, created_at, like_count, parent_id")
+    .in("parent_id", topIds)
+    .not("comment", "is", null)
+    .neq("comment", "")
+    .order("created_at", { ascending: true });
+
+  const replies = (replyRows ?? []) as RawComment[];
+
+  // 3. Profiles for everyone (top + replies) in batch.
+  const userIds = [
+    ...new Set([
+      ...topRows.map((r) => r.user_id),
+      ...replies.map((r) => r.user_id),
+    ]),
+  ];
+
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, username, display_name, avatar_url")
@@ -79,13 +114,14 @@ export async function GET(req: NextRequest) {
     (profiles as RawProfile[] ?? []).map((p) => [p.id, p])
   );
 
-  // 3. Fetch ratings by user_id + tmdb_id — reliable even when activity_id is NULL on comment
+  // 4. Ratings by user_id+tmdb_id — only relevant for top-level reviewers.
   const ratingMap = new Map<string, number>();
-  if (userIds.length > 0) {
+  const topUserIds = [...new Set(topRows.map((r) => r.user_id))];
+  if (topUserIds.length > 0) {
     const { data: activities } = await supabase
       .from("user_title_activities")
       .select("user_id, rating, media_type")
-      .in("user_id", userIds)
+      .in("user_id", topUserIds)
       .eq("tmdb_id", tmdb_id)
       .not("rating", "is", null);
 
@@ -96,7 +132,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 4. Fetch creators for badge — PK on approved_creators is `id` (the user UUID)
+  // 5. Creator badge for everyone.
   const { data: creators } = await supabase
     .from("approved_creators")
     .select("id")
@@ -104,8 +140,29 @@ export async function GET(req: NextRequest) {
 
   const creatorSet = new Set((creators ?? []).map((c: { id: string }) => c.id));
 
-  // 5. Assemble reviews
-  const reviews: ReviewItem[] = rows.map((row) => {
+  // 6. Group replies under their parent.
+  const repliesByParent = new Map<number, ReplyItem[]>();
+  for (const r of replies) {
+    if (r.parent_id == null) continue;
+    const profile = profileMap.get(r.user_id);
+    const item: ReplyItem = {
+      id: r.id,
+      parent_id: r.parent_id,
+      comment: r.comment,
+      created_at: r.created_at,
+      like_count: r.like_count ?? 0,
+      username: profile?.username ?? "usuario",
+      display_name: profile?.display_name ?? null,
+      avatar_url: profile?.avatar_url ?? null,
+      is_creator: creatorSet.has(r.user_id),
+    };
+    const arr = repliesByParent.get(r.parent_id) ?? [];
+    arr.push(item);
+    repliesByParent.set(r.parent_id, arr);
+  }
+
+  // 7. Assemble top-level reviews with their replies.
+  const reviews: ReviewItem[] = topRows.map((row) => {
     const profile = profileMap.get(row.user_id);
     return {
       id: row.id,
@@ -117,6 +174,7 @@ export async function GET(req: NextRequest) {
       display_name: profile?.display_name ?? null,
       avatar_url: profile?.avatar_url ?? null,
       is_creator: creatorSet.has(row.user_id),
+      replies: repliesByParent.get(row.id) ?? [],
     };
   });
 
@@ -124,7 +182,9 @@ export async function GET(req: NextRequest) {
     { reviews, total: reviews.length },
     {
       headers: {
-        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+        // Lower cache TTL because the modal now drives writes — stale
+        // data for new posts is more visible than before.
+        "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
       },
     }
   );

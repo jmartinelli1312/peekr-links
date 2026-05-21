@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { ReviewItem } from "@/app/api/reviews/route";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import type { ReviewItem, ReplyItem } from "@/app/api/reviews/route";
+
+// Shape stored in component state — the API ReviewItem plus the
+// viewer's like state + reply visibility for inline composer.
+type ReviewLocal = ReviewItem & { _liked?: boolean; replies: ReplyLocal[] };
+type ReplyLocal = ReplyItem & { _liked?: boolean };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Rating badge  — Peekr scale is 1-10, NOT stars
@@ -56,20 +63,75 @@ function browserLang(): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Single review card
+// Reply card — smaller, no rating, with its own like/translate state
+// ─────────────────────────────────────────────────────────────────────────────
+interface ReplyCardProps {
+  reply: ReplyLocal;
+  viewerId: string | null;
+  onToggleLike: (kind: "reply", id: number) => void;
+}
+
+function ReplyCard({ reply, viewerId, onToggleLike }: ReplyCardProps) {
+  const displayName = reply.display_name || reply.username;
+  const date = new Date(reply.created_at).toLocaleDateString(undefined, {
+    year: "numeric", month: "short", day: "numeric",
+  });
+
+  return (
+    <div className="r-reply">
+      <Avatar url={reply.avatar_url} name={displayName} />
+      <div className="r-reply-body">
+        <div className="r-reply-meta">
+          <span className="r-reply-name">{displayName}</span>
+          {reply.is_creator && <span className="r-badge">✓ Creador</span>}
+          <span className="r-reply-date">{date}</span>
+        </div>
+        <p className="r-reply-text">{reply.comment}</p>
+        <button
+          type="button"
+          className={`r-like-btn ${reply._liked ? "r-like-on" : ""}`}
+          onClick={() => viewerId && onToggleLike("reply", reply.id)}
+          disabled={!viewerId}
+          aria-label="Me gusta"
+        >
+          <span aria-hidden>{reply._liked ? "♥" : "♡"}</span>
+          {reply.like_count > 0 && <span>{reply.like_count}</span>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Top-level review card
 // ─────────────────────────────────────────────────────────────────────────────
 interface CardProps {
-  review: ReviewItem;
+  review: ReviewLocal;
   targetLang: string;           // language to translate to
   autoTranslate: boolean;       // if true, translate on mount
   translatedText: string | null;
   onTranslated: (id: number, text: string) => void;
+  viewerId: string | null;
+  onToggleLike: (kind: "review" | "reply", id: number) => void;
+  onSubmitReply: (parentId: number, text: string) => Promise<void>;
 }
 
-function ReviewCard({ review, targetLang, autoTranslate, translatedText, onTranslated }: CardProps) {
+function ReviewCard({
+  review,
+  targetLang,
+  autoTranslate,
+  translatedText,
+  onTranslated,
+  viewerId,
+  onToggleLike,
+  onSubmitReply,
+}: CardProps) {
   const [showOriginal, setShowOriginal] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const displayName = review.display_name || review.username;
   const date = new Date(review.created_at).toLocaleDateString(undefined, {
@@ -134,9 +196,29 @@ function ReviewCard({ review, targetLang, autoTranslate, translatedText, onTrans
       <div className="r-footer">
         <span className="r-date">{date}</span>
         <div className="r-footer-right">
-          {review.like_count > 0 && (
-            <span className="r-likes">♥ {review.like_count}</span>
+          {/* Like */}
+          <button
+            type="button"
+            className={`r-like-btn ${review._liked ? "r-like-on" : ""}`}
+            onClick={() => viewerId && onToggleLike("review", review.id)}
+            disabled={!viewerId}
+            aria-label="Me gusta"
+          >
+            <span aria-hidden>{review._liked ? "♥" : "♡"}</span>
+            {review.like_count > 0 && <span>{review.like_count}</span>}
+          </button>
+
+          {/* Reply */}
+          {viewerId && (
+            <button
+              type="button"
+              className="r-reply-toggle"
+              onClick={() => setReplyOpen(v => !v)}
+            >
+              {replyOpen ? "Cancelar" : "Responder"}
+            </button>
           )}
+
           {/* Translate toggle */}
           {failed && (
             <button className="r-translate-btn r-translate-err" onClick={translate}>
@@ -160,6 +242,51 @@ function ReviewCard({ review, targetLang, autoTranslate, translatedText, onTrans
           )}
         </div>
       </div>
+
+      {/* Inline reply composer */}
+      {replyOpen && viewerId && (
+        <div className="r-reply-form">
+          <textarea
+            className="r-reply-input"
+            placeholder="Tu respuesta…"
+            value={replyText}
+            onChange={e => setReplyText(e.target.value)}
+            rows={2}
+            disabled={submitting}
+          />
+          <button
+            type="button"
+            className="r-reply-submit"
+            disabled={submitting || replyText.trim().length === 0}
+            onClick={async () => {
+              setSubmitting(true);
+              try {
+                await onSubmitReply(review.id, replyText.trim());
+                setReplyText("");
+                setReplyOpen(false);
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+          >
+            {submitting ? "Enviando…" : "Responder"}
+          </button>
+        </div>
+      )}
+
+      {/* Replies list */}
+      {review.replies.length > 0 && (
+        <div className="r-replies">
+          {review.replies.map(rep => (
+            <ReplyCard
+              key={rep.id}
+              reply={rep}
+              viewerId={viewerId}
+              onToggleLike={onToggleLike}
+            />
+          ))}
+        </div>
+      )}
     </article>
   );
 }
@@ -176,10 +303,19 @@ interface Props {
 }
 
 export default function ReviewsModal({ tmdbId, mediaType, title, label, count }: Props) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [reviews, setReviews] = useState<ReviewLocal[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
+
+  // Viewer / auth state — populated when the modal opens.
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const [viewerHasRated, setViewerHasRated] = useState(false);
+
+  // New top-level comment composer state.
+  const [newComment, setNewComment] = useState("");
+  const [posting, setPosting] = useState(false);
 
   // Must be client-side before portal works
   const [mounted, setMounted] = useState(false);
@@ -229,14 +365,75 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  async function openModal() {
-    setOpen(true);
-    if (fetched) return;
-    setLoading(true);
-    try {
+  // Pulls comments + viewer-specific state in one open. Splits into helpers
+  // so we can refresh after a post/reply without re-running the auth check.
+  const fetchComments = useCallback(
+    async (uid: string | null): Promise<ReviewLocal[]> => {
       const res = await fetch(`/api/reviews?tmdb_id=${tmdbId}&type=${mediaType}`);
       const json = await res.json();
-      setReviews(json.reviews ?? []);
+      const items: ReviewItem[] = json.reviews ?? [];
+      if (items.length === 0) return [];
+
+      // Pull the viewer's likes for these comments in one round-trip so we
+      // can render the filled-heart state without per-card queries.
+      let likedSet = new Set<number>();
+      if (uid) {
+        const allIds: number[] = [];
+        for (const it of items) {
+          allIds.push(it.id);
+          for (const rep of it.replies) allIds.push(rep.id);
+        }
+        if (allIds.length > 0) {
+          const { data } = await supabase
+            .from("comment_likes")
+            .select("comment_id")
+            .eq("user_id", uid)
+            .in("comment_id", allIds);
+          likedSet = new Set(
+            (data ?? []).map(r => (r as { comment_id: number }).comment_id)
+          );
+        }
+      }
+      return items.map(it => ({
+        ...it,
+        _liked: likedSet.has(it.id),
+        replies: it.replies.map(rep => ({ ...rep, _liked: likedSet.has(rep.id) })),
+      }));
+    },
+    [tmdbId, mediaType]
+  );
+
+  async function openModal() {
+    setOpen(true);
+    if (fetched) {
+      // Refresh viewer state in case the user signed in / rated since last open.
+      const { data: userResp } = await supabase.auth.getUser();
+      setViewerId(userResp.user?.id ?? null);
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data: userResp } = await supabase.auth.getUser();
+      const uid = userResp.user?.id ?? null;
+      setViewerId(uid);
+
+      // Has the viewer rated this title? Drives the "must rate to comment"
+      // gate that mirrors Flutter's CommentsTmdbScreen behavior.
+      if (uid) {
+        const { data: rated } = await supabase
+          .from("user_title_activities")
+          .select("rating")
+          .eq("user_id", uid)
+          .eq("tmdb_id", tmdbId)
+          .not("rating", "is", null)
+          .limit(1);
+        setViewerHasRated(Boolean(rated && rated.length > 0));
+      } else {
+        setViewerHasRated(false);
+      }
+
+      const items = await fetchComments(uid);
+      setReviews(items);
       setFetched(true);
     } catch {
       setReviews([]);
@@ -244,6 +441,131 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
       setLoading(false);
     }
   }
+
+  const refreshComments = useCallback(async () => {
+    const items = await fetchComments(viewerId);
+    setReviews(items);
+  }, [fetchComments, viewerId]);
+
+  // Optimistic like toggle on a top-level review or one of its replies.
+  // Reverts the UI on DB error so the heart stays in sync.
+  const toggleLike = useCallback(
+    async (kind: "review" | "reply", id: number) => {
+      if (!viewerId) return;
+
+      let prevLiked = false;
+      setReviews(prev =>
+        prev.map(r => {
+          if (kind === "review" && r.id === id) {
+            prevLiked = Boolean(r._liked);
+            return {
+              ...r,
+              _liked: !prevLiked,
+              like_count: Math.max(0, r.like_count + (prevLiked ? -1 : 1)),
+            };
+          }
+          if (kind === "reply") {
+            const next = r.replies.map(rep => {
+              if (rep.id !== id) return rep;
+              prevLiked = Boolean(rep._liked);
+              return {
+                ...rep,
+                _liked: !prevLiked,
+                like_count: Math.max(0, rep.like_count + (prevLiked ? -1 : 1)),
+              };
+            });
+            return { ...r, replies: next };
+          }
+          return r;
+        })
+      );
+
+      try {
+        if (prevLiked) {
+          await supabase
+            .from("comment_likes")
+            .delete()
+            .eq("user_id", viewerId)
+            .eq("comment_id", id);
+        } else {
+          await supabase
+            .from("comment_likes")
+            .insert({ user_id: viewerId, comment_id: id });
+        }
+      } catch (e) {
+        console.error("[ReviewsModal] toggleLike error", e);
+        // Revert by flipping again — _liked may have changed since, so we
+        // do a targeted invert using the same id.
+        setReviews(prev =>
+          prev.map(r => {
+            if (kind === "review" && r.id === id) {
+              return {
+                ...r,
+                _liked: !r._liked,
+                like_count: Math.max(0, r.like_count + (r._liked ? -1 : 1)),
+              };
+            }
+            if (kind === "reply") {
+              const next = r.replies.map(rep => {
+                if (rep.id !== id) return rep;
+                return {
+                  ...rep,
+                  _liked: !rep._liked,
+                  like_count: Math.max(0, rep.like_count + (rep._liked ? -1 : 1)),
+                };
+              });
+              return { ...r, replies: next };
+            }
+            return r;
+          })
+        );
+      }
+    },
+    [viewerId]
+  );
+
+  // Inserts a top-level comment for this title. The parent component
+  // already enforces "must have rated" via the disabled state; this
+  // function just handles the write + refresh.
+  const submitNewComment = useCallback(async () => {
+    if (!viewerId || posting) return;
+    const text = newComment.trim();
+    if (text.length === 0) return;
+    setPosting(true);
+    try {
+      const { error } = await supabase
+        .from("comments")
+        .insert({ tmdb_id: tmdbId, user_id: viewerId, comment: text });
+      if (error) {
+        console.error("[ReviewsModal] submitNewComment error", error);
+        return;
+      }
+      setNewComment("");
+      await refreshComments();
+    } finally {
+      setPosting(false);
+    }
+  }, [viewerId, posting, newComment, tmdbId, refreshComments]);
+
+  const submitReply = useCallback(
+    async (parentId: number, text: string) => {
+      if (!viewerId) return;
+      const { error } = await supabase
+        .from("comments")
+        .insert({
+          tmdb_id: tmdbId,
+          user_id: viewerId,
+          comment: text,
+          parent_id: parentId,
+        });
+      if (error) {
+        console.error("[ReviewsModal] submitReply error", error);
+        return;
+      }
+      await refreshComments();
+    },
+    [viewerId, tmdbId, refreshComments]
+  );
 
   const handleTranslated = useCallback((id: number, text: string) => {
     setTranslations(prev => ({ ...prev, [id]: text }));
@@ -320,8 +642,47 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
                   autoTranslate={autoTranslate}
                   translatedText={translations[r.id] ?? null}
                   onTranslated={handleTranslated}
+                  viewerId={viewerId}
+                  onToggleLike={toggleLike}
+                  onSubmitReply={submitReply}
                 />
               ))}
+            </div>
+
+            {/* Bottom composer — sticky inside the panel so it stays visible
+                while the user scrolls long threads. Behavior mirrors the
+                Flutter CommentsTmdbScreen "must have rated" gate. */}
+            <div className="r-composer">
+              {!viewerId ? (
+                <button
+                  className="r-composer-cta"
+                  onClick={() => router.push("/signup")}
+                >
+                  Iniciá sesión para comentar
+                </button>
+              ) : !viewerHasRated ? (
+                <div className="r-composer-gate">
+                  Marcá visto y calificá este título primero para poder comentar.
+                </div>
+              ) : (
+                <div className="r-composer-row">
+                  <textarea
+                    className="r-composer-input"
+                    placeholder="Escribí un comentario…"
+                    value={newComment}
+                    onChange={e => setNewComment(e.target.value)}
+                    rows={2}
+                    disabled={posting}
+                  />
+                  <button
+                    className="r-composer-send"
+                    onClick={submitNewComment}
+                    disabled={posting || newComment.trim().length === 0}
+                  >
+                    {posting ? "…" : "Enviar"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>,
@@ -502,6 +863,116 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
         .r-translate-btn:hover { color: rgba(255,255,255,.7); }
         .r-translated { color: rgba(168,85,247,.6); }
         .r-translate-err { color: #ef4444; }
+
+        /* ── Like button (review + reply) ── */
+        .r-like-btn {
+          display: inline-flex; align-items: center; gap: 4px;
+          font-size: 12px; color: rgba(255,255,255,.4);
+          background: none; border: none; cursor: pointer; padding: 2px 4px;
+          font-weight: 600; transition: color .12s;
+          touch-action: manipulation;
+        }
+        .r-like-btn:hover:not(:disabled) { color: #FA0082; }
+        .r-like-btn:disabled { cursor: default; opacity: .55; }
+        .r-like-on { color: #FA0082; }
+
+        .r-reply-toggle {
+          font-size: 12px; color: rgba(168,85,247,.85);
+          background: none; border: none; cursor: pointer; padding: 2px 4px;
+          font-weight: 700;
+        }
+        .r-reply-toggle:hover { color: #c4b5fd; }
+
+        /* ── Inline reply composer ── */
+        .r-reply-form {
+          display: flex; gap: 8px; margin-top: 10px;
+          padding-left: 49px; /* aligns with the avatar gutter */
+        }
+        .r-reply-input {
+          flex: 1; resize: vertical; min-height: 40px;
+          background: rgba(255,255,255,.05);
+          color: #fff; border: 1px solid rgba(255,255,255,.08);
+          border-radius: 10px; padding: 8px 10px;
+          font-family: inherit; font-size: 13px;
+        }
+        .r-reply-input::placeholder { color: rgba(255,255,255,.4); }
+        .r-reply-submit {
+          background: #FA0082; color: #fff;
+          border: 0; border-radius: 10px;
+          padding: 0 14px; font-size: 13px; font-weight: 700;
+          cursor: pointer; align-self: flex-start; height: 40px;
+        }
+        .r-reply-submit:disabled {
+          background: rgba(255,255,255,.12); color: rgba(255,255,255,.4);
+          cursor: not-allowed;
+        }
+
+        /* ── Replies list ── */
+        .r-replies {
+          margin-top: 12px;
+          padding-left: 49px;
+          display: flex; flex-direction: column; gap: 10px;
+        }
+        .r-reply {
+          display: flex; gap: 10px;
+          padding: 8px 10px;
+          background: rgba(255,255,255,.03);
+          border-radius: 10px;
+        }
+        .r-reply .r-avatar { width: 28px; height: 28px; }
+        .r-reply-body { flex: 1; min-width: 0; }
+        .r-reply-meta {
+          display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+          margin-bottom: 3px;
+        }
+        .r-reply-name { font-size: 12px; font-weight: 700; color: #fff; }
+        .r-reply-date { font-size: 10px; color: rgba(255,255,255,.32); }
+        .r-reply-text {
+          font-size: 13px; color: rgba(255,255,255,.82); line-height: 1.45;
+          margin: 0 0 4px; word-break: break-word;
+        }
+
+        /* ── Bottom composer ── */
+        .r-composer {
+          flex-shrink: 0;
+          border-top: 1px solid rgba(255,255,255,.08);
+          padding: 12px 16px;
+          background: #0f1014;
+        }
+        .r-composer-row { display: flex; gap: 8px; }
+        .r-composer-input {
+          flex: 1; resize: vertical; min-height: 44px;
+          background: rgba(255,255,255,.06);
+          color: #fff; border: 0; border-radius: 12px;
+          padding: 10px 12px; font-family: inherit; font-size: 14px;
+        }
+        .r-composer-input::placeholder { color: rgba(255,255,255,.4); }
+        .r-composer-send {
+          background: #FA0082; color: #fff;
+          border: 0; border-radius: 12px;
+          padding: 0 18px; font-size: 14px; font-weight: 800;
+          cursor: pointer; min-width: 80px;
+        }
+        .r-composer-send:disabled {
+          background: rgba(255,255,255,.12); color: rgba(255,255,255,.4);
+          cursor: not-allowed;
+        }
+        .r-composer-gate {
+          color: rgba(255,255,255,.55);
+          font-size: 13px; text-align: center;
+          padding: 8px 0;
+        }
+        .r-composer-cta {
+          width: 100%; padding: 12px;
+          background: rgba(168,85,247,.18);
+          color: #d8b4fe; font-weight: 700;
+          border: 1px solid rgba(168,85,247,.45);
+          border-radius: 12px; font-size: 14px;
+          cursor: pointer;
+        }
+        .r-composer-cta:hover {
+          background: rgba(168,85,247,.28);
+        }
       `}</style>
     </>
   );

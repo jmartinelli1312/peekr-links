@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import TitleTabs from "./title-tabs";
 import ReviewsModal from "@/components/ReviewsModal";
 import WatchedButton from "@/components/title-actions/WatchedButton";
+import TitleLikeButton from "@/components/title-actions/TitleLikeButton";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB = "https://api.themoviedb.org/3";
@@ -1594,6 +1595,11 @@ export default async function TitlePage({ params }: PageProps) {
               posterPath={base.poster_path ?? null}
               releaseYear={year ? Number.parseInt(year, 10) : null}
               seasons={type === "tv" ? (base.seasons ?? []) : null}
+              lang={lang}
+            />
+            <TitleLikeButton
+              tmdbId={numericId}
+              mediaType={type}
               lang={lang}
             />
             <ReviewsModal
