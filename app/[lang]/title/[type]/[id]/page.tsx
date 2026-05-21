@@ -10,6 +10,7 @@ import { cache } from "react";
 import { supabase } from "@/lib/supabase";
 import TitleTabs from "./title-tabs";
 import ReviewsModal from "@/components/ReviewsModal";
+import WatchedButton from "@/components/title-actions/WatchedButton";
 
 const TMDB_KEY = process.env.TMDB_API_KEY!;
 const TMDB = "https://api.themoviedb.org/3";
@@ -58,6 +59,16 @@ type TmdbBaseTitleResponse = {
   // cuando Peekr todavía no tiene ratings propios.
   vote_average?: number | null;
   vote_count?: number | null;
+  // TV-only: seasons array. TMDB returns this on /tv/{id} by default.
+  // We pass it through to WatchedButton so it can render the season picker
+  // without an extra client-side fetch.
+  seasons?: Array<{
+    season_number: number;
+    name: string | null;
+    episode_count?: number | null;
+    air_date?: string | null;
+    poster_path?: string | null;
+  }>;
 };
 
 type TmdbCast = {
@@ -1576,6 +1587,15 @@ export default async function TitlePage({ params }: PageProps) {
                 👀 {stats.viewsCount} {t.views}
               </div>
             ) : null}
+            <WatchedButton
+              tmdbId={numericId}
+              mediaType={type}
+              title={title}
+              posterPath={base.poster_path ?? null}
+              releaseYear={year ? Number.parseInt(year, 10) : null}
+              seasons={type === "tv" ? (base.seasons ?? []) : null}
+              lang={lang}
+            />
             <ReviewsModal
               tmdbId={numericId}
               mediaType={type}
