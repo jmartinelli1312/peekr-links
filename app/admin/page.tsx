@@ -503,11 +503,9 @@ export default function AdminPage() {
 
         const [
           authRes,
-          totalUsersRes,
+          globalRes,
           engagementRes,
-          onboardingCompletedRes,
 
-          totalRatingsRes,
           ratingsTodayRes,
           ratings7dRes,
           ratings30dRes,
@@ -516,11 +514,6 @@ export default function AdminPage() {
           watchlist7dRes,
           watchlist30dRes,
 
-          totalPeeklistsRes,
-          publishedBuzzRes,
-          totalEditorialCollectionsRes,
-          publishedEditorialCollectionsRes,
-
           recentUsersRes,
           recentRatingsRes,
           recentWatchlistRes,
@@ -528,7 +521,11 @@ export default function AdminPage() {
         ] = await Promise.all([
           supabase.auth.getUser(),
 
-          supabase.from("profiles").select("*", { count: "exact", head: true }),
+          // All global counts (total_users, onboarding_completed,
+          // total_ratings, total_peeklists, published_buzz, editorial)
+          // in one SECURITY DEFINER call. Bypasses PostgREST max-rows
+          // that was clipping totalUsers at 1000 via .count="exact".
+          supabase.rpc("admin_metrics_global"),
 
           // Single source of truth for DAU/WAU/MAU + new-user counts.
           // Returns Argentina-calendar cuts and a union of every activity
@@ -537,16 +534,6 @@ export default function AdminPage() {
           supabase.rpc("admin_metrics_engagement", {
             p_tz: "America/Argentina/Buenos_Aires",
           }),
-
-          supabase
-            .from("profiles")
-            .select("*", { count: "exact", head: true })
-            .eq("has_completed_onboarding", true),
-
-          supabase
-            .from("user_title_activities")
-            .select("*", { count: "exact", head: true })
-            .not("rating", "is", null),
 
           supabase
             .from("user_title_activities")
@@ -580,22 +567,6 @@ export default function AdminPage() {
             .from("watchlist")
             .select("*", { count: "exact", head: true })
             .gte("created_at", thirtyIso),
-
-          supabase.from("peeklists").select("*", { count: "exact", head: true }),
-
-          supabase
-            .from("peekrbuzz_articles")
-            .select("*", { count: "exact", head: true })
-            .eq("is_published", true),
-
-          supabase
-            .from("editorial_collections")
-            .select("*", { count: "exact", head: true }),
-
-          supabase
-            .from("editorial_collections")
-            .select("*", { count: "exact", head: true })
-            .eq("is_published", true),
 
           supabase
             .from("profiles")
@@ -653,20 +624,14 @@ export default function AdminPage() {
         }
 
         const queryErrors = [
-          totalUsersRes.error,
+          globalRes.error,
           engagementRes.error,
-          onboardingCompletedRes.error,
-          totalRatingsRes.error,
           ratingsTodayRes.error,
           ratings7dRes.error,
           ratings30dRes.error,
           watchlistTodayRes.error,
           watchlist7dRes.error,
           watchlist30dRes.error,
-          totalPeeklistsRes.error,
-          publishedBuzzRes.error,
-          totalEditorialCollectionsRes.error,
-          publishedEditorialCollectionsRes.error,
           recentUsersRes.error,
           recentRatingsRes.error,
           recentWatchlistRes.error,
@@ -693,26 +658,39 @@ export default function AdminPage() {
           new_users_30d?: number;
         } | null) ?? {};
 
+        // All global counts arrive from admin_metrics_global to dodge the
+        // PostgREST max-rows clipping that previously froze totalUsers at
+        // ~1000 via the .count="exact" REST queries.
+        const global = (globalRes.data as {
+          total_users?: number;
+          onboarding_completed?: number;
+          total_ratings?: number;
+          total_peeklists?: number;
+          published_buzz?: number;
+          total_editorial_collections?: number;
+          published_editorial_collections?: number;
+        } | null) ?? {};
+
         setMetrics({
-          totalUsers: totalUsersRes.count ?? 0,
+          totalUsers: global.total_users ?? 0,
           newUsersToday: engagement.new_users_today ?? 0,
           newUsers7d: engagement.new_users_7d ?? 0,
           newUsers30d: engagement.new_users_30d ?? 0,
           dau: engagement.dau ?? 0,
           wau: engagement.wau ?? 0,
           mau: engagement.mau ?? 0,
-          totalRatings: totalRatingsRes.count ?? 0,
+          totalRatings: global.total_ratings ?? 0,
           ratingsToday: ratingsTodayRes.count ?? 0,
           ratings7d: ratings7dRes.count ?? 0,
           ratings30d: ratings30dRes.count ?? 0,
           watchlistToday: watchlistTodayRes.count ?? 0,
           watchlist7d: watchlist7dRes.count ?? 0,
           watchlist30d: watchlist30dRes.count ?? 0,
-          totalPeeklists: totalPeeklistsRes.count ?? 0,
-          publishedBuzz: publishedBuzzRes.count ?? 0,
-          onboardingCompleted: onboardingCompletedRes.count ?? 0,
-          totalEditorialCollections: totalEditorialCollectionsRes.count ?? 0,
-          publishedEditorialCollections: publishedEditorialCollectionsRes.count ?? 0,
+          totalPeeklists: global.total_peeklists ?? 0,
+          publishedBuzz: global.published_buzz ?? 0,
+          onboardingCompleted: global.onboarding_completed ?? 0,
+          totalEditorialCollections: global.total_editorial_collections ?? 0,
+          publishedEditorialCollections: global.published_editorial_collections ?? 0,
         });
 
         setRecentUsers((recentUsersRes.data as RecentUser[] | null) ?? []);
