@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import PeekrbuzzDailyTab from "./PeekrbuzzDailyTab";
 import UserGeoTab from "./UserGeoTab";
+import AnalyticsTab from "./AnalyticsTab";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 // Catches runtime exceptions inside WeeklyEditorialTab and shows the actual
@@ -319,7 +320,7 @@ export default function AdminPage() {
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
-  const [activeTab, setActiveTab] = useState<"metrics" | "editorial">("metrics");
+  const [activeTab, setActiveTab] = useState<"metrics" | "analytics" | "editorial">("metrics");
   const [pendingCounts, setPendingCounts] = useState({ articles: 0, carousels: 0, creators: 0, newsletters: 0 });
   const [pendingArticles, setPendingArticles] = useState<PendingArticle[]>([]);
   const [pendingCarousels, setPendingCarousels] = useState<PendingCarousel[]>([]);
@@ -1408,6 +1409,17 @@ export default function AdminPage() {
                 📊 Métricas
               </button>
               <button
+                className={`admin-tab${activeTab === "analytics" ? " active" : ""}`}
+                onClick={() => setActiveTab("analytics")}
+                style={{
+                  color: activeTab === "analytics" ? "#ff80bf" : "#FA0082",
+                  fontWeight: 700,
+                  borderColor: activeTab === "analytics" ? "#e6006e" : "transparent",
+                }}
+              >
+                📈 Analytics
+              </button>
+              <button
                 className={`admin-tab${activeTab === "editorial" ? " active" : ""}`}
                 onClick={() => setActiveTab("editorial")}
                 style={{ fontWeight: 700, color: activeTab === "editorial" ? "#FA0082" : "#FA0082" }}
@@ -1415,6 +1427,13 @@ export default function AdminPage() {
                 📋 Editorial
               </button>
             </div>
+
+            {/* ===================== TAB: ANALYTICS ===================== */}
+            {activeTab === "analytics" && (
+              <div style={{ marginTop: 20 }}>
+                <AnalyticsTab supabase={supabase} />
+              </div>
+            )}
 
             {/* ===================== TAB: METRICAS ===================== */}
             <div style={{ display: activeTab === "metrics" ? "block" : "none" }}>
