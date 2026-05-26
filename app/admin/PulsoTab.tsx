@@ -931,28 +931,35 @@ const BUCKET_LABEL: Record<Cohort["bucket"], string> = {
   Other: "🌎 Otros",
 };
 
-// Known campaign attributions by (bucket × week_start). Used to label cohorts
-// in the table with their likely source so we can compare campaigns instead
-// of just countries.
-type KnownCampaign = { from: string; to: string; label: string };
+// Known campaign WINDOWS — used to overlay context onto cohorts. We do NOT
+// claim "this cohort came from X" because we have zero per-user attribution
+// today (no UTM, no ref code, no self-report). We just list every campaign
+// whose active window intersected the cohort's week. The cohort can include
+// users from multiple campaigns + organic; the table makes that uncertainty
+// visible instead of pretending we know.
+//
+// Use "2099-01-01" as `to` for campaigns still running.
+type KnownCampaign = { from: string; to: string; label: string; kind: "paid" | "organic" };
 const KNOWN_CAMPAIGNS: Record<Cohort["bucket"], KnownCampaign[]> = {
   PA: [
-    { from: "2026-05-04", to: "2026-05-10", label: "Kevin Urriola reel" },
-    { from: "2026-05-11", to: "2026-05-17", label: "@elchotin.xyz carrusel" },
+    { from: "2026-05-12", to: "2099-01-01", label: "Kevin paid (ongoing)", kind: "paid" },
+    { from: "2026-05-13", to: "2026-05-16", label: "@elchotin.xyz carrusel", kind: "organic" },
   ],
   AR: [
-    { from: "2026-05-18", to: "2026-06-30", label: "pelisaldetalle reel" },
+    { from: "2026-05-24", to: "2099-01-01", label: "pelisaldetalle reel", kind: "organic" },
   ],
   Other: [],
 };
 
-function attributionFor(cohort: Cohort): string {
-  const camps = KNOWN_CAMPAIGNS[cohort.bucket];
-  const match = camps.find(
-    (c) => cohort.week_start >= c.from && cohort.week_start <= c.to,
-  );
-  if (match) return match.label;
-  return cohort.bucket === "Other" ? "orgánico + otras fuentes" : "orgánico";
+function campaignsActiveDuring(cohort: Cohort): KnownCampaign[] {
+  const camps = KNOWN_CAMPAIGNS[cohort.bucket] ?? [];
+  // The cohort's week spans [week_start, week_start+6]. A campaign is active
+  // in the cohort if its window overlaps that range at all.
+  const weekStart = cohort.week_start;
+  const d = new Date(`${weekStart}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 6);
+  const weekEnd = d.toISOString().slice(0, 10);
+  return camps.filter((c) => c.from <= weekEnd && c.to >= weekStart);
 }
 
 function cohortLight(pct: number | null): Light {
@@ -977,13 +984,29 @@ function CohortRetentionSection({ cohorts }: { cohorts: Cohort[] | null }) {
 
   return (
     <section style={sectionCard}>
-      <h3 style={sectionTitle}>🧪 Cohorts por origen — ¿qué fuente trae users que vuelven?</h3>
+      <h3 style={sectionTitle}>🧪 Cohorts por semana × país</h3>
       <p style={{ color: "#fff8", fontSize: 12, marginTop: -4, marginBottom: 14 }}>
         Cada fila = una semana de signups × país. <strong style={{ color: "#fff" }}>W1-W4</strong>{" "}
-        son los % de la cohort que volvieron a hacer alguna acción post-install en esa
-        ventana de 7 días. <strong style={{ color: "#fff" }}>—</strong> = la cohort
-        es muy joven para medir esa ventana todavía. 🎯 Letterboxd ~30-40% W1.
+        son los % de la cohort que hicieron alguna acción post-install en esa ventana
+        de 7 días. <strong style={{ color: "#fff" }}>—</strong> = cohort muy joven aún.
+        🎯 Letterboxd ~30-40% W1.
       </p>
+      <div style={{
+        background: "rgba(245,158,11,.08)",
+        border: "1px solid rgba(245,158,11,.3)",
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 14,
+        fontSize: 11,
+        color: "#fcd34d",
+        lineHeight: 1.5,
+      }}>
+        ⚠️ <strong>No tenemos atribución por usuario.</strong> Los chips son las campañas
+        que estaban <em>activas</em> durante la semana de signup, no la fuente
+        confirmada del user. Cuando hay 2+ chips activos en la misma semana, los users
+        de esa cohort son una mezcla desconocida (Kevin paid + @elchotin.xyz + orgánico).
+        Para arreglar esto: hace falta UTM tagging o ref code en los links de IG.
+      </div>
 
       <div style={{ overflowX: "auto" }}>
         <table style={cohortTable}>
@@ -1023,7 +1046,7 @@ function CohortRow({ cohort }: { cohort: Cohort }) {
       </td>
       <td style={td}>
         <div style={{ color: "#fff", fontWeight: 600 }}>{BUCKET_LABEL[cohort.bucket]}</div>
-        <div style={{ color: "#fff6", fontSize: 10 }}>{attributionFor(cohort)}</div>
+        <CampaignChips cohort={cohort} />
       </td>
       <td style={{ ...td, textAlign: "right", color: "#fff" }}>{formatNumber(cohort.size)}</td>
       <td style={{ ...td, textAlign: "right", color: "#fff8" }}>{cohort.age_days}d</td>
@@ -1043,6 +1066,42 @@ function CohortRow({ cohort }: { cohort: Cohort }) {
         <PctCell pct={cohort.w4_pct} traffic />
       </td>
     </tr>
+  );
+}
+
+function CampaignChips({ cohort }: { cohort: Cohort }) {
+  const active = campaignsActiveDuring(cohort);
+  if (active.length === 0) {
+    return (
+      <div style={{ color: "#fff5", fontSize: 10 }}>
+        sin campaña conocida · orgánico + otras
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 2 }}>
+      {active.map((c) => (
+        <span
+          key={c.label}
+          title={`${c.kind === "paid" ? "Pago" : "Orgánico"} · ${c.from} → ${c.to === "2099-01-01" ? "ongoing" : c.to}`}
+          style={{
+            fontSize: 10,
+            padding: "1px 6px",
+            borderRadius: 4,
+            background: c.kind === "paid" ? "rgba(250,0,130,.15)" : "rgba(168,85,247,.15)",
+            color: c.kind === "paid" ? "#FA0082" : "#a855f7",
+            border: `1px solid ${c.kind === "paid" ? "#FA008255" : "#a855f755"}`,
+          }}
+        >
+          {c.kind === "paid" ? "💰" : "📱"} {c.label}
+        </span>
+      ))}
+      {active.length > 1 && (
+        <span style={{ fontSize: 9, color: "#f59e0b", marginLeft: 4 }}>
+          ⚠️ overlap — no podemos atribuir por user
+        </span>
+      )}
+    </div>
   );
 }
 
