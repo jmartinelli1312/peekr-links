@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import PeekrbuzzDailyTab from "./PeekrbuzzDailyTab";
 import UserGeoTab from "./UserGeoTab";
 import AnalyticsTab from "./AnalyticsTab";
+import PulsoTab from "./PulsoTab";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 // Catches runtime exceptions inside WeeklyEditorialTab and shows the actual
@@ -320,7 +321,7 @@ export default function AdminPage() {
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
-  const [activeTab, setActiveTab] = useState<"metrics" | "analytics" | "editorial">("metrics");
+  const [activeTab, setActiveTab] = useState<"pulso" | "metrics" | "analytics" | "editorial">("pulso");
   const [pendingCounts, setPendingCounts] = useState({ articles: 0, carousels: 0, creators: 0, newsletters: 0 });
   const [pendingArticles, setPendingArticles] = useState<PendingArticle[]>([]);
   const [pendingCarousels, setPendingCarousels] = useState<PendingCarousel[]>([]);
@@ -1398,6 +1399,17 @@ export default function AdminPage() {
             {/* Tab navigation */}
             <div className="admin-tabs">
               <button
+                className={`admin-tab${activeTab === "pulso" ? " active" : ""}`}
+                onClick={() => setActiveTab("pulso")}
+                style={{
+                  color: activeTab === "pulso" ? "#ff80bf" : "#FA0082",
+                  fontWeight: 700,
+                  borderColor: activeTab === "pulso" ? "#e6006e" : "transparent",
+                }}
+              >
+                📈 Pulso
+              </button>
+              <button
                 className={`admin-tab${activeTab === "metrics" ? " active" : ""}`}
                 onClick={() => setActiveTab("metrics")}
                 style={{
@@ -1406,7 +1418,7 @@ export default function AdminPage() {
                   borderColor: activeTab === "metrics" ? "#e6006e" : "transparent",
                 }}
               >
-                📊 Métricas
+                📊 Métricas (legacy)
               </button>
               <button
                 className={`admin-tab${activeTab === "analytics" ? " active" : ""}`}
@@ -1417,7 +1429,7 @@ export default function AdminPage() {
                   borderColor: activeTab === "analytics" ? "#e6006e" : "transparent",
                 }}
               >
-                📈 Analytics
+                🔍 Analytics (legacy)
               </button>
               <button
                 className={`admin-tab${activeTab === "editorial" ? " active" : ""}`}
@@ -1428,7 +1440,14 @@ export default function AdminPage() {
               </button>
             </div>
 
-            {/* ===================== TAB: ANALYTICS ===================== */}
+            {/* ===================== TAB: PULSO ===================== */}
+            {activeTab === "pulso" && (
+              <div style={{ marginTop: 20 }}>
+                <PulsoTab supabase={supabase} />
+              </div>
+            )}
+
+            {/* ===================== TAB: ANALYTICS (legacy) ===================== */}
             {activeTab === "analytics" && (
               <div style={{ marginTop: 20 }}>
                 <AnalyticsTab supabase={supabase} />
