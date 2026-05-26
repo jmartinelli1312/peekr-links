@@ -931,11 +931,29 @@ const BUCKET_LABEL: Record<Cohort["bucket"], string> = {
   Other: "🌎 Otros",
 };
 
-const BUCKET_NOTE: Record<Cohort["bucket"], string> = {
-  AR: "pelisaldetalle reel · May 24+",
-  PA: "Kevin Urriola reel · May 13+",
-  Other: "orgánico + otras fuentes",
+// Known campaign attributions by (bucket × week_start). Used to label cohorts
+// in the table with their likely source so we can compare campaigns instead
+// of just countries.
+type KnownCampaign = { from: string; to: string; label: string };
+const KNOWN_CAMPAIGNS: Record<Cohort["bucket"], KnownCampaign[]> = {
+  PA: [
+    { from: "2026-05-04", to: "2026-05-10", label: "Kevin Urriola reel" },
+    { from: "2026-05-11", to: "2026-05-17", label: "@elchotin.xyz carrusel" },
+  ],
+  AR: [
+    { from: "2026-05-18", to: "2026-06-30", label: "pelisaldetalle reel" },
+  ],
+  Other: [],
 };
+
+function attributionFor(cohort: Cohort): string {
+  const camps = KNOWN_CAMPAIGNS[cohort.bucket];
+  const match = camps.find(
+    (c) => cohort.week_start >= c.from && cohort.week_start <= c.to,
+  );
+  if (match) return match.label;
+  return cohort.bucket === "Other" ? "orgánico + otras fuentes" : "orgánico";
+}
 
 function cohortLight(pct: number | null): Light {
   if (pct === null) return "neutral";
@@ -1005,7 +1023,7 @@ function CohortRow({ cohort }: { cohort: Cohort }) {
       </td>
       <td style={td}>
         <div style={{ color: "#fff", fontWeight: 600 }}>{BUCKET_LABEL[cohort.bucket]}</div>
-        <div style={{ color: "#fff6", fontSize: 10 }}>{BUCKET_NOTE[cohort.bucket]}</div>
+        <div style={{ color: "#fff6", fontSize: 10 }}>{attributionFor(cohort)}</div>
       </td>
       <td style={{ ...td, textAlign: "right", color: "#fff" }}>{formatNumber(cohort.size)}</td>
       <td style={{ ...td, textAlign: "right", color: "#fff8" }}>{cohort.age_days}d</td>
