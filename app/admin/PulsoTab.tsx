@@ -67,6 +67,26 @@ type Behavior = {
   shares_total: number;
 };
 
+type TimeSeries = {
+  days: string[];
+  retention: {
+    dau: number[];
+    signups: number[];
+    first_time_active: number[];
+  };
+  behavior: {
+    ratings: number[];
+    comments: number[];
+    watchlist: number[];
+    peeklists: number[];
+    likes: number[];
+    follows: number[];
+  };
+};
+
+type RetentionSeries = keyof TimeSeries["retention"];
+type BehaviorSeries = keyof TimeSeries["behavior"];
+
 type Creator = {
   user_id: string;
   username: string;
@@ -217,6 +237,9 @@ export default function PulsoTab({ supabase }: Props) {
   const [acquisition, setAcquisition] = useState<Acquisition | null>(null);
   const [retention, setRetention] = useState<Retention | null>(null);
   const [behavior, setBehavior] = useState<Behavior | null>(null);
+  const [timeSeries, setTimeSeries] = useState<TimeSeries | null>(null);
+  const [retentionTab, setRetentionTab] = useState<RetentionSeries>("dau");
+  const [behaviorTab, setBehaviorTab] = useState<BehaviorSeries>("ratings");
   const [topMetric, setTopMetric] = useState<TopMetric>("ratings");
   const [topCreators, setTopCreators] = useState<Creator[]>([]);
   const [loading, setLoading] = useState(false);
@@ -228,7 +251,7 @@ export default function PulsoTab({ supabase }: Props) {
     try {
       const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
 
-      const [acqRes, retRes, behRes] = await Promise.all([
+      const [acqRes, retRes, behRes, tsRes] = await Promise.all([
         supabase.rpc("admin_kpi_acquisition", {
           p_from: fromTs,
           p_to_exclusive: toTsExclusive,
@@ -241,15 +264,22 @@ export default function PulsoTab({ supabase }: Props) {
           p_to_exclusive: toTsExclusive,
           p_only_onboarded: onlyOnboarded,
         }),
+        supabase.rpc("admin_kpi_time_series", {
+          p_from: fromTs,
+          p_to_exclusive: toTsExclusive,
+          p_only_onboarded: onlyOnboarded,
+        }),
       ]);
 
       if (acqRes.error) throw acqRes.error;
       if (retRes.error) throw retRes.error;
       if (behRes.error) throw behRes.error;
+      if (tsRes.error) throw tsRes.error;
 
       setAcquisition(acqRes.data as Acquisition);
       setRetention(retRes.data as Retention);
       setBehavior(behRes.data as Behavior);
+      setTimeSeries(tsRes.data as TimeSeries);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -397,10 +427,20 @@ export default function PulsoTab({ supabase }: Props) {
       <AcquisitionSection data={acquisition} />
 
       {/* ═════ RETENCIÓN ═════ */}
-      <RetentionSection data={retention} />
+      <RetentionSection
+        data={retention}
+        series={timeSeries}
+        tab={retentionTab}
+        setTab={setRetentionTab}
+      />
 
       {/* ═════ COMPORTAMIENTO ═════ */}
-      <BehaviorSection data={behavior} />
+      <BehaviorSection
+        data={behavior}
+        series={timeSeries}
+        tab={behaviorTab}
+        setTab={setBehaviorTab}
+      />
 
       {/* ═════ TOP CREATORS ═════ */}
       <TopCreatorsSection
@@ -570,7 +610,20 @@ function AcquisitionSection({ data }: { data: Acquisition | null }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // RETENCIÓN
 // ═════════════════════════════════════════════════════════════════════════════
-function RetentionSection({ data }: { data: Retention | null }) {
+const RETENTION_TAB_LABELS: Record<RetentionSeries, string> = {
+  dau: "DAU (activos por día)",
+  signups: "Nuevos signups",
+  first_time_active: "First-time active",
+};
+
+function RetentionSection({
+  data, series, tab, setTab,
+}: {
+  data: Retention | null;
+  series: TimeSeries | null;
+  tab: RetentionSeries;
+  setTab: (t: RetentionSeries) => void;
+}) {
   if (!data) return <SectionSkeleton title="🔁 Retención" />;
 
   // Standard stickiness includes install-day-only users, so it's a
@@ -616,6 +669,27 @@ function RetentionSection({ data }: { data: Retention | null }) {
           sub="Activos esta semana, dormidos ≥30d"
         />
       </div>
+
+      {series && series.days.length > 1 && (
+        <div style={{ marginTop: 18 }}>
+          <div style={subtitle}>Evolución</div>
+          <TabSwitcher
+            tabs={(Object.keys(RETENTION_TAB_LABELS) as RetentionSeries[]).map((k) => ({
+              key: k,
+              label: RETENTION_TAB_LABELS[k],
+            }))}
+            active={tab}
+            onChange={setTab}
+          />
+          <div style={{ marginTop: 8 }}>
+            <MetricSparkline
+              days={series.days}
+              values={series.retention[tab]}
+              label={RETENTION_TAB_LABELS[tab]}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -643,7 +717,23 @@ function RetentionPair({
 // ═════════════════════════════════════════════════════════════════════════════
 // COMPORTAMIENTO
 // ═════════════════════════════════════════════════════════════════════════════
-function BehaviorSection({ data }: { data: Behavior | null }) {
+const BEHAVIOR_TAB_LABELS: Record<BehaviorSeries, string> = {
+  ratings: "Ratings",
+  comments: "Comments",
+  watchlist: "Watchlist adds",
+  peeklists: "Peeklists creadas",
+  likes: "Likes (comment + title)",
+  follows: "Follows",
+};
+
+function BehaviorSection({
+  data, series, tab, setTab,
+}: {
+  data: Behavior | null;
+  series: TimeSeries | null;
+  tab: BehaviorSeries;
+  setTab: (t: BehaviorSeries) => void;
+}) {
   if (!data) return <SectionSkeleton title="🎬 Comportamiento" />;
 
   const ratingDelta = deltaPct(data.ratings.total, data.ratings.prev);
@@ -704,6 +794,27 @@ function BehaviorSection({ data }: { data: Behavior | null }) {
           light="neutral"
         />
       </div>
+
+      {series && series.days.length > 1 && (
+        <div style={{ marginTop: 18 }}>
+          <div style={subtitle}>Evolución</div>
+          <TabSwitcher
+            tabs={(Object.keys(BEHAVIOR_TAB_LABELS) as BehaviorSeries[]).map((k) => ({
+              key: k,
+              label: BEHAVIOR_TAB_LABELS[k],
+            }))}
+            active={tab}
+            onChange={setTab}
+          />
+          <div style={{ marginTop: 8 }}>
+            <MetricSparkline
+              days={series.days}
+              values={series.behavior[tab]}
+              label={BEHAVIOR_TAB_LABELS[tab]}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -915,6 +1026,108 @@ function GrowthSparkline({
           Hoy: <strong style={{ color: "#fff" }}>{formatNumber(lastPoint?.signups ?? 0)}</strong> signups
         </span>
         <span>{lastPoint?.day}</span>
+      </div>
+    </div>
+  );
+}
+
+// Generic tab switcher used by the trend charts in Retención / Comportamiento.
+function TabSwitcher<K extends string>({
+  tabs, active, onChange,
+}: {
+  tabs: { key: K; label: string }[];
+  active: K;
+  onChange: (k: K) => void;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      {tabs.map((t) => (
+        <button
+          key={t.key}
+          onClick={() => onChange(t.key)}
+          style={active === t.key ? presetActive : presetBtn}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Line chart for a single time series. Shows min/max/last values and a
+// soft trend line so you can eyeball whether the metric is improving.
+function MetricSparkline({
+  days, values, label,
+}: { days: string[]; values: number[]; label: string }) {
+  const w = 720;
+  const h = 130;
+  const padding = 6;
+  const safeValues = values.length === days.length ? values : days.map(() => 0);
+  const max = Math.max(...safeValues, 1);
+  const stepX = (w - padding * 2) / Math.max(days.length - 1, 1);
+
+  const linePath = days
+    .map((_, i) => {
+      const x = padding + i * stepX;
+      const y = h - padding - ((safeValues[i] / max) * (h - padding * 2));
+      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  // 7-day moving average to show the underlying trend
+  const ma7 = safeValues.map((_, i) => {
+    const start = Math.max(0, i - 6);
+    const slice = safeValues.slice(start, i + 1);
+    return slice.reduce((a, b) => a + b, 0) / slice.length;
+  });
+  const maPath = ma7
+    .map((v, i) => {
+      const x = padding + i * stepX;
+      const y = h - padding - ((v / max) * (h - padding * 2));
+      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  const lastValue = safeValues[safeValues.length - 1] ?? 0;
+  const firstValue = safeValues[0] ?? 0;
+  const totalSum = safeValues.reduce((a, b) => a + b, 0);
+  const trend =
+    firstValue === 0
+      ? "—"
+      : `${lastValue > firstValue ? "▲" : lastValue < firstValue ? "▼" : "→"} ${
+          firstValue > 0
+            ? Math.abs(((lastValue - firstValue) / firstValue) * 100).toFixed(0)
+            : 0
+        }%`;
+  const trendColor =
+    lastValue > firstValue
+      ? "#10b981"
+      : lastValue < firstValue
+        ? "#ef4444"
+        : "#fff8";
+
+  return (
+    <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 8, padding: 12 }}>
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: "100%", height: 130 }}>
+        {/* moving average */}
+        <path d={maPath} stroke="#a855f733" strokeWidth={6} fill="none" strokeLinecap="round" />
+        {/* main line */}
+        <path d={linePath} stroke="#a855f7" strokeWidth={2} fill="none" />
+        {days.map((_, i) => {
+          const x = padding + i * stepX;
+          const y = h - padding - ((safeValues[i] / max) * (h - padding * 2));
+          return <circle key={i} cx={x} cy={y} r={2.2} fill="#a855f7" />;
+        })}
+      </svg>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11, color: "#fff8" }}>
+        <span>{days[0]}</span>
+        <span>
+          <span style={{ color: "#fff" }}>{label}</span> ·
+          {" "}último: <strong style={{ color: "#fff" }}>{formatNumber(lastValue)}</strong>
+          {" "}· total: <strong style={{ color: "#fff" }}>{formatNumber(totalSum)}</strong>
+          {" "}· trend: <strong style={{ color: trendColor }}>{trend}</strong>
+        </span>
+        <span>{days[days.length - 1]}</span>
       </div>
     </div>
   );
