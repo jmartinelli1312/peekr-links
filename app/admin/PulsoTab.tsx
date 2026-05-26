@@ -63,7 +63,10 @@ type Behavior = {
     title_likes: number;
   };
   follows: { created: number; mutual: number; mutual_pct: number };
+  /** Legacy: rating-only North Star (mature accounts that rated this week) */
   north_star_war_returning: number;
+  /** Current North Star: any meaningful action + mature account */
+  north_star_weu_returning: number;
   shares_total: number;
 };
 
@@ -324,13 +327,13 @@ export default function PulsoTab({ supabase }: Props) {
         );
     }
     if (behavior) {
-      const warLight = lightFor(behavior.north_star_war_returning, {
-        red: 50,
-        yellow: 150,
+      const weuLight = lightFor(behavior.north_star_weu_returning, {
+        red: 100,
+        yellow: 250,
       });
-      if (warLight === "red")
+      if (weuLight === "red")
         list.push(
-          `North Star (WAR returning) = ${behavior.north_star_war_returning}. Pocos users establecidos están rateando.`
+          `North Star (WEU returning) = ${behavior.north_star_weu_returning}. Pocos users establecidos están activos esta semana.`
         );
     }
     if (retention) {
@@ -511,8 +514,9 @@ function DateFilter({
 // NORTH STAR
 // ═════════════════════════════════════════════════════════════════════════════
 function NorthStarCard({ behavior }: { behavior: Behavior | null }) {
-  const value = behavior?.north_star_war_returning ?? 0;
-  const light = lightFor(value, { red: 50, yellow: 150 });
+  const value = behavior?.north_star_weu_returning ?? 0;
+  const ratersValue = behavior?.north_star_war_returning ?? 0;
+  const light = lightFor(value, { red: 100, yellow: 250 });
 
   return (
     <div
@@ -524,7 +528,7 @@ function NorthStarCard({ behavior }: { behavior: Behavior | null }) {
       }}
     >
       <div style={{ fontSize: 12, color: "#fff8", letterSpacing: 1 }}>
-        🌟 NORTH STAR — Weekly Active Raters (returning)
+        🌟 NORTH STAR — Weekly Engaged Returners
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginTop: 6 }}>
         <div
@@ -538,13 +542,20 @@ function NorthStarCard({ behavior }: { behavior: Behavior | null }) {
           {formatNumber(value)}
         </div>
         <div style={{ fontSize: 14, color: "#ffffffaa", marginBottom: 6 }}>
-          users con cuenta ≥7d que ratearon al menos 1 título esta semana
+          users con cuenta ≥7d que hicieron alguna acción esta semana
+          <br />
+          <span style={{ fontSize: 12, color: "#fff6" }}>
+            (rate / comment / watchlist / peeklist / like / follow)
+          </span>
         </div>
       </div>
-      <div style={{ display: "flex", gap: 14, marginTop: 12, fontSize: 12, color: "#fff9" }}>
-        <span>🔴 &lt; 50</span>
-        <span>🟡 50 – 150</span>
-        <span>🟢 ≥ 150</span>
+      <div style={{ display: "flex", gap: 14, marginTop: 12, fontSize: 12, color: "#fff9", alignItems: "center" }}>
+        <span>🔴 &lt; 100</span>
+        <span>🟡 100 – 250</span>
+        <span>🟢 ≥ 250</span>
+        <span style={{ marginLeft: "auto", color: "#fff6" }}>
+          De esos, <strong style={{ color: "#fff" }}>{formatNumber(ratersValue)}</strong> ratearon (quality signal)
+        </span>
       </div>
     </div>
   );
