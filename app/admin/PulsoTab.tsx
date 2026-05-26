@@ -198,6 +198,10 @@ export default function PulsoTab({ supabase }: Props) {
   const [preset, setPreset] = useState<Preset>("7d");
   const [customFrom, setCustomFrom] = useState(todayStr());
   const [customTo, setCustomTo] = useState(todayStr());
+  // When true, retention + behavior + top_creators RPCs filter to users
+  // who completed onboarding. Acquisition counters are not affected
+  // because they intentionally show the full funnel including bouncers.
+  const [onlyOnboarded, setOnlyOnboarded] = useState(false);
 
   const range = useMemo(() => {
     if (preset === "custom") return { from: customFrom, to: customTo };
@@ -224,10 +228,13 @@ export default function PulsoTab({ supabase }: Props) {
           p_from: fromTs,
           p_to_exclusive: toTsExclusive,
         }),
-        supabase.rpc("admin_kpi_retention", {}),
+        supabase.rpc("admin_kpi_retention", {
+          p_only_onboarded: onlyOnboarded,
+        }),
         supabase.rpc("admin_kpi_behavior", {
           p_from: fromTs,
           p_to_exclusive: toTsExclusive,
+          p_only_onboarded: onlyOnboarded,
         }),
       ]);
 
@@ -243,7 +250,7 @@ export default function PulsoTab({ supabase }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [supabase, range]);
+  }, [supabase, range, onlyOnboarded]);
 
   const fetchTopCreators = useCallback(async () => {
     try {
@@ -253,6 +260,7 @@ export default function PulsoTab({ supabase }: Props) {
         p_to_exclusive: toTsExclusive,
         p_metric: topMetric,
         p_limit: 10,
+        p_only_onboarded: onlyOnboarded,
       });
       if (error) throw error;
       setTopCreators((data as Creator[]) ?? []);
@@ -260,7 +268,7 @@ export default function PulsoTab({ supabase }: Props) {
       console.warn("[PulsoTab] top creators fetch error", e);
       setTopCreators([]);
     }
-  }, [supabase, range, topMetric]);
+  }, [supabase, range, topMetric, onlyOnboarded]);
 
   useEffect(() => {
     void fetchAll();
@@ -325,6 +333,33 @@ export default function PulsoTab({ supabase }: Props) {
         setCustomFrom={setCustomFrom}
         setCustomTo={setCustomTo}
       />
+
+      {/* Onboarded-only toggle. Acquisition is unaffected (it always shows
+          the full funnel). Retention/Behavior/Top creators filter to the
+          subset of users with has_completed_follow_onboarding=true. */}
+      <div style={onboardedToggleBar}>
+        <div>
+          <div style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>
+            Filtrar a usuarios que completaron onboarding
+          </div>
+          <div style={{ color: "#fff8", fontSize: 11, marginTop: 2 }}>
+            Solo afecta Retención, Comportamiento y Top creators. Adquisición
+            siempre cuenta el funnel completo.
+          </div>
+        </div>
+        <button
+          onClick={() => setOnlyOnboarded((v) => !v)}
+          style={onlyOnboarded ? toggleOn : toggleOff}
+          aria-pressed={onlyOnboarded}
+        >
+          <div
+            style={{
+              ...toggleKnob,
+              transform: onlyOnboarded ? "translateX(20px)" : "translateX(0)",
+            }}
+          />
+        </button>
+      </div>
 
       {err && (
         <div style={errBox}>
@@ -1021,4 +1056,45 @@ const creatorBadge: React.CSSProperties = {
   fontSize: 10,
   color: "#a855f7",
   fontWeight: 700,
+};
+
+const onboardedToggleBar: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  background: "rgba(168,85,247,.08)",
+  border: "1px solid rgba(168,85,247,.3)",
+  borderRadius: 10,
+  padding: 12,
+};
+
+const toggleBase: React.CSSProperties = {
+  width: 44,
+  height: 24,
+  borderRadius: 99,
+  border: 0,
+  cursor: "pointer",
+  padding: 2,
+  display: "flex",
+  alignItems: "center",
+  transition: "background .2s",
+};
+
+const toggleOff: React.CSSProperties = {
+  ...toggleBase,
+  background: "rgba(255,255,255,.14)",
+};
+
+const toggleOn: React.CSSProperties = {
+  ...toggleBase,
+  background: "#a855f7",
+};
+
+const toggleKnob: React.CSSProperties = {
+  width: 20,
+  height: 20,
+  borderRadius: 99,
+  background: "#fff",
+  transition: "transform .2s",
 };
