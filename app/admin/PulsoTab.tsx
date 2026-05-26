@@ -35,15 +35,22 @@ type Retention = {
   dau: number;
   wau: number;
   mau: number;
-  dau_returning: number;
-  wau_returning: number;
-  mau_returning: number;
-  stickiness: number;            // standard DAU / MAU
-  stickiness_returning: number;  // returning DAU / returning MAU
+  stickiness_dau_mau: number;  // DAU / MAU — daily engagement intensity
+  stickiness_wau_mau: number;  // WAU / MAU — weekly cadence (the one that matters for Letterboxd-style)
   churn_risk: number;
   resurrected: number;
   first_time_active: number;
   by_app_version: Record<string, number>;
+};
+
+// Week-over-Week retention: for each base week, what % of users active in
+// that week came back the next week? Most meaningful retention metric for
+// movie-tracking apps (Letterboxd benchmark is ~30-40%).
+type WoWRetention = {
+  base_weeks: string[];      // ISO date of week start
+  base_active: number[];     // users active in that base week
+  retained: number[];        // of those, how many were active the next week
+  retention_pct: number[];   // retained / base_active * 100
 };
 
 type Behavior = {
@@ -239,6 +246,7 @@ export default function PulsoTab({ supabase }: Props) {
   // Data state
   const [acquisition, setAcquisition] = useState<Acquisition | null>(null);
   const [retention, setRetention] = useState<Retention | null>(null);
+  const [wowRetention, setWowRetention] = useState<WoWRetention | null>(null);
   const [behavior, setBehavior] = useState<Behavior | null>(null);
   const [timeSeries, setTimeSeries] = useState<TimeSeries | null>(null);
   const [retentionTab, setRetentionTab] = useState<RetentionSeries>("dau");
@@ -254,13 +262,16 @@ export default function PulsoTab({ supabase }: Props) {
     try {
       const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
 
-      const [acqRes, retRes, behRes, tsRes] = await Promise.all([
+      const [acqRes, retRes, wowRes, behRes, tsRes] = await Promise.all([
         supabase.rpc("admin_kpi_acquisition", {
           p_from: fromTs,
           p_to_exclusive: toTsExclusive,
         }),
         supabase.rpc("admin_kpi_retention", {
           p_only_onboarded: onlyOnboarded,
+        }),
+        supabase.rpc("admin_kpi_wow_retention", {
+          p_weeks: 8,
         }),
         supabase.rpc("admin_kpi_behavior", {
           p_from: fromTs,
@@ -276,11 +287,13 @@ export default function PulsoTab({ supabase }: Props) {
 
       if (acqRes.error) throw acqRes.error;
       if (retRes.error) throw retRes.error;
+      if (wowRes.error) throw wowRes.error;
       if (behRes.error) throw behRes.error;
       if (tsRes.error) throw tsRes.error;
 
       setAcquisition(acqRes.data as Acquisition);
       setRetention(retRes.data as Retention);
+      setWowRetention(wowRes.data as WoWRetention);
       setBehavior(behRes.data as Behavior);
       setTimeSeries(tsRes.data as TimeSeries);
     } catch (e: unknown) {
@@ -337,14 +350,25 @@ export default function PulsoTab({ supabase }: Props) {
         );
     }
     if (retention) {
-      const stkLight = lightFor(retention.stickiness, { red: 5, yellow: 12 });
+      // For movie-tracking (Letterboxd-style) apps the meaningful cadence is
+      // weekly, not daily. WAU/MAU is the right signal here — Letterboxd sits
+      // around 35-45%. Below 20% means even weekly users churn fast.
+      const stkLight = lightFor(retention.stickiness_wau_mau, { red: 20, yellow: 35 });
       if (stkLight === "red")
         list.push(
-          `Stickiness (DAU/MAU) = ${retention.stickiness}%. La gente abre el app, pero no vuelve.`
+          `Stickiness semanal (WAU/MAU) = ${retention.stickiness_wau_mau}%. Letterboxd está en ~35-45% — estás abajo del piso.`
+        );
+    }
+    if (wowRetention && wowRetention.retention_pct.length > 0) {
+      const last = wowRetention.retention_pct[wowRetention.retention_pct.length - 1];
+      const wowLight = lightFor(last, { red: 20, yellow: 30 });
+      if (wowLight === "red")
+        list.push(
+          `Retención WoW = ${last}%. Letterboxd está en ~30-40%. La semana pasada los activos no volvieron esta semana.`
         );
     }
     return list;
-  }, [acquisition, retention, behavior]);
+  }, [acquisition, retention, wowRetention, behavior]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -432,6 +456,7 @@ export default function PulsoTab({ supabase }: Props) {
       {/* ═════ RETENCIÓN ═════ */}
       <RetentionSection
         data={retention}
+        wow={wowRetention}
         series={timeSeries}
         tab={retentionTab}
         setTab={setRetentionTab}
@@ -583,7 +608,7 @@ function AcquisitionSection({ data }: { data: Acquisition | null }) {
         <Kpi
           label="Onboarding %"
           value={`${data.onboarding_rate}%`}
-          sub={`${data.onboarding_completed} de ${data.new_signups} completaron`}
+          sub={`${data.onboarding_completed}/${data.new_signups} completaron · 🎯 industria 70-80%`}
           light={obLight}
         />
         <BreakdownCard
@@ -628,41 +653,60 @@ const RETENTION_TAB_LABELS: Record<RetentionSeries, string> = {
 };
 
 function RetentionSection({
-  data, series, tab, setTab,
+  data, wow, series, tab, setTab,
 }: {
   data: Retention | null;
+  wow: WoWRetention | null;
   series: TimeSeries | null;
   tab: RetentionSeries;
   setTab: (t: RetentionSeries) => void;
 }) {
   if (!data) return <SectionSkeleton title="🔁 Retención" />;
 
-  // Standard stickiness includes install-day-only users, so it's a
-  // structurally lower number. The "returning" variant (returning-DAU
-  // over returning-MAU) is the more meaningful engagement signal —
-  // it answers "of users who actually come back, how many are here today".
-  const stickyStdLight = lightFor(data.stickiness, { red: 5, yellow: 12 });
-  const stickyRetLight = lightFor(data.stickiness_returning, { red: 8, yellow: 15 });
+  // For Letterboxd-style movie-tracking apps the natural cadence is weekly,
+  // not daily. Stickiness WAU/MAU is the headline number — Letterboxd sits
+  // around 35-45%. DAU/MAU is shown for completeness but is naturally low
+  // (Letterboxd ~12-15%); we use it more for intensity than as the bar.
+  const stickyDauLight = lightFor(data.stickiness_dau_mau, { red: 8, yellow: 12 });
+  const stickyWauLight = lightFor(data.stickiness_wau_mau, { red: 20, yellow: 35 });
 
   return (
     <section style={sectionCard}>
       <h3 style={sectionTitle}>🔁 Retención</h3>
+      <p style={{ color: "#fff8", fontSize: 12, marginTop: -4, marginBottom: 14 }}>
+        <strong style={{ color: "#fff" }}>Activo</strong> = hizo ≥1 acción
+        (rate / comment / watchlist / peeklist / like / follow) en un día{" "}
+        <strong style={{ color: "#fff" }}>posterior</strong> al día de signup.
+        Excluye actividad de install-day para medir retorno real.
+      </p>
 
       <div style={cardsGrid}>
-        <RetentionPair label="DAU" total={data.dau} returning={data.dau_returning} hint="≥2 sesiones hoy" />
-        <RetentionPair label="WAU" total={data.wau} returning={data.wau_returning} hint="≥2 días activos esta semana" />
-        <RetentionPair label="MAU" total={data.mau} returning={data.mau_returning} hint="≥2 días activos este mes" />
         <Kpi
-          label="Stickiness · returning"
-          value={`${data.stickiness_returning}%`}
-          sub="rDAU/rMAU — la que importa"
-          light={stickyRetLight}
+          label="DAU"
+          value={data.dau}
+          sub="Activos hoy (sin install-day)"
         />
         <Kpi
-          label="Stickiness · standard"
-          value={`${data.stickiness}%`}
-          sub="DAU/MAU — diluida por nuevos signups"
-          light={stickyStdLight}
+          label="WAU"
+          value={data.wau}
+          sub="Activos últimos 7d (post-install)"
+        />
+        <Kpi
+          label="MAU"
+          value={data.mau}
+          sub="Activos últimos 30d (post-install)"
+        />
+        <Kpi
+          label="Stickiness · WAU/MAU"
+          value={`${data.stickiness_wau_mau}%`}
+          sub="🎯 Letterboxd ~35-45% — la métrica clave"
+          light={stickyWauLight}
+        />
+        <Kpi
+          label="Stickiness · DAU/MAU"
+          value={`${data.stickiness_dau_mau}%`}
+          sub="🎯 Letterboxd ~12-15% (intensidad diaria)"
+          light={stickyDauLight}
         />
         <Kpi
           label="First-time active"
@@ -681,6 +725,13 @@ function RetentionSection({
         />
       </div>
 
+      {/* WoW retention — most meaningful retention metric for movie apps */}
+      {wow && wow.base_weeks.length > 1 && (
+        <div style={{ marginTop: 18 }}>
+          <WoWRetentionCard wow={wow} />
+        </div>
+      )}
+
       {series && series.days.length > 1 && (
         <div style={{ marginTop: 18 }}>
           <div style={subtitle}>Evolución</div>
@@ -697,6 +748,7 @@ function RetentionSection({
               days={series.days}
               values={series.retention[tab]}
               label={RETENTION_TAB_LABELS[tab]}
+              aggregateMode={tab === "dau" || tab === "signups" ? "avg" : "sum"}
             />
           </div>
         </div>
@@ -705,21 +757,135 @@ function RetentionSection({
   );
 }
 
-function RetentionPair({
-  label, total, returning, hint,
-}: { label: string; total: number; returning: number; hint: string }) {
-  const ratio = total > 0 ? Math.round((returning / total) * 100) : 0;
+// Week-over-Week retention card — shows the % of users active in week N who
+// came back in week N+1. Most meaningful retention number for Letterboxd-style
+// apps because viewing cadence is naturally weekly, not daily.
+function WoWRetentionCard({ wow }: { wow: WoWRetention }) {
+  // The last base week measures retention against the *current* (in-progress)
+  // week — so its number is artificially low. The previous base week is the
+  // last "complete" data point, and that's what we headline.
+  const completeIdx = Math.max(wow.retention_pct.length - 2, 0);
+  const headline = wow.retention_pct[completeIdx] ?? 0;
+  const headlineBase = wow.base_weeks[completeIdx] ?? "";
+  const inProgress = wow.retention_pct[wow.retention_pct.length - 1] ?? 0;
+  const inProgressBase = wow.base_weeks[wow.base_weeks.length - 1] ?? "";
+  const hasInProgress = wow.retention_pct.length > 1;
+  const light = lightFor(headline, { red: 20, yellow: 30 });
+
   return (
-    <div style={kpiCard}>
-      <div style={kpiLabel}>{label}</div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <div style={kpiValue}>{formatNumber(total)}</div>
-        <div style={{ fontSize: 14, color: "#a855f7", fontWeight: 700 }}>
-          ↻ {formatNumber(returning)}
+    <div
+      style={{
+        background: LIGHT_BG[light],
+        border: `1px solid ${LIGHT_COLOR[light]}55`,
+        borderRadius: 10,
+        padding: 14,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <div style={kpiLabel}>Retención WoW (semana → semana siguiente)</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+            <div style={{ ...kpiValue, color: LIGHT_COLOR[light], fontSize: 32 }}>
+              {headline}%
+            </div>
+            <div style={{ fontSize: 12, color: "#fff8" }}>
+              base: {headlineBase}
+              {hasInProgress && (
+                <>
+                  <br />
+                  <span style={{ color: "#fff6" }}>
+                    semana actual (parcial): {inProgress}% sobre base {inProgressBase}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: "#fff8", textAlign: "right" }}>
+          🎯 <strong style={{ color: "#fff" }}>Letterboxd ~30-40%</strong>
+          <br />
+          <span style={{ color: "#fff6" }}>
+            🔴 &lt; 20% &nbsp; 🟡 20-30% &nbsp; 🟢 ≥ 30%
+          </span>
         </div>
       </div>
-      <div style={kpiSub}>
-        {ratio}% returning · {hint}
+      <WoWRetentionChart wow={wow} />
+    </div>
+  );
+}
+
+function WoWRetentionChart({ wow }: { wow: WoWRetention }) {
+  const w = 720;
+  const h = 130;
+  const padding = 8;
+  const pcts = wow.retention_pct;
+  const max = Math.max(...pcts, 50); // ceiling at least 50 to make Letterboxd line visible
+  const stepX = (w - padding * 2) / Math.max(pcts.length - 1, 1);
+
+  const linePath = pcts
+    .map((v, i) => {
+      const x = padding + i * stepX;
+      const y = h - padding - ((v / max) * (h - padding * 2));
+      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  // Letterboxd benchmark line at 35% (mid of the 30-40% range)
+  const letterboxdY = h - padding - ((35 / max) * (h - padding * 2));
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: "100%", height: 130 }}>
+        {/* Letterboxd benchmark line */}
+        <line
+          x1={padding}
+          x2={w - padding}
+          y1={letterboxdY}
+          y2={letterboxdY}
+          stroke="#fbbf24"
+          strokeWidth={1.5}
+          strokeDasharray="4 4"
+          opacity={0.7}
+        />
+        <text x={w - padding - 4} y={letterboxdY - 4} fill="#fbbf24" fontSize={10} textAnchor="end">
+          Letterboxd ~35%
+        </text>
+
+        {/* our line */}
+        <path d={linePath} stroke="#a855f7" strokeWidth={2.5} fill="none" />
+        {pcts.map((v, i) => {
+          const x = padding + i * stepX;
+          const y = h - padding - ((v / max) * (h - padding * 2));
+          // last point is in-progress (current week not yet complete)
+          const isInProgress = i === pcts.length - 1 && pcts.length > 1;
+          return (
+            <circle
+              key={i}
+              cx={x}
+              cy={y}
+              r={isInProgress ? 3.5 : 3}
+              fill={isInProgress ? "transparent" : "#a855f7"}
+              stroke="#a855f7"
+              strokeWidth={isInProgress ? 2 : 0}
+              strokeDasharray={isInProgress ? "2 2" : undefined}
+            />
+          );
+        })}
+      </svg>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 10, color: "#fff8" }}>
+        {wow.base_weeks.map((wk, i) => {
+          // show every other label to avoid clutter
+          if (wow.base_weeks.length > 6 && i % 2 !== 0 && i !== wow.base_weeks.length - 1) {
+            return <span key={wk} />;
+          }
+          return (
+            <span key={wk} style={{ textAlign: "center", flex: 1 }}>
+              {wk.slice(5)}
+              <br />
+              <strong style={{ color: "#fff" }}>{wow.retention_pct[i]}%</strong>
+            </span>
+          );
+        })}
       </div>
     </div>
   );
@@ -764,7 +930,7 @@ function BehaviorSection({
           label="Ratings"
           value={data.ratings.total}
           delta={ratingDelta}
-          sub={`${data.ratings.per_active_avg}/user activo`}
+          sub={`${data.ratings.per_active_avg}/user activo · 🎯 Letterboxd ~5-10/mes`}
         />
         <Kpi
           label="Comments"
@@ -776,7 +942,7 @@ function BehaviorSection({
           label="Watchlist adds"
           value={data.watchlist.total}
           delta={watchlistDelta}
-          sub={`${data.watchlist.per_active_avg}/user`}
+          sub={`${data.watchlist.per_active_avg}/user · 🎯 Letterboxd ~3-5/mes`}
         />
         <Kpi
           label="Peeklists creadas"
@@ -1065,11 +1231,21 @@ function TabSwitcher<K extends string>({
   );
 }
 
-// Line chart for a single time series. Shows min/max/last values and a
-// soft trend line so you can eyeball whether the metric is improving.
+// Line chart for a single time series. Shows summary stats and a soft trend
+// line so you can eyeball whether the metric is improving.
+//
+// `aggregateMode` controls which summary is most meaningful:
+//   - "sum"  → cumulative count is sensible (events: ratings, comments, follows…)
+//   - "avg"  → daily-active counts where summing would double-count users
+//             active multiple days (DAU, signups). Shows avg + peak instead.
 function MetricSparkline({
-  days, values, label,
-}: { days: string[]; values: number[]; label: string }) {
+  days, values, label, aggregateMode = "sum",
+}: {
+  days: string[];
+  values: number[];
+  label: string;
+  aggregateMode?: "sum" | "avg";
+}) {
   const w = 720;
   const h = 130;
   const padding = 6;
@@ -1102,6 +1278,8 @@ function MetricSparkline({
   const lastValue = safeValues[safeValues.length - 1] ?? 0;
   const firstValue = safeValues[0] ?? 0;
   const totalSum = safeValues.reduce((a, b) => a + b, 0);
+  const peak = Math.max(...safeValues, 0);
+  const avg = safeValues.length > 0 ? totalSum / safeValues.length : 0;
   const trend =
     firstValue === 0
       ? "—"
@@ -1135,7 +1313,16 @@ function MetricSparkline({
         <span>
           <span style={{ color: "#fff" }}>{label}</span> ·
           {" "}último: <strong style={{ color: "#fff" }}>{formatNumber(lastValue)}</strong>
-          {" "}· total: <strong style={{ color: "#fff" }}>{formatNumber(totalSum)}</strong>
+          {aggregateMode === "sum" ? (
+            <>
+              {" "}· total: <strong style={{ color: "#fff" }}>{formatNumber(totalSum)}</strong>
+            </>
+          ) : (
+            <>
+              {" "}· avg: <strong style={{ color: "#fff" }}>{Math.round(avg).toLocaleString("es-AR")}</strong>
+              {" "}· peak: <strong style={{ color: "#fff" }}>{formatNumber(peak)}</strong>
+            </>
+          )}
           {" "}· trend: <strong style={{ color: trendColor }}>{trend}</strong>
         </span>
         <span>{days[days.length - 1]}</span>
