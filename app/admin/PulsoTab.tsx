@@ -53,6 +53,22 @@ type WoWRetention = {
   retention_pct: number[];   // retained / base_active * 100
 };
 
+// Per-cohort retention curve. Used to compare acquisition sources side-by-side
+// (e.g., Kevin PA reel vs pelisaldetalle AR reel). A cohort is one
+// (signup_week × country_bucket) combination.
+type Cohort = {
+  week_start: string;          // ISO date of the week start
+  bucket: "AR" | "PA" | "Other";
+  size: number;
+  age_days: number;
+  ever_returned_pct: number;
+  // null if the cohort isn't old enough for that window to be observable
+  w1_pct: number | null;       // days 1-7 post-install
+  w2_pct: number | null;       // days 8-14
+  w3_pct: number | null;       // days 15-21
+  w4_pct: number | null;       // days 22-28
+};
+
 type Behavior = {
   active_users: number;
   ratings: { total: number; prev: number; per_active_avg: number };
@@ -247,6 +263,7 @@ export default function PulsoTab({ supabase }: Props) {
   const [acquisition, setAcquisition] = useState<Acquisition | null>(null);
   const [retention, setRetention] = useState<Retention | null>(null);
   const [wowRetention, setWowRetention] = useState<WoWRetention | null>(null);
+  const [cohorts, setCohorts] = useState<Cohort[] | null>(null);
   const [behavior, setBehavior] = useState<Behavior | null>(null);
   const [timeSeries, setTimeSeries] = useState<TimeSeries | null>(null);
   const [retentionTab, setRetentionTab] = useState<RetentionSeries>("dau");
@@ -262,7 +279,7 @@ export default function PulsoTab({ supabase }: Props) {
     try {
       const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
 
-      const [acqRes, retRes, wowRes, behRes, tsRes] = await Promise.all([
+      const [acqRes, retRes, wowRes, cohortRes, behRes, tsRes] = await Promise.all([
         supabase.rpc("admin_kpi_acquisition", {
           p_from: fromTs,
           p_to_exclusive: toTsExclusive,
@@ -272,6 +289,9 @@ export default function PulsoTab({ supabase }: Props) {
         }),
         supabase.rpc("admin_kpi_wow_retention", {
           p_weeks: 8,
+        }),
+        supabase.rpc("admin_kpi_cohort_retention", {
+          p_weeks: 10,
         }),
         supabase.rpc("admin_kpi_behavior", {
           p_from: fromTs,
@@ -288,12 +308,14 @@ export default function PulsoTab({ supabase }: Props) {
       if (acqRes.error) throw acqRes.error;
       if (retRes.error) throw retRes.error;
       if (wowRes.error) throw wowRes.error;
+      if (cohortRes.error) throw cohortRes.error;
       if (behRes.error) throw behRes.error;
       if (tsRes.error) throw tsRes.error;
 
       setAcquisition(acqRes.data as Acquisition);
       setRetention(retRes.data as Retention);
       setWowRetention(wowRes.data as WoWRetention);
+      setCohorts(cohortRes.data as Cohort[]);
       setBehavior(behRes.data as Behavior);
       setTimeSeries(tsRes.data as TimeSeries);
     } catch (e: unknown) {
@@ -461,6 +483,9 @@ export default function PulsoTab({ supabase }: Props) {
         tab={retentionTab}
         setTab={setRetentionTab}
       />
+
+      {/* ═════ COHORT RETENTION ═════ */}
+      <CohortRetentionSection cohorts={cohorts} />
 
       {/* ═════ COMPORTAMIENTO ═════ */}
       <BehaviorSection
@@ -888,6 +913,144 @@ function WoWRetentionChart({ wow }: { wow: WoWRetention }) {
         })}
       </div>
     </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// COHORT RETENTION (compare acquisition sources)
+//
+// Each row is one signup-week × country (AR / PA / Other). Columns show what
+// % of that cohort came back in week 1, 2, 3, 4 post-install. Lets you spot
+// at a glance which campaigns brought users that stuck — and crucially,
+// compare paid IG cohorts (the big ones in May) against the small organic
+// baseline of earlier weeks.
+// ═════════════════════════════════════════════════════════════════════════════
+const BUCKET_LABEL: Record<Cohort["bucket"], string> = {
+  AR: "🇦🇷 Argentina",
+  PA: "🇵🇦 Panamá",
+  Other: "🌎 Otros",
+};
+
+const BUCKET_NOTE: Record<Cohort["bucket"], string> = {
+  AR: "pelisaldetalle reel · May 24+",
+  PA: "Kevin Urriola reel · May 13+",
+  Other: "orgánico + otras fuentes",
+};
+
+function cohortLight(pct: number | null): Light {
+  if (pct === null) return "neutral";
+  if (pct >= 30) return "green";   // Letterboxd-territory
+  if (pct >= 15) return "yellow";
+  return "red";
+}
+
+function CohortRetentionSection({ cohorts }: { cohorts: Cohort[] | null }) {
+  if (!cohorts) return <SectionSkeleton title="🧪 Cohorts por origen" />;
+  if (cohorts.length === 0) {
+    return (
+      <section style={sectionCard}>
+        <h3 style={sectionTitle}>🧪 Cohorts por origen</h3>
+        <div style={{ color: "#fff6", fontSize: 13 }}>
+          Sin cohorts con ≥3 usuarios.
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section style={sectionCard}>
+      <h3 style={sectionTitle}>🧪 Cohorts por origen — ¿qué fuente trae users que vuelven?</h3>
+      <p style={{ color: "#fff8", fontSize: 12, marginTop: -4, marginBottom: 14 }}>
+        Cada fila = una semana de signups × país. <strong style={{ color: "#fff" }}>W1-W4</strong>{" "}
+        son los % de la cohort que volvieron a hacer alguna acción post-install en esa
+        ventana de 7 días. <strong style={{ color: "#fff" }}>—</strong> = la cohort
+        es muy joven para medir esa ventana todavía. 🎯 Letterboxd ~30-40% W1.
+      </p>
+
+      <div style={{ overflowX: "auto" }}>
+        <table style={cohortTable}>
+          <thead>
+            <tr>
+              <th style={th}>Semana</th>
+              <th style={th}>Origen</th>
+              <th style={{ ...th, textAlign: "right" }}>Size</th>
+              <th style={{ ...th, textAlign: "right" }}>Age</th>
+              <th style={{ ...th, textAlign: "right" }}>Ever</th>
+              <th style={{ ...th, textAlign: "right" }}>W1</th>
+              <th style={{ ...th, textAlign: "right" }}>W2</th>
+              <th style={{ ...th, textAlign: "right" }}>W3</th>
+              <th style={{ ...th, textAlign: "right" }}>W4</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cohorts.map((c, i) => (
+              <CohortRow key={`${c.week_start}-${c.bucket}-${i}`} cohort={c} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginTop: 12, fontSize: 11, color: "#fff7", lineHeight: 1.7 }}>
+        🔴 &lt; 15% &nbsp; 🟡 15-30% &nbsp; 🟢 ≥ 30% &nbsp;·&nbsp; cohorts con &lt;3 users se ocultan.
+      </div>
+    </section>
+  );
+}
+
+function CohortRow({ cohort }: { cohort: Cohort }) {
+  return (
+    <tr style={{ borderTop: "1px solid rgba(255,255,255,.06)" }}>
+      <td style={td}>
+        <span style={{ color: "#fff", fontWeight: 600 }}>{cohort.week_start}</span>
+      </td>
+      <td style={td}>
+        <div style={{ color: "#fff", fontWeight: 600 }}>{BUCKET_LABEL[cohort.bucket]}</div>
+        <div style={{ color: "#fff6", fontSize: 10 }}>{BUCKET_NOTE[cohort.bucket]}</div>
+      </td>
+      <td style={{ ...td, textAlign: "right", color: "#fff" }}>{formatNumber(cohort.size)}</td>
+      <td style={{ ...td, textAlign: "right", color: "#fff8" }}>{cohort.age_days}d</td>
+      <td style={{ ...td, textAlign: "right" }}>
+        <PctCell pct={cohort.ever_returned_pct} />
+      </td>
+      <td style={{ ...td, textAlign: "right" }}>
+        <PctCell pct={cohort.w1_pct} traffic />
+      </td>
+      <td style={{ ...td, textAlign: "right" }}>
+        <PctCell pct={cohort.w2_pct} traffic />
+      </td>
+      <td style={{ ...td, textAlign: "right" }}>
+        <PctCell pct={cohort.w3_pct} traffic />
+      </td>
+      <td style={{ ...td, textAlign: "right" }}>
+        <PctCell pct={cohort.w4_pct} traffic />
+      </td>
+    </tr>
+  );
+}
+
+function PctCell({ pct, traffic = false }: { pct: number | null; traffic?: boolean }) {
+  if (pct === null) {
+    return <span style={{ color: "#fff5" }}>—</span>;
+  }
+  if (!traffic) {
+    return <span style={{ color: "#fff", fontWeight: 600 }}>{pct}%</span>;
+  }
+  const light = cohortLight(pct);
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "2px 8px",
+        borderRadius: 6,
+        background: LIGHT_BG[light],
+        color: LIGHT_COLOR[light],
+        fontWeight: 700,
+        fontSize: 12,
+        minWidth: 44,
+      }}
+    >
+      {pct}%
+    </span>
   );
 }
 
@@ -1486,6 +1649,28 @@ const creatorBadge: React.CSSProperties = {
   fontSize: 10,
   color: "#a855f7",
   fontWeight: 700,
+};
+
+const cohortTable: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  fontSize: 12,
+};
+
+const th: React.CSSProperties = {
+  textAlign: "left",
+  padding: "8px 10px",
+  color: "#fff8",
+  textTransform: "uppercase",
+  letterSpacing: 0.6,
+  fontSize: 10,
+  fontWeight: 700,
+  borderBottom: "1px solid rgba(255,255,255,.12)",
+};
+
+const td: React.CSSProperties = {
+  padding: "10px",
+  verticalAlign: "middle",
 };
 
 const onboardedToggleBar: React.CSSProperties = {
