@@ -942,7 +942,13 @@ const BUCKET_LABEL: Record<Cohort["bucket"], string> = {
 type KnownCampaign = { from: string; to: string; label: string; kind: "paid" | "organic" };
 const KNOWN_CAMPAIGNS: Record<Cohort["bucket"], KnownCampaign[]> = {
   PA: [
-    { from: "2026-05-12", to: "2099-01-01", label: "Kevin paid (ongoing)", kind: "paid" },
+    // Kevin posted his reel organically May 3. The same reel was then boosted
+    // as a paid Meta ad starting May 12 (still running). We model them as two
+    // distinct phases because the audience differs dramatically:
+    //   - Organic = Kevin's actual followers (engaged film audience)
+    //   - Paid = broader cold audience served by Meta's algo
+    { from: "2026-05-03", to: "2026-05-11", label: "Kevin reel orgánico", kind: "organic" },
+    { from: "2026-05-12", to: "2099-01-01", label: "Kevin reel boosted (paid)", kind: "paid" },
     { from: "2026-05-13", to: "2026-05-16", label: "@elchotin.xyz carrusel", kind: "organic" },
   ],
   AR: [
