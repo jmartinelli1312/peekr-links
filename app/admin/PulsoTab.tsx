@@ -38,7 +38,8 @@ type Retention = {
   dau_returning: number;
   wau_returning: number;
   mau_returning: number;
-  stickiness: number;
+  stickiness: number;            // standard DAU / MAU
+  stickiness_returning: number;  // returning DAU / returning MAU
   churn_risk: number;
   resurrected: number;
   first_time_active: number;
@@ -199,8 +200,12 @@ export default function PulsoTab({ supabase }: Props) {
   const [customFrom, setCustomFrom] = useState(todayStr());
   const [customTo, setCustomTo] = useState(todayStr());
   // When true, retention + behavior + top_creators RPCs filter to users
-  // who completed onboarding. Acquisition counters are not affected
-  // because they intentionally show the full funnel including bouncers.
+  // who have done at least one meaningful action (rating / comment /
+  // watchlist / peeklist / follow / like). This catches both completed-
+  // onboarding users AND the ~500 users who completed actions but bounced
+  // before tapping "Continuar" on the rate screen (the flag stayed false).
+  // Acquisition counters are not affected — that section deliberately
+  // shows the full funnel including bouncers.
   const [onlyOnboarded, setOnlyOnboarded] = useState(false);
 
   const range = useMemo(() => {
@@ -334,17 +339,20 @@ export default function PulsoTab({ supabase }: Props) {
         setCustomTo={setCustomTo}
       />
 
-      {/* Onboarded-only toggle. Acquisition is unaffected (it always shows
-          the full funnel). Retention/Behavior/Top creators filter to the
-          subset of users with has_completed_follow_onboarding=true. */}
+      {/* Engaged-users toggle. The original "onboarded" filter relied on
+          a flag that's set only after the user taps "Continuar" on the
+          rate screen — but ~500 users complete actions and bounce before
+          that final tap. This toggle uses a cleaner proxy: "user has
+          done ≥1 meaningful action ever". */}
       <div style={onboardedToggleBar}>
         <div>
           <div style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>
-            Filtrar a usuarios que completaron onboarding
+            Filtrar a usuarios con ≥1 acción real
           </div>
           <div style={{ color: "#fff8", fontSize: 11, marginTop: 2 }}>
-            Solo afecta Retención, Comportamiento y Top creators. Adquisición
-            siempre cuenta el funnel completo.
+            Excluye signups que se fueron sin hacer nada. Solo afecta
+            Retención, Comportamiento y Top creators — Adquisición siempre
+            cuenta el funnel completo.
           </div>
         </div>
         <button
@@ -565,7 +573,12 @@ function AcquisitionSection({ data }: { data: Acquisition | null }) {
 function RetentionSection({ data }: { data: Retention | null }) {
   if (!data) return <SectionSkeleton title="🔁 Retención" />;
 
-  const stickyLight = lightFor(data.stickiness, { red: 5, yellow: 12 });
+  // Standard stickiness includes install-day-only users, so it's a
+  // structurally lower number. The "returning" variant (returning-DAU
+  // over returning-MAU) is the more meaningful engagement signal —
+  // it answers "of users who actually come back, how many are here today".
+  const stickyStdLight = lightFor(data.stickiness, { red: 5, yellow: 12 });
+  const stickyRetLight = lightFor(data.stickiness_returning, { red: 8, yellow: 15 });
 
   return (
     <section style={sectionCard}>
@@ -576,10 +589,16 @@ function RetentionSection({ data }: { data: Retention | null }) {
         <RetentionPair label="WAU" total={data.wau} returning={data.wau_returning} hint="≥2 días activos esta semana" />
         <RetentionPair label="MAU" total={data.mau} returning={data.mau_returning} hint="≥2 días activos este mes" />
         <Kpi
-          label="Stickiness (DAU/MAU)"
+          label="Stickiness · returning"
+          value={`${data.stickiness_returning}%`}
+          sub="rDAU/rMAU — la que importa"
+          light={stickyRetLight}
+        />
+        <Kpi
+          label="Stickiness · standard"
           value={`${data.stickiness}%`}
-          sub="Target ≥ 12%"
-          light={stickyLight}
+          sub="DAU/MAU — diluida por nuevos signups"
+          light={stickyStdLight}
         />
         <Kpi
           label="First-time active"
