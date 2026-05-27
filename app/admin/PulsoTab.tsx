@@ -31,6 +31,18 @@ type Acquisition = {
   growth_chart: { day: string; signups: number; cumulative: number }[];
 };
 
+// All-time counterpart used to render global "context" cards alongside the
+// timeframe-filtered numbers. Lighter than `Acquisition` — no growth chart,
+// no prev-period delta (meaningless at all-time scale).
+type AcquisitionGlobal = {
+  total_users: number;
+  onboarding_completed: number;
+  onboarding_rate: number;
+  by_platform: Record<string, number>;
+  by_country: { top: { country_code: string; n: number }[]; other: number };
+  by_provider: Record<string, number>;
+};
+
 type Retention = {
   dau: number;
   wau: number;
@@ -261,6 +273,7 @@ export default function PulsoTab({ supabase }: Props) {
 
   // Data state
   const [acquisition, setAcquisition] = useState<Acquisition | null>(null);
+  const [acquisitionGlobal, setAcquisitionGlobal] = useState<AcquisitionGlobal | null>(null);
   const [retention, setRetention] = useState<Retention | null>(null);
   const [wowRetention, setWowRetention] = useState<WoWRetention | null>(null);
   const [cohorts, setCohorts] = useState<Cohort[] | null>(null);
@@ -279,11 +292,12 @@ export default function PulsoTab({ supabase }: Props) {
     try {
       const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
 
-      const [acqRes, retRes, wowRes, cohortRes, behRes, tsRes] = await Promise.all([
+      const [acqRes, acqGlobalRes, retRes, wowRes, cohortRes, behRes, tsRes] = await Promise.all([
         supabase.rpc("admin_kpi_acquisition", {
           p_from: fromTs,
           p_to_exclusive: toTsExclusive,
         }),
+        supabase.rpc("admin_kpi_acquisition_global"),
         supabase.rpc("admin_kpi_retention", {
           p_only_onboarded: onlyOnboarded,
         }),
@@ -306,6 +320,7 @@ export default function PulsoTab({ supabase }: Props) {
       ]);
 
       if (acqRes.error) throw acqRes.error;
+      if (acqGlobalRes.error) throw acqGlobalRes.error;
       if (retRes.error) throw retRes.error;
       if (wowRes.error) throw wowRes.error;
       if (cohortRes.error) throw cohortRes.error;
@@ -313,6 +328,7 @@ export default function PulsoTab({ supabase }: Props) {
       if (tsRes.error) throw tsRes.error;
 
       setAcquisition(acqRes.data as Acquisition);
+      setAcquisitionGlobal(acqGlobalRes.data as AcquisitionGlobal);
       setRetention(retRes.data as Retention);
       setWowRetention(wowRes.data as WoWRetention);
       setCohorts(cohortRes.data as Cohort[]);
@@ -454,40 +470,21 @@ export default function PulsoTab({ supabase }: Props) {
         </div>
       )}
 
-      {/* ═════ NORTH STAR ═════ */}
-      <NorthStarCard behavior={behavior} />
+      {/* ═════ 1. ADQUISICIÓN (con globales) ═════ */}
+      <AcquisitionSection data={acquisition} globalData={acquisitionGlobal} />
 
-      {/* ═════ ALERTS ═════ */}
-      {alerts.length > 0 && (
-        <div style={alertBox}>
-          <div style={{ fontWeight: 700, color: "#fca5a5", marginBottom: 8 }}>
-            ⚠️ {alerts.length} alerta{alerts.length === 1 ? "" : "s"} activa
-            {alerts.length === 1 ? "" : "s"}
-          </div>
-          <ul style={{ margin: 0, paddingLeft: 18, color: "#fecaca" }}>
-            {alerts.map((a, i) => (
-              <li key={i}>{a}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* ═════ ADQUISICIÓN ═════ */}
-      <AcquisitionSection data={acquisition} />
-
-      {/* ═════ RETENCIÓN ═════ */}
+      {/* ═════ 2. RETENCIÓN (con North Star + Alertas adentro) ═════ */}
       <RetentionSection
         data={retention}
         wow={wowRetention}
         series={timeSeries}
         tab={retentionTab}
         setTab={setRetentionTab}
+        behavior={behavior}
+        alerts={alerts}
       />
 
-      {/* ═════ COHORT RETENTION ═════ */}
-      <CohortRetentionSection cohorts={cohorts} />
-
-      {/* ═════ COMPORTAMIENTO ═════ */}
+      {/* ═════ 3. COMPORTAMIENTO ═════ */}
       <BehaviorSection
         data={behavior}
         series={timeSeries}
@@ -495,7 +492,10 @@ export default function PulsoTab({ supabase }: Props) {
         setTab={setBehaviorTab}
       />
 
-      {/* ═════ TOP CREATORS ═════ */}
+      {/* ═════ 4. COHORTS ═════ */}
+      <CohortRetentionSection cohorts={cohorts} />
+
+      {/* ═════ 5. TOP CREATORS ═════ */}
       <TopCreatorsSection
         creators={topCreators}
         metric={topMetric}
@@ -614,16 +614,26 @@ function NorthStarCard({ behavior }: { behavior: Behavior | null }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // ADQUISICIÓN
 // ═════════════════════════════════════════════════════════════════════════════
-function AcquisitionSection({ data }: { data: Acquisition | null }) {
+function AcquisitionSection({
+  data, globalData,
+}: {
+  data: Acquisition | null;
+  globalData: AcquisitionGlobal | null;
+}) {
   if (!data) return <SectionSkeleton title="📥 Adquisición" />;
 
   const d = deltaPct(data.new_signups, data.new_signups_prev);
   const obLight = lightFor(data.onboarding_rate, { red: 40, yellow: 60 });
+  const obGlobalLight = globalData
+    ? lightFor(globalData.onboarding_rate, { red: 40, yellow: 60 })
+    : "neutral";
 
   return (
     <section style={sectionCard}>
       <h3 style={sectionTitle}>📥 Adquisición</h3>
 
+      {/* ── Timeframe row ── */}
+      <div style={subtitle}>📅 En el rango seleccionado</div>
       <div style={cardsGrid}>
         <Kpi
           label="New signups"
@@ -650,17 +660,60 @@ function AcquisitionSection({ data }: { data: Acquisition | null }) {
         />
       </div>
 
-      <div style={{ marginTop: 16 }}>
-        <div style={subtitle}>Top países</div>
+      {/* ── Global row (all-time) ── */}
+      {globalData && (
+        <>
+          <div style={{ ...subtitle, marginTop: 18 }}>🌐 Global (all-time)</div>
+          <div style={cardsGrid}>
+            <Kpi
+              label="Global users"
+              value={globalData.total_users}
+              sub="Total signups desde el día 1"
+            />
+            <Kpi
+              label="Onboarding % global"
+              value={`${globalData.onboarding_rate}%`}
+              sub={`${globalData.onboarding_completed}/${globalData.total_users} completaron · 🎯 industria 70-80%`}
+              light={obGlobalLight}
+            />
+            <BreakdownCard
+              label="Platform global"
+              entries={Object.entries(globalData.by_platform)}
+              formatKey={(k) => k}
+              total={globalData.total_users}
+            />
+            <BreakdownCard
+              label="Provider global"
+              entries={Object.entries(globalData.by_provider)}
+              formatKey={(k) => k}
+              total={globalData.total_users}
+            />
+          </div>
+        </>
+      )}
+
+      {/* ── Top países: timeframe luego global ── */}
+      <div style={{ marginTop: 18 }}>
+        <div style={subtitle}>Top países · rango</div>
         <CountryTable
           rows={data.by_country.top}
           total={data.new_signups}
         />
       </div>
 
+      {globalData && (
+        <div style={{ marginTop: 18 }}>
+          <div style={subtitle}>Top países · global</div>
+          <CountryTable
+            rows={globalData.by_country.top}
+            total={globalData.total_users}
+          />
+        </div>
+      )}
+
       {data.growth_chart.length > 1 && (
-        <div style={{ marginTop: 16 }}>
-          <div style={subtitle}>Crecimiento diario</div>
+        <div style={{ marginTop: 18 }}>
+          <div style={subtitle}>Crecimiento diario · rango</div>
           <GrowthSparkline points={data.growth_chart} />
         </div>
       )}
@@ -678,13 +731,15 @@ const RETENTION_TAB_LABELS: Record<RetentionSeries, string> = {
 };
 
 function RetentionSection({
-  data, wow, series, tab, setTab,
+  data, wow, series, tab, setTab, behavior, alerts,
 }: {
   data: Retention | null;
   wow: WoWRetention | null;
   series: TimeSeries | null;
   tab: RetentionSeries;
   setTab: (t: RetentionSeries) => void;
+  behavior: Behavior | null;
+  alerts: string[];
 }) {
   if (!data) return <SectionSkeleton title="🔁 Retención" />;
 
@@ -698,6 +753,27 @@ function RetentionSection({
   return (
     <section style={sectionCard}>
       <h3 style={sectionTitle}>🔁 Retención</h3>
+
+      {/* North Star (Weekly Engaged Returners) — la métrica que importa */}
+      <div style={{ marginBottom: 14 }}>
+        <NorthStarCard behavior={behavior} />
+      </div>
+
+      {/* Alertas activas — semáforos en rojo */}
+      {alerts.length > 0 && (
+        <div style={{ ...alertBox, marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, color: "#fca5a5", marginBottom: 8 }}>
+            ⚠️ {alerts.length} alerta{alerts.length === 1 ? "" : "s"} activa
+            {alerts.length === 1 ? "" : "s"}
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 18, color: "#fecaca" }}>
+            {alerts.map((a, i) => (
+              <li key={i}>{a}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <p style={{ color: "#fff8", fontSize: 12, marginTop: -4, marginBottom: 14 }}>
         <strong style={{ color: "#fff" }}>Activo</strong> = hizo ≥1 acción
         (rate / comment / watchlist / peeklist / like / follow) en un día{" "}
