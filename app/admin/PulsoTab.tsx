@@ -952,7 +952,10 @@ const KNOWN_CAMPAIGNS: Record<Cohort["bucket"], KnownCampaign[]> = {
     { from: "2026-05-13", to: "2026-05-16", label: "@elchotin.xyz carrusel", kind: "organic" },
   ],
   AR: [
-    { from: "2026-05-24", to: "2099-01-01", label: "pelisaldetalle reel", kind: "organic" },
+    // Pelisaldetalle didn't post to his own profile — he handed the video to
+    // Jorge, who ran it as a paid Meta ad. So this is 100% paid traffic,
+    // same delivery model as Kevin's boosted reel (just a different creative).
+    { from: "2026-05-24", to: "2099-01-01", label: "pelisaldetalle reel (paid Meta)", kind: "paid" },
   ],
   Other: [],
 };
