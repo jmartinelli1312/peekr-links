@@ -140,6 +140,21 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
+        {/*
+          Meta (Facebook) Domain Verification — required by Aggregated
+          Event Measurement (AEM) for iOS attribution post-iOS 14.5.
+          Hardcoded as a JSX <meta> instead of going through Next.js
+          metadata.other because child segments (e.g. /[lang]/title/...)
+          declare their OWN `other` object, which would replace this
+          verification tag on those pages — Next.js does a shallow merge
+          on metadata top-level keys. Putting it directly in the root
+          layout's <head> guarantees the tag is present on every server-
+          rendered page, including ones that override `other`.
+        */}
+        <meta
+          name="facebook-domain-verification"
+          content="1z710p3mwpldyf5cb1ztgom2dj8yuk"
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
