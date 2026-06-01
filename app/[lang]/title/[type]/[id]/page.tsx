@@ -21,6 +21,10 @@ const IMG = "https://image.tmdb.org/t/p/w780";
 const POSTER = "https://image.tmdb.org/t/p/w342";
 const PERSON = "https://image.tmdb.org/t/p/w185";
 const PROVIDER = "https://image.tmdb.org/t/p/w92";
+// Library tab thumbnails (download links always hit the original via the proxy)
+const LIB_BACKDROP = "https://image.tmdb.org/t/p/w500";
+const LIB_POSTER = "https://image.tmdb.org/t/p/w342";
+const LIB_LOGO = "https://image.tmdb.org/t/p/w300";
 const BRAND = "#FA0082";
 
 type Lang = "en" | "es" | "pt";
@@ -30,6 +34,7 @@ type TabKey =
   | "crew"
   | "platforms"
   | "awards"
+  | "library"
   | "comments";
 
 type PageProps = {
@@ -98,6 +103,22 @@ type TmdbVideosResponse = {
     type: string;
     site?: string;
   }[];
+};
+
+type TmdbImage = {
+  file_path: string;
+  width: number;
+  height: number;
+  aspect_ratio: number;
+  iso_639_1: string | null;
+  vote_average?: number;
+  vote_count?: number;
+};
+
+type TmdbImagesResponse = {
+  backdrops?: TmdbImage[];
+  posters?: TmdbImage[];
+  logos?: TmdbImage[];
 };
 
 type ProviderItem = {
@@ -227,7 +248,13 @@ function getStrings(lang: Lang) {
       crew: "Crew",
       platforms: "Platforms",
       awards: "Awards",
+      library: "Library",
       comments: "Comments",
+      backdrops: "Backdrops",
+      posters: "Posters",
+      logos: "Logos",
+      download: "Download",
+      noImages: "No images available for this title yet.",
       usersWhoWatched: "Users who watched",
       whereToWatch: "Where to watch",
       watched: "watched",
@@ -242,6 +269,7 @@ function getStrings(lang: Lang) {
       tabsCrew: "Crew",
       tabsPlatforms: "Platforms",
       tabsAwards: "Awards",
+      tabsLibrary: "Library",
       tabsComments: "Comments",
       defaultDescription:
         "Discover and discuss movies and series on Peekr.",
@@ -283,7 +311,13 @@ function getStrings(lang: Lang) {
       crew: "Crew",
       platforms: "Plataformas",
       awards: "Premios",
+      library: "Galería",
       comments: "Comentarios",
+      backdrops: "Fondos",
+      posters: "Pósters",
+      logos: "Logos",
+      download: "Descargar",
+      noImages: "Todavía no hay imágenes disponibles para este título.",
       usersWhoWatched: "Usuarios que la vieron",
       whereToWatch: "Dónde verla",
       watched: "vistos",
@@ -298,6 +332,7 @@ function getStrings(lang: Lang) {
       tabsCrew: "Crew",
       tabsPlatforms: "Plataformas",
       tabsAwards: "Premios",
+      tabsLibrary: "Galería",
       tabsComments: "Comentarios",
       defaultDescription:
         "Descubre y comenta películas y series en Peekr.",
@@ -337,7 +372,13 @@ function getStrings(lang: Lang) {
       crew: "Crew",
       platforms: "Plataformas",
       awards: "Prêmios",
+      library: "Galeria",
       comments: "Comentários",
+      backdrops: "Fundos",
+      posters: "Pôsteres",
+      logos: "Logos",
+      download: "Baixar",
+      noImages: "Ainda não há imagens disponíveis para este título.",
       usersWhoWatched: "Usuários que assistiram",
       whereToWatch: "Onde assistir",
       watched: "vistos",
@@ -352,6 +393,7 @@ function getStrings(lang: Lang) {
       tabsCrew: "Crew",
       tabsPlatforms: "Plataformas",
       tabsAwards: "Prêmios",
+      tabsLibrary: "Galeria",
       tabsComments: "Comentários",
       defaultDescription:
         "Descubra e comente filmes e séries no Peekr.",
@@ -471,6 +513,24 @@ async function getVideos(type: string, id: number, lang: string) {
 
 async function getWatchProviders(type: string, id: number) {
   return tmdbFetch<TmdbWatchProvidersResponse>(`/${type}/${id}/watch/providers`);
+}
+
+// Sin `language` → TMDB devuelve TODAS las imágenes (todos los idiomas +
+// las sin idioma). Así la galería trae el máximo de backdrops/posters/logos.
+async function getImages(type: string, id: number) {
+  return tmdbFetch<TmdbImagesResponse>(`/${type}/${id}/images`);
+}
+
+// Mejores primero (más votadas), y recorta para no renderizar cientos.
+function pickImages(images: TmdbImage[] | undefined, limit: number) {
+  return [...(images || [])]
+    .sort((a, b) => {
+      const va = a.vote_average ?? 0;
+      const vb = b.vote_average ?? 0;
+      if (vb !== va) return vb - va;
+      return (b.vote_count ?? 0) - (a.vote_count ?? 0);
+    })
+    .slice(0, limit);
 }
 
 function pickProviders(
@@ -802,7 +862,7 @@ export default async function TitlePage({ params }: PageProps) {
   }
 
   // Always fetch ALL data — ISR caches once, client switches tabs
-  const [stats, credits, videos, watchProviders, watchers, comments] =
+  const [stats, credits, videos, watchProviders, watchers, comments, images] =
     await Promise.all([
       getPeekrStats(numericId, type, true),
       getCredits(type, numericId, tmdbLang),
@@ -810,7 +870,14 @@ export default async function TitlePage({ params }: PageProps) {
       getWatchProviders(type, numericId),
       getPeekrWatchers(numericId, type),
       getPeekrComments(numericId, type),
+      getImages(type, numericId),
     ]);
+
+  // Library tab: backdrops / posters / logos, best-voted first, capped.
+  const backdrops = pickImages(images?.backdrops, 24);
+  const posters = pickImages(images?.posters, 24);
+  const logos = pickImages(images?.logos, 12);
+  const hasImages = backdrops.length + posters.length + logos.length > 0;
 
   const backdrop = base.backdrop_path;
   const poster = base.poster_path;
@@ -1425,10 +1492,81 @@ export default async function TitlePage({ params }: PageProps) {
           line-height: 1.6;
         }
 
+        .library-subtitle {
+          margin: 24px 0 12px 0;
+          font-size: 18px;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          color: rgba(255,255,255,0.92);
+        }
+
+        .library-grid {
+          display: grid;
+          gap: 14px;
+        }
+
+        .library-grid-wide {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .library-grid-poster {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .library-item {
+          margin: 0;
+          position: relative;
+          border-radius: 14px;
+          overflow: hidden;
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.08);
+          line-height: 0;
+        }
+
+        .library-img {
+          width: 100%;
+          height: auto;
+          display: block;
+          object-fit: cover;
+        }
+
+        .library-download {
+          position: absolute;
+          right: 8px;
+          bottom: 8px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 12px;
+          border-radius: 999px;
+          background: rgba(0,0,0,0.62);
+          color: #fff;
+          font-size: 12px;
+          font-weight: 700;
+          line-height: 1;
+          text-decoration: none;
+          -webkit-backdrop-filter: blur(4px);
+          backdrop-filter: blur(4px);
+          border: 1px solid rgba(255,255,255,0.14);
+        }
+
+        .library-download:hover {
+          background: ${BRAND};
+          border-color: ${BRAND};
+        }
+
         @media (min-width: 900px) {
           .hero-backdrop {
             height: 400px;
             border-radius: 0 0 28px 28px;
+          }
+
+          .library-grid-wide {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+
+          .library-grid-poster {
+            grid-template-columns: repeat(6, minmax(0, 1fr));
           }
 
           .title-shell {
@@ -1738,6 +1876,7 @@ export default async function TitlePage({ params }: PageProps) {
               { key: "cast", label: t.tabsCast, available: true },
               { key: "crew", label: t.tabsCrew, available: true },
               { key: "awards", label: t.tabsAwards, available: true },
+              { key: "library", label: t.tabsLibrary, available: true },
               { key: "platforms", label: t.tabsPlatforms, available: providers.length > 0 },
               { key: "comments", label: t.tabsComments, available: stats.commentsCount > 0 },
             ]}
@@ -1870,6 +2009,108 @@ export default async function TitlePage({ params }: PageProps) {
             <section className="section-block">
               <h2 className="section-title">{t.awards}</h2>
               <p className="overview-text">{t.noAwards}</p>
+            </section>
+
+            {/* Library tab — TMDB images (backdrops / posters / logos) with download */}
+            <section className="section-block">
+              <h2 className="section-title">{t.library}</h2>
+
+              {!hasImages ? (
+                <p className="overview-text">{t.noImages}</p>
+              ) : (
+                <>
+                  {backdrops.length > 0 ? (
+                    <>
+                      <h3 className="library-subtitle">{t.backdrops}</h3>
+                      <div className="library-grid library-grid-wide">
+                        {backdrops.map((img, i) => (
+                          <figure key={img.file_path} className="library-item">
+                            <Image
+                              src={`${LIB_BACKDROP}${img.file_path}`}
+                              alt={`${title} — ${t.backdrops} ${i + 1}`}
+                              width={img.width}
+                              height={img.height}
+                              className="library-img"
+                              unoptimized
+                            />
+                            <a
+                              className="library-download"
+                              href={`/api/tmdb-image?path=${encodeURIComponent(
+                                img.file_path
+                              )}&name=${encodeURIComponent(
+                                `${slugify(title)}-backdrop-${i + 1}`
+                              )}`}
+                            >
+                              ⬇ {t.download}
+                            </a>
+                          </figure>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {posters.length > 0 ? (
+                    <>
+                      <h3 className="library-subtitle">{t.posters}</h3>
+                      <div className="library-grid library-grid-poster">
+                        {posters.map((img, i) => (
+                          <figure key={img.file_path} className="library-item">
+                            <Image
+                              src={`${LIB_POSTER}${img.file_path}`}
+                              alt={`${title} — ${t.posters} ${i + 1}`}
+                              width={img.width}
+                              height={img.height}
+                              className="library-img"
+                              unoptimized
+                            />
+                            <a
+                              className="library-download"
+                              href={`/api/tmdb-image?path=${encodeURIComponent(
+                                img.file_path
+                              )}&name=${encodeURIComponent(
+                                `${slugify(title)}-poster-${i + 1}`
+                              )}`}
+                            >
+                              ⬇ {t.download}
+                            </a>
+                          </figure>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {logos.length > 0 ? (
+                    <>
+                      <h3 className="library-subtitle">{t.logos}</h3>
+                      <div className="library-grid library-grid-wide">
+                        {logos.map((img, i) => (
+                          <figure key={img.file_path} className="library-item">
+                            <Image
+                              src={`${LIB_LOGO}${img.file_path}`}
+                              alt={`${title} — ${t.logos} ${i + 1}`}
+                              width={img.width}
+                              height={img.height}
+                              className="library-img"
+                              style={{ background: "rgba(255,255,255,0.06)" }}
+                              unoptimized
+                            />
+                            <a
+                              className="library-download"
+                              href={`/api/tmdb-image?path=${encodeURIComponent(
+                                img.file_path
+                              )}&name=${encodeURIComponent(
+                                `${slugify(title)}-logo-${i + 1}`
+                              )}`}
+                            >
+                              ⬇ {t.download}
+                            </a>
+                          </figure>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+                </>
+              )}
             </section>
 
             {/* Platforms tab */}

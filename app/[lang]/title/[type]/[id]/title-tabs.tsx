@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type TabKey = "overview" | "cast" | "crew" | "platforms" | "awards" | "comments";
+type TabKey = "overview" | "cast" | "crew" | "platforms" | "awards" | "library" | "comments";
 
 interface TitleTabsProps {
   tabs: { key: TabKey; label: string; available: boolean }[];
