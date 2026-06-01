@@ -53,6 +53,10 @@ type PersonResponse = {
   images?: {
     profiles?: {
       file_path: string;
+      width?: number;
+      height?: number;
+      vote_average?: number;
+      vote_count?: number;
     }[];
   };
 };
@@ -239,6 +243,8 @@ function getStrings(lang: Lang) {
       knownForDepartment: "Known for",
       aka: "Also known as",
       noBiography: "No biography available.",
+      gallery: "Library",
+      download: "Download",
       appearances: "Talk shows & appearances",
       defaultDescription:
         "Explore biography, movies, TV series and credits on Peekr.",
@@ -269,6 +275,8 @@ function getStrings(lang: Lang) {
       knownForDepartment: "Conocido por",
       aka: "También conocido como",
       noBiography: "No hay biografía disponible.",
+      gallery: "Galería",
+      download: "Descargar",
       appearances: "Talk shows y apariciones",
       defaultDescription:
         "Explora biografía, películas, series y créditos en Peekr.",
@@ -299,6 +307,8 @@ function getStrings(lang: Lang) {
       knownForDepartment: "Conhecido por",
       aka: "Também conhecido como",
       noBiography: "Sem biografia disponível.",
+      gallery: "Galeria",
+      download: "Baixar",
       appearances: "Talk shows e aparições",
       defaultDescription:
         "Explore biografia, filmes, séries e créditos no Peekr.",
@@ -433,6 +443,16 @@ export default async function ActorPage({ params }: PageProps) {
 
   const heroImage =
     actor.images?.profiles?.[0]?.file_path || actor.profile_path || null;
+
+  // Galería: fotos del actor (TMDB person images), mejores primero, recortado.
+  const photos = [...(actor.images?.profiles || [])]
+    .sort((a, b) => {
+      const va = a.vote_average ?? 0;
+      const vb = b.vote_average ?? 0;
+      if (vb !== va) return vb - va;
+      return (b.vote_count ?? 0) - (a.vote_count ?? 0);
+    })
+    .slice(0, 24);
 
   const slug = slugify(actor.name);
   const canonicalPath = `/${lang}/actor/${numericId}-${slug}`;
@@ -686,10 +706,62 @@ export default async function ActorPage({ params }: PageProps) {
           color: rgba(255,255,255,0.6);
         }
 
+        .library-grid {
+          display: grid;
+          gap: 14px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .library-item {
+          margin: 0;
+          position: relative;
+          border-radius: 14px;
+          overflow: hidden;
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.08);
+          line-height: 0;
+        }
+
+        .library-img {
+          width: 100%;
+          height: auto;
+          display: block;
+          object-fit: cover;
+        }
+
+        .library-download {
+          position: absolute;
+          right: 8px;
+          bottom: 8px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 12px;
+          border-radius: 999px;
+          background: rgba(0,0,0,0.62);
+          color: #fff;
+          font-size: 12px;
+          font-weight: 700;
+          line-height: 1;
+          text-decoration: none;
+          -webkit-backdrop-filter: blur(4px);
+          backdrop-filter: blur(4px);
+          border: 1px solid rgba(255,255,255,0.14);
+        }
+
+        .library-download:hover {
+          background: #FA0082;
+          border-color: #FA0082;
+        }
+
         @media (min-width: 900px) {
           .actor-hero {
             height: 340px;
             border-radius: 0 0 28px 28px;
+          }
+
+          .library-grid {
+            grid-template-columns: repeat(6, minmax(0, 1fr));
           }
 
           .actor-shell {
@@ -831,6 +903,34 @@ export default async function ActorPage({ params }: PageProps) {
                   <div key={name} className="aka-pill">
                     {name}
                   </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {photos.length > 0 ? (
+            <section className="section-block">
+              <h2 className="section-title">{t.gallery}</h2>
+              <div className="library-grid">
+                {photos.map((img, i) => (
+                  <figure key={img.file_path} className="library-item">
+                    <Image
+                      src={`${POSTER}${img.file_path}`}
+                      alt={`${actor.name} — ${i + 1}`}
+                      width={img.width || 342}
+                      height={img.height || 513}
+                      className="library-img"
+                      unoptimized
+                    />
+                    <a
+                      className="library-download"
+                      href={`/api/tmdb-image?path=${encodeURIComponent(
+                        img.file_path
+                      )}&name=${encodeURIComponent(`${slug}-photo-${i + 1}`)}`}
+                    >
+                      ⬇ {t.download}
+                    </a>
+                  </figure>
                 ))}
               </div>
             </section>
