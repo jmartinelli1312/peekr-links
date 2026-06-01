@@ -22,6 +22,11 @@ const RESERVED_SEGMENTS = new Set([
   // username rewrite so /forgot-password and /reset-password resolve
   // to the actual pages instead of /u/forgot-password.
   "forgot-password", "reset-password",
+  // Branded newsletter previews live under /newsletter/<edition-slug>
+  // (e.g. /newsletter/may-2026). Multi-segment paths bypass the username
+  // rewrite already, but reserving the top-level keeps future single-
+  // segment links (like /newsletter as an index) safe too.
+  "newsletter",
 ]);
 
 function hasLangPrefix(pathname: string) {
