@@ -17,7 +17,7 @@ const RESERVED_SEGMENTS = new Set([
   // Without these, the username-rewrite below would interpret
   // "/my-peeklists" as a vanity username and serve /u/[username],
   // which then shows "User not found".
-  "my-peeklists", "my-watchlist",
+  "my-peeklists", "my-watchlist", "dashboard",
   // Password recovery flow — same reason: keep them out of the vanity
   // username rewrite so /forgot-password and /reset-password resolve
   // to the actual pages instead of /u/forgot-password.
@@ -119,7 +119,9 @@ export function middleware(request: NextRequest) {
       finalPath.startsWith("/activity") ||
       finalPath.startsWith("/download-app") ||
       finalPath === "/my-peeklists" ||
-      finalPath.startsWith("/my-peeklists/");
+      finalPath.startsWith("/my-peeklists/") ||
+      finalPath === "/dashboard" ||
+      finalPath.startsWith("/dashboard/");
 
     if (shouldRedirectForLang) {
       finalPath = `/${lang}${finalPath}`;

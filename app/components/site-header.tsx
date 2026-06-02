@@ -23,6 +23,7 @@ type HeaderTexts = {
   settings: string;
   signOut: string;
   profile: string;
+  dashboard: string;
 };
 
 function normalizeLang(value?: string | null): Lang {
@@ -40,6 +41,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [isCreator, setIsCreator] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
   const desktopLangRef = useRef<HTMLDetailsElement>(null);
@@ -58,6 +60,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
       settings: "Settings",
       signOut: "Sign out",
       profile: "Profile",
+      dashboard: "Dashboard",
     },
     es: {
       explore: "Explorar",
@@ -69,6 +72,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
       settings: "Configuración",
       signOut: "Cerrar sesión",
       profile: "Perfil",
+      dashboard: "Dashboard",
     },
     pt: {
       explore: "Explorar",
@@ -80,6 +84,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
       settings: "Configurações",
       signOut: "Sair",
       profile: "Perfil",
+      dashboard: "Dashboard",
     },
   }[currentLang];
 
@@ -133,22 +138,33 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
       if (!session?.user) {
         setIsLoggedIn(false);
         setProfile(null);
+        setIsCreator(false);
         setLoadingAuth(false);
         return;
       }
 
       setIsLoggedIn(true);
 
-      const { data } = await supabase
-        .from("profiles")
-        .select("username,avatar_url,display_name")
-        .eq("id", session.user.id)
-        .maybeSingle();
+      const [{ data }, { data: creatorRow }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("username,avatar_url,display_name")
+          .eq("id", session.user.id)
+          .maybeSingle(),
+        supabase
+          .from("creator_dashboards")
+          .select("user_id")
+          .eq("user_id", session.user.id)
+          .eq("enabled", true)
+          .maybeSingle(),
+      ]);
 
       setProfile((data as Profile | null) ?? null);
+      setIsCreator(!!creatorRow);
     } catch {
       setIsLoggedIn(false);
       setProfile(null);
+      setIsCreator(false);
     } finally {
       setLoadingAuth(false);
     }
@@ -584,6 +600,15 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
                   >
                     {t.profile}
                   </Link>
+                  {isCreator && (
+                    <Link
+                      href={localizedHref("/dashboard")}
+                      className="peekr-user-item"
+                      onClick={closeAllMenus}
+                    >
+                      {t.dashboard}
+                    </Link>
+                  )}
                   <Link
                     href={localizedHref("/download-app")}
                     className="peekr-user-item"
@@ -698,6 +723,15 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
                     >
                       {t.profile}
                     </Link>
+                    {isCreator && (
+                      <Link
+                        href={localizedHref("/dashboard")}
+                        className="peekr-user-item"
+                        onClick={closeAllMenus}
+                      >
+                        {t.dashboard}
+                      </Link>
+                    )}
                     <Link
                       href={localizedHref("/download-app")}
                       className="peekr-user-item"
