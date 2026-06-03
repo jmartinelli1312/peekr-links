@@ -288,6 +288,7 @@ export default function PulsoTab({ supabase }: Props) {
   const [cohorts, setCohorts] = useState<Cohort[] | null>(null);
   const [behavior, setBehavior] = useState<Behavior | null>(null);
   const [timeSeries, setTimeSeries] = useState<TimeSeries | null>(null);
+  const [appEngagement, setAppEngagement] = useState<AppEngagement | null>(null);
   const [retentionTab, setRetentionTab] = useState<RetentionSeries>("dau");
   const [behaviorTab, setBehaviorTab] = useState<BehaviorSeries>("ratings");
   const [topMetric, setTopMetric] = useState<TopMetric>("ratings");
@@ -301,7 +302,7 @@ export default function PulsoTab({ supabase }: Props) {
     try {
       const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
 
-      const [acqRes, acqGlobalRes, retRes, wowRes, cohortRes, behRes, tsRes] = await Promise.all([
+      const [acqRes, acqGlobalRes, retRes, wowRes, cohortRes, behRes, tsRes, appRes] = await Promise.all([
         supabase.rpc("admin_kpi_acquisition", {
           p_from: fromTs,
           p_to_exclusive: toTsExclusive,
@@ -326,6 +327,10 @@ export default function PulsoTab({ supabase }: Props) {
           p_to_exclusive: toTsExclusive,
           p_only_onboarded: onlyOnboarded,
         }),
+        supabase.rpc("admin_kpi_app_engagement", {
+          p_from: fromTs,
+          p_to_exclusive: toTsExclusive,
+        }),
       ]);
 
       if (acqRes.error) throw acqRes.error;
@@ -335,6 +340,7 @@ export default function PulsoTab({ supabase }: Props) {
       if (cohortRes.error) throw cohortRes.error;
       if (behRes.error) throw behRes.error;
       if (tsRes.error) throw tsRes.error;
+      if (appRes.error) throw appRes.error;
 
       setAcquisition(acqRes.data as Acquisition);
       setAcquisitionGlobal(acqGlobalRes.data as AcquisitionGlobal);
@@ -343,6 +349,7 @@ export default function PulsoTab({ supabase }: Props) {
       setCohorts(cohortRes.data as Cohort[]);
       setBehavior(behRes.data as Behavior);
       setTimeSeries(tsRes.data as TimeSeries);
+      setAppEngagement(appRes.data as AppEngagement);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -501,6 +508,9 @@ export default function PulsoTab({ supabase }: Props) {
         setTab={setBehaviorTab}
       />
 
+      {/* ═════ 3.5 USO DE LA APP (tiempo + secciones) ═════ */}
+      <AppEngagementSection data={appEngagement} />
+
       {/* ═════ 4. COHORTS ═════ */}
       <CohortRetentionSection cohorts={cohorts} />
 
@@ -572,6 +582,94 @@ function DateFilter({
 // ═════════════════════════════════════════════════════════════════════════════
 // NORTH STAR
 // ═════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
+// USO DE LA APP (tiempo + secciones navegadas, desde screen_views)
+// ═════════════════════════════════════════════════════════════════════════════
+type AppSection = {
+  screen: string;
+  views: number;
+  users: number;
+  total_min: number;
+  avg_sec: number;
+};
+type AppEngagement = {
+  active_users: number;
+  total_minutes: number;
+  avg_min_per_user: number;
+  median_min_per_user: number;
+  avg_sec_per_screen: number;
+  top_sections: AppSection[];
+};
+
+// Onboarding/auth funnel screens — excluded from "secciones más navegadas".
+const ONBOARDING_SCREENS = new Set([
+  "/intro-carousel", "/post-signup", "/auth-landing", "/login-callback",
+  "/follow-onboarding-seen", "/onboarding", "/signup", "/guest-lock",
+]);
+
+const SECTION_LABELS: Record<string, string> = {
+  "/title/:type/:id": "Ficha de título",
+  "/detail": "Detalle de título",
+  "/actor/:id": "Actor",
+  "/u/:username": "Perfil de usuario",
+  "/profile/peeklists/:id": "Peeklist",
+  "/watchlist": "Watchlist",
+  "/follow-list": "Seguidores / Siguiendo",
+  "/inbox/chat/:id": "Chat",
+  "/inbox/new": "Nuevo chat",
+  "/settings": "Ajustes",
+  "/settings/about": "Acerca de",
+  "/edit-profile": "Editar perfil",
+};
+
+function sectionLabel(screen: string): string {
+  return SECTION_LABELS[screen] ?? screen;
+}
+
+function AppEngagementSection({ data }: { data: AppEngagement | null }) {
+  if (!data) return null;
+  const sections = (data.top_sections ?? []).filter(
+    (s) => !ONBOARDING_SCREENS.has(s.screen)
+  );
+  const maxViews = sections.reduce((m, s) => Math.max(m, s.views), 0) || 1;
+
+  return (
+    <section style={sectionCard}>
+      <h3 style={sectionTitle}>📱 Uso de la app</h3>
+      <p style={{ color: "#fff8", fontSize: 12, marginTop: -4, marginBottom: 14 }}>
+        Tiempo en app y secciones más navegadas (<strong style={{ color: "#fff" }}>screen_views</strong>,
+        desde 29-may). Duración capada a 10 min/pantalla para descartar app en background.
+      </p>
+
+      <div style={cardsGrid}>
+        <Kpi label="Tiempo / usuario" value={`${data.avg_min_per_user} min`} sub={`Mediana: ${data.median_min_per_user} min`} />
+        <Kpi label="Tiempo total" value={`${Math.round(data.total_minutes / 60)} h`} sub={`${formatNumber(data.total_minutes)} min en el período`} />
+        <Kpi label="Por pantalla" value={`${data.avg_sec_per_screen}s`} sub="Promedio por vista" />
+        <Kpi label="Usuarios con navegación" value={data.active_users} sub="Distintos en el período" />
+      </div>
+
+      <div style={{ ...subtitle, marginTop: 18 }}>Secciones más navegadas</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+        {sections.length === 0 ? (
+          <div style={{ fontSize: 13, color: "#fff6" }}>Sin datos en el período</div>
+        ) : (
+          sections.map((s) => (
+            <div key={s.screen} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 150, fontSize: 13, color: "#fffc" }}>{sectionLabel(s.screen)}</div>
+              <div style={{ flex: 1, background: "rgba(255,255,255,0.06)", borderRadius: 6, height: 20, position: "relative" }}>
+                <div style={{ width: `${(s.views / maxViews) * 100}%`, background: "#FA0082", height: "100%", borderRadius: 6, minWidth: 2 }} />
+              </div>
+              <div style={{ width: 175, textAlign: "right", fontSize: 12, color: "#fff9" }}>
+                {formatNumber(s.views)} vistas · {formatNumber(s.users)} users · {s.avg_sec}s
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 function NorthStarCard({ behavior }: { behavior: Behavior | null }) {
   const value = behavior?.north_star_weu_returning ?? 0;
   const ratersValue = behavior?.north_star_war_returning ?? 0;
@@ -601,10 +699,11 @@ function NorthStarCard({ behavior }: { behavior: Behavior | null }) {
           {formatNumber(value)}
         </div>
         <div style={{ fontSize: 14, color: "#ffffffaa", marginBottom: 6 }}>
-          users con cuenta ≥7d que hicieron alguna acción esta semana
+          users con cuenta ≥7d que volvieron esta semana
           <br />
           <span style={{ fontSize: 12, color: "#fff6" }}>
-            (rate / comment / watchlist / peeklist / like / follow)
+            (navegaron contenido o hicieron una acción: rate / comment /
+            watchlist / like / follow)
           </span>
         </div>
       </div>

@@ -53,6 +53,27 @@ type TimeSeries = {
   retention: { dau: number[]; signups: number[]; first_time_active: number[] };
 };
 
+type AppSection = { screen: string; views: number; users: number; total_min: number; avg_sec: number };
+type AppEngagement = {
+  active_users: number;
+  total_minutes: number;
+  avg_min_per_user: number;
+  median_min_per_user: number;
+  avg_sec_per_screen: number;
+  top_sections: AppSection[];
+};
+
+const ONBOARDING_SCREENS = new Set([
+  "/intro-carousel", "/post-signup", "/auth-landing", "/login-callback",
+  "/follow-onboarding-seen", "/onboarding", "/signup", "/guest-lock",
+]);
+const SECTION_LABELS: Record<string, string> = {
+  "/title/:type/:id": "Ficha de título", "/detail": "Detalle de título", "/actor/:id": "Actor",
+  "/u/:username": "Perfil de usuario", "/profile/peeklists/:id": "Peeklist", "/watchlist": "Watchlist",
+  "/follow-list": "Seguidores / Siguiendo", "/inbox/chat/:id": "Chat", "/inbox/new": "Nuevo chat",
+  "/settings": "Ajustes", "/settings/about": "Acerca de", "/edit-profile": "Editar perfil",
+};
+
 type Behavior = {
   active_users: number;
   ratings: { total: number; per_active_avg: number };
@@ -78,6 +99,7 @@ export default function CountryMetricsTab({
   const [wow, setWow] = useState<Wow | null>(null);
   const [ts, setTs] = useState<TimeSeries | null>(null);
   const [beh, setBeh] = useState<Behavior | null>(null);
+  const [app, setApp] = useState<AppEngagement | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -86,23 +108,26 @@ export default function CountryMetricsTab({
     setErr(null);
     try {
       const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
-      const [geoRes, retRes, wowRes, tsRes, behRes] = await Promise.all([
+      const [geoRes, retRes, wowRes, tsRes, behRes, appRes] = await Promise.all([
         supabase.rpc("creator_kpi_geo", { p_from: fromTs, p_to_exclusive: toTsExclusive }),
         supabase.rpc("creator_kpi_retention", { p_only_onboarded: onlyOnboarded }),
         supabase.rpc("creator_kpi_wow_retention", { p_weeks: 8 }),
         supabase.rpc("creator_kpi_time_series", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_only_onboarded: onlyOnboarded }),
         supabase.rpc("creator_kpi_behavior", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_only_onboarded: onlyOnboarded }),
+        supabase.rpc("creator_kpi_app_engagement", { p_from: fromTs, p_to_exclusive: toTsExclusive }),
       ]);
       if (geoRes.error) throw geoRes.error;
       if (retRes.error) throw retRes.error;
       if (wowRes.error) throw wowRes.error;
       if (tsRes.error) throw tsRes.error;
       if (behRes.error) throw behRes.error;
+      if (appRes.error) throw appRes.error;
       setGeo(geoRes.data as Geo);
       setRet(retRes.data as Retention);
       setWow(wowRes.data as Wow);
       setTs(tsRes.data as TimeSeries);
       setBeh(behRes.data as Behavior);
+      setApp(appRes.data as AppEngagement);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -222,6 +247,40 @@ export default function CountryMetricsTab({
             <StatCard label="Follows" value={fmtInt(beh.follows.created)} hint={`${fmtPct(beh.follows.mutual_pct)} mutuos`} />
             <StatCard label="WAR retornando" value={fmtInt(beh.north_star_war_returning)} hint="North star (7d)" accent={BRAND} />
           </StatGrid>
+        </Panel>
+      )}
+
+      {/* Uso de la app: tiempo + secciones */}
+      {app && (
+        <Panel title="Uso de la app" subtitle="Tiempo en app y secciones más navegadas (screen_views desde 29-may, duración capada a 10 min/pantalla)">
+          <StatGrid>
+            <StatCard label="Tiempo / usuario" value={`${app.avg_min_per_user} min`} hint={`Mediana: ${app.median_min_per_user} min`} accent={BRAND} />
+            <StatCard label="Tiempo total" value={`${Math.round(app.total_minutes / 60)} h`} hint={`${fmtInt(app.total_minutes)} min`} />
+            <StatCard label="Por pantalla" value={`${app.avg_sec_per_screen}s`} />
+            <StatCard label="Usuarios con navegación" value={fmtInt(app.active_users)} />
+          </StatGrid>
+          <div style={{ marginTop: 16 }}>
+            {(() => {
+              const sections = (app.top_sections ?? []).filter((s) => !ONBOARDING_SCREENS.has(s.screen));
+              const maxViews = sections.reduce((m, s) => Math.max(m, s.views), 0) || 1;
+              if (sections.length === 0) return <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Sin datos</div>;
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {sections.map((s) => (
+                    <div key={s.screen} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 140, fontSize: 13, color: "rgba(255,255,255,0.75)" }}>{SECTION_LABELS[s.screen] ?? s.screen}</div>
+                      <div style={{ flex: 1, background: "rgba(255,255,255,0.06)", borderRadius: 6, height: 20 }}>
+                        <div style={{ width: `${(s.views / maxViews) * 100}%`, background: BRAND, height: "100%", borderRadius: 6, minWidth: 2 }} />
+                      </div>
+                      <div style={{ width: 170, textAlign: "right", fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
+                        {fmtInt(s.views)} vistas · {fmtInt(s.users)} users · {s.avg_sec}s
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
         </Panel>
       )}
     </div>
