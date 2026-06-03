@@ -13,6 +13,7 @@ import {
   presetRange,
   todayStr,
 } from "./_shared";
+import { dashTexts } from "./texts";
 
 type Gate = "loading" | "ok" | "denied";
 type TabKey = "country" | "titles";
@@ -24,18 +25,16 @@ function normalizeLang(value?: string): Lang {
   return "es";
 }
 
-const PRESET_LABELS: Record<Exclude<Preset, "custom">, string> = {
-  today: "Hoy",
-  yesterday: "Ayer",
-  "7d": "7 días",
-  "30d": "30 días",
-  "90d": "90 días",
-};
+const PRESETS: Array<Exclude<Preset, "custom">> = ["today", "yesterday", "7d", "30d", "90d"];
 
 export default function DashboardPage({ params }: { params: Promise<{ lang: string }> }) {
   const { lang: rawLang } = use(params);
   const lang = normalizeLang(rawLang);
+  const t = dashTexts(lang);
   const router = useRouter();
+
+  const presetLabel = (p: Exclude<Preset, "custom">): string =>
+    ({ today: t.presetToday, yesterday: t.presetYesterday, "7d": t.preset7d, "30d": t.preset30d, "90d": t.preset90d }[p]);
 
   const [gate, setGate] = useState<Gate>("loading");
   const [country, setCountry] = useState<string>("");
@@ -83,7 +82,7 @@ export default function DashboardPage({ params }: { params: Promise<{ lang: stri
   if (gate !== "ok") {
     return (
       <div style={{ padding: 48, textAlign: "center", color: "rgba(255,255,255,0.55)" }}>
-        {gate === "loading" ? "Cargando…" : "Acceso no autorizado"}
+        {gate === "loading" ? t.loading : t.denied}
       </div>
     );
   }
@@ -104,29 +103,29 @@ export default function DashboardPage({ params }: { params: Promise<{ lang: stri
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Dashboard</h1>
         <p style={{ margin: "6px 0 0", color: "rgba(255,255,255,0.6)", fontSize: 14 }}>
-          Métricas de <strong style={{ color: "rgba(255,255,255,0.9)" }}>{countryName(country)}</strong>
+          {t.metricsFor} <strong style={{ color: "rgba(255,255,255,0.9)" }}>{countryName(country)}</strong>
         </p>
       </div>
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
         <button style={pill(tab === "country")} onClick={() => setTab("country")}>
-          Métricas del País
+          {t.tabCountry}
         </button>
         <button style={pill(tab === "titles")} onClick={() => setTab("titles")}>
-          Métricas de Títulos
+          {t.tabTitles}
         </button>
       </div>
 
       {/* Date filter */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 22 }}>
-        {(Object.keys(PRESET_LABELS) as Array<Exclude<Preset, "custom">>).map((p) => (
+        {PRESETS.map((p) => (
           <button key={p} style={pill(preset === p)} onClick={() => setPreset(p)}>
-            {PRESET_LABELS[p]}
+            {presetLabel(p)}
           </button>
         ))}
         <button style={pill(preset === "custom")} onClick={() => setPreset("custom")}>
-          Personalizado
+          {t.custom}
         </button>
         {preset === "custom" && (
           <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
@@ -153,15 +152,15 @@ export default function DashboardPage({ params }: { params: Promise<{ lang: stri
           <button
             style={{ ...pill(onlyOnboarded), marginLeft: "auto" }}
             onClick={() => setOnlyOnboarded((v) => !v)}
-            title="Considerar solo usuarios que completaron onboarding"
+            title={t.onlyOnboardedTip}
           >
-            {onlyOnboarded ? "✓ " : ""}Solo onboarded
+            {onlyOnboarded ? "✓ " : ""}{t.onlyOnboarded}
           </button>
         )}
       </div>
 
       {tab === "country" ? (
-        <CountryMetricsTab supabase={supabase} range={range} onlyOnboarded={onlyOnboarded} />
+        <CountryMetricsTab supabase={supabase} range={range} onlyOnboarded={onlyOnboarded} lang={lang} />
       ) : (
         <TitlesTab supabase={supabase} range={range} lang={lang} />
       )}

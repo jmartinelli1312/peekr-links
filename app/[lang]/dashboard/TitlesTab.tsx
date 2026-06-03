@@ -12,6 +12,7 @@ import {
   posterUrl,
   TitleRow,
 } from "./_shared";
+import { dashTexts, DashTexts } from "./texts";
 
 type Range = { from: string; to: string };
 
@@ -32,22 +33,22 @@ type Person = {
   known_for: string[];
 };
 
-function TitleGrid({ items, lang, metric }: { items: TitleRow[]; lang: Lang; metric: "views" | "peekr" | "tmdb" }) {
+function TitleGrid({ items, lang, metric, t }: { items: TitleRow[]; lang: Lang; metric: "views" | "peekr" | "tmdb"; t: DashTexts }) {
   if (!items || items.length === 0) {
-    return <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Sin datos en el período</div>;
+    return <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>{t.noDataPeriod}</div>;
   }
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 14 }}>
-      {items.map((t, i) => {
-        const poster = posterUrl(t.poster_path);
+      {items.map((it, i) => {
+        const poster = posterUrl(it.poster_path);
         const badge =
           metric === "views"
-            ? `${fmtInt(t.views_count ?? 0)} vistas`
+            ? t.badgeViews(fmtInt(it.views_count ?? 0))
             : metric === "peekr"
-            ? `★ ${t.peekr_avg ?? "—"} (${fmtInt(t.ratings_count ?? 0)})`
-            : `TMDB ${t.vote_average ?? "—"}`;
+            ? `★ ${it.peekr_avg ?? "—"} (${fmtInt(it.ratings_count ?? 0)})`
+            : `TMDB ${it.vote_average ?? "—"}`;
         return (
-          <div key={`${t.tmdb_id}-${i}`} style={{ minWidth: 0 }}>
+          <div key={`${it.tmdb_id}-${i}`} style={{ minWidth: 0 }}>
             <div
               style={{
                 position: "relative",
@@ -59,10 +60,10 @@ function TitleGrid({ items, lang, metric }: { items: TitleRow[]; lang: Lang; met
             >
               {poster ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={poster} alt={pickTitle(t, lang)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <img src={poster} alt={pickTitle(it, lang)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 11, color: "rgba(255,255,255,0.4)", padding: 8, textAlign: "center" }}>
-                  {pickTitle(t, lang)}
+                  {pickTitle(it, lang)}
                 </div>
               )}
               <div style={{ position: "absolute", top: 6, left: 6, background: "rgba(0,0,0,0.65)", color: "#fff", fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 6 }}>
@@ -70,7 +71,7 @@ function TitleGrid({ items, lang, metric }: { items: TitleRow[]; lang: Lang; met
               </div>
             </div>
             <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.9)", marginTop: 6, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-              {pickTitle(t, lang)}
+              {pickTitle(it, lang)}
             </div>
             <div style={{ fontSize: 11, color: metric === "views" ? BRAND : "rgba(255,255,255,0.55)", marginTop: 2 }}>{badge}</div>
           </div>
@@ -89,6 +90,7 @@ export default function TitlesTab({
   range: Range;
   lang: Lang;
 }) {
+  const t = dashTexts(lang);
   const [titles, setTitles] = useState<TitlesResult | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,39 +136,39 @@ export default function TitlesTab({
     return <div style={{ color: "#fca5a5", padding: 16 }}>⚠ {err}</div>;
   }
   if (loading && !titles) {
-    return <div style={{ color: "rgba(255,255,255,0.5)", padding: 24 }}>Cargando títulos…</div>;
+    return <div style={{ color: "rgba(255,255,255,0.5)", padding: 24 }}>{t.loadingTitles}</div>;
   }
 
   return (
     <div style={{ opacity: loading ? 0.6 : 1, transition: "opacity .15s" }}>
       {titles && (
         <>
-          <Panel title="Películas más vistas en Peekr" subtitle="Por cantidad de vistas en el país y período">
-            <TitleGrid items={titles.movies_most_viewed} lang={lang} metric="views" />
+          <Panel title={t.moviesMostViewed} subtitle={t.mostViewedSub}>
+            <TitleGrid items={titles.movies_most_viewed} lang={lang} metric="views" t={t} />
           </Panel>
-          <Panel title="Series más vistas en Peekr" subtitle="Por cantidad de vistas en el país y período">
-            <TitleGrid items={titles.series_most_viewed} lang={lang} metric="views" />
-          </Panel>
-
-          <Panel title="Películas mejor rateadas en Peekr" subtitle="Promedio de rating de usuarios del país (mín. 3 ratings)">
-            <TitleGrid items={titles.movies_top_rated_peekr} lang={lang} metric="peekr" />
-          </Panel>
-          <Panel title="Series mejor rateadas en Peekr" subtitle="Promedio de rating de usuarios del país (mín. 3 ratings)">
-            <TitleGrid items={titles.series_top_rated_peekr} lang={lang} metric="peekr" />
+          <Panel title={t.seriesMostViewed} subtitle={t.mostViewedSub}>
+            <TitleGrid items={titles.series_most_viewed} lang={lang} metric="views" t={t} />
           </Panel>
 
-          <Panel title="Películas mejor rateadas en TMDB" subtitle="vote_average de TMDB entre los títulos activos del período">
-            <TitleGrid items={titles.movies_top_rated_tmdb} lang={lang} metric="tmdb" />
+          <Panel title={t.moviesTopPeekr} subtitle={t.topPeekrSub}>
+            <TitleGrid items={titles.movies_top_rated_peekr} lang={lang} metric="peekr" t={t} />
           </Panel>
-          <Panel title="Series mejor rateadas en TMDB" subtitle="vote_average de TMDB entre los títulos activos del período">
-            <TitleGrid items={titles.series_top_rated_tmdb} lang={lang} metric="tmdb" />
+          <Panel title={t.seriesTopPeekr} subtitle={t.topPeekrSub}>
+            <TitleGrid items={titles.series_top_rated_peekr} lang={lang} metric="peekr" t={t} />
+          </Panel>
+
+          <Panel title={t.moviesTopTmdb} subtitle={t.topTmdbSub}>
+            <TitleGrid items={titles.movies_top_rated_tmdb} lang={lang} metric="tmdb" t={t} />
+          </Panel>
+          <Panel title={t.seriesTopTmdb} subtitle={t.topTmdbSub}>
+            <TitleGrid items={titles.series_top_rated_tmdb} lang={lang} metric="tmdb" t={t} />
           </Panel>
         </>
       )}
 
-      <Panel title="Actores trending (TMDB)" subtitle="Personas en tendencia esta semana — global (TMDB no permite filtrar por región)">
+      <Panel title={t.actorsTitle} subtitle={t.actorsSub}>
         {people.length === 0 ? (
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Sin datos de TMDB</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>{t.noDataTmdb}</div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 14 }}>
             {people.map((p, i) => {

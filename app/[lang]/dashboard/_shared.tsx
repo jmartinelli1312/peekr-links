@@ -184,11 +184,11 @@ export function StatGrid({ children, min = 150 }: { children: ReactNode; min?: n
 }
 
 /** Horizontal bar breakdown from a {label -> count} map. */
-export function BarList({ data, color = BRAND }: { data: Record<string, number>; color?: string }) {
+export function BarList({ data, color = BRAND, emptyLabel = "—" }: { data: Record<string, number>; color?: string; emptyLabel?: string }) {
   const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
   const max = entries.reduce((m, [, v]) => Math.max(m, v), 0) || 1;
   if (entries.length === 0) {
-    return <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Sin datos</div>;
+    return <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>{emptyLabel}</div>;
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

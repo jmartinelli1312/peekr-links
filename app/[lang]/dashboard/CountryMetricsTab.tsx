@@ -8,11 +8,13 @@ import {
   BRAND,
   fmtInt,
   fmtPct,
+  Lang,
   LineChart,
   Panel,
   StatCard,
   StatGrid,
 } from "./_shared";
+import { dashTexts, sectionLabel } from "./texts";
 
 type Range = { from: string; to: string };
 
@@ -69,14 +71,6 @@ const ONBOARDING_SCREENS = new Set([
   "/intro-carousel", "/post-signup", "/auth-landing", "/login-callback",
   "/follow-onboarding-seen", "/onboarding", "/signup", "/guest-lock",
 ]);
-const SECTION_LABELS: Record<string, string> = {
-  "/feed": "Feed", "/explore": "Explorar", "/explore/search": "Buscador (Explore)",
-  "/activity": "Actividad", "/activity/ranking": "Ranking", "/inbox": "Inbox", "/profile": "Perfil propio",
-  "/title/:type/:id": "Ficha de título", "/detail": "Detalle de título", "/actor/:id": "Actor",
-  "/u/:username": "Perfil de usuario", "/profile/peeklists/:id": "Peeklist", "/watchlist": "Watchlist",
-  "/follow-list": "Seguidores / Siguiendo", "/inbox/chat/:id": "Chat", "/inbox/new": "Nuevo chat",
-  "/settings": "Ajustes", "/settings/about": "Acerca de", "/edit-profile": "Editar perfil",
-};
 
 type Behavior = {
   active_users: number;
@@ -93,11 +87,14 @@ export default function CountryMetricsTab({
   supabase,
   range,
   onlyOnboarded,
+  lang,
 }: {
   supabase: SupabaseClient;
   range: Range;
   onlyOnboarded: boolean;
+  lang: Lang;
 }) {
+  const t = dashTexts(lang);
   const [geo, setGeo] = useState<Geo | null>(null);
   const [ret, setRet] = useState<Retention | null>(null);
   const [wow, setWow] = useState<Wow | null>(null);
@@ -147,37 +144,37 @@ export default function CountryMetricsTab({
     return <div style={{ color: "#fca5a5", padding: 16 }}>⚠ {err}</div>;
   }
   if (loading && !geo) {
-    return <div style={{ color: "rgba(255,255,255,0.5)", padding: 24 }}>Cargando métricas…</div>;
+    return <div style={{ color: "rgba(255,255,255,0.5)", padding: 24 }}>{t.loadingMetrics}</div>;
   }
 
   return (
     <div style={{ opacity: loading ? 0.6 : 1, transition: "opacity .15s" }}>
       {/* Global data del país (totales acumulados) */}
       {geo && (
-        <Panel title="Global del país" subtitle="Totales acumulados (toda la historia)">
+        <Panel title={t.globalTitle} subtitle={t.globalSub}>
           <StatGrid>
-            <StatCard label="Usuarios totales" value={fmtInt(geo.totals.users)} />
-            <StatCard label="Onboarding completo" value={fmtInt(geo.totals.onboarded)} />
-            <StatCard label="Ratings totales" value={fmtInt(geo.totals.ratings)} />
-            <StatCard label="En watchlist" value={fmtInt(geo.totals.watchlist)} />
+            <StatCard label={t.totalUsers} value={fmtInt(geo.totals.users)} />
+            <StatCard label={t.onboardingDone} value={fmtInt(geo.totals.onboarded)} />
+            <StatCard label={t.totalRatings} value={fmtInt(geo.totals.ratings)} />
+            <StatCard label={t.inWatchlist} value={fmtInt(geo.totals.watchlist)} />
           </StatGrid>
         </Panel>
       )}
 
       {/* Audiencia (installs) + onboarding del período */}
       {geo && (
-        <Panel title="Audiencia del período" subtitle="Installs y onboarding en el rango seleccionado">
+        <Panel title={t.audienceTitle} subtitle={t.audienceSub}>
           <StatGrid>
-            <StatCard label="Nuevos installs" value={fmtInt(geo.new_signups)} hint={`Período previo: ${fmtInt(geo.new_signups_prev)}`} accent={BRAND} />
-            <StatCard label="Onboarding completo" value={fmtInt(geo.onboarding_completed)} />
-            <StatCard label="Tasa de onboarding" value={fmtPct(geo.onboarding_rate)} />
+            <StatCard label={t.newInstalls} value={fmtInt(geo.new_signups)} hint={t.prevPeriod(fmtInt(geo.new_signups_prev))} accent={BRAND} />
+            <StatCard label={t.onboardingDone} value={fmtInt(geo.onboarding_completed)} />
+            <StatCard label={t.onboardingRate} value={fmtPct(geo.onboarding_rate)} />
           </StatGrid>
         </Panel>
       )}
 
       {/* Crecimiento de audiencia */}
       {geo && geo.growth_chart.length > 0 && (
-        <Panel title="Crecimiento de audiencia" subtitle="Usuarios acumulados del país en el período">
+        <Panel title={t.growthTitle} subtitle={t.growthSub}>
           <LineChart
             values={geo.growth_chart.map((g) => g.cumulative)}
             labels={geo.growth_chart.map((g) => g.day)}
@@ -188,35 +185,35 @@ export default function CountryMetricsTab({
       {/* Platform + Provider */}
       {geo && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
-          <Panel title="Platform" subtitle="Nuevos installs por plataforma">
-            <BarList data={geo.by_platform} />
+          <Panel title={t.platformTitle} subtitle={t.platformSub}>
+            <BarList data={geo.by_platform} emptyLabel={t.noData} />
           </Panel>
-          <Panel title="Provider" subtitle="Método de registro (Google / Apple / email)">
-            <BarList data={geo.by_provider} color="#6366f1" />
+          <Panel title={t.providerTitle} subtitle={t.providerSub}>
+            <BarList data={geo.by_provider} color="#6366f1" emptyLabel={t.noData} />
           </Panel>
         </div>
       )}
 
       {/* Retención DAU/WAU/MAU */}
       {ret && (
-        <Panel title="Retención" subtitle={`Promedio diario del período (${ret.days_in_period ?? "—"} día${ret.days_in_period === 1 ? "" : "s"}). Uso real = navegó contenido o hizo una acción. 'contrib' = solo acciones explícitas post-install.`}>
+        <Panel title={t.retentionTitle} subtitle={t.retentionSub(String(ret.days_in_period ?? "—"), ret.days_in_period !== 1)}>
           <StatGrid>
-            <StatCard label="DAU prom/día" value={`${ret.dau}`} hint={ret.contributors_dau != null ? `contrib: ${ret.contributors_dau}` : undefined} accent={BRAND} />
-            <StatCard label="WAU prom/día" value={`${ret.wau}`} hint={ret.contributors_wau != null ? `contrib: ${ret.contributors_wau}` : undefined} />
-            <StatCard label="MAU prom/día" value={`${ret.mau}`} hint={ret.contributors_mau != null ? `contrib: ${ret.contributors_mau}` : undefined} />
-            <StatCard label="North Star prom/día" value={ret.north_star != null ? `${ret.north_star}` : "—"} hint="WEU (cuentas ≥7d)" accent={BRAND} />
-            <StatCard label="DAU / MAU" value={fmtPct(ret.stickiness_dau_mau)} hint="Stickiness diario" />
-            <StatCard label="WAU / MAU" value={fmtPct(ret.stickiness_wau_mau)} hint="Stickiness semanal" />
-            <StatCard label="En riesgo de churn" value={fmtInt(ret.churn_risk)} />
-            <StatCard label="Resucitados" value={fmtInt(ret.resurrected)} />
-            <StatCard label="Activos por 1ª vez" value={fmtInt(ret.first_time_active)} hint="Esta semana" />
+            <StatCard label={t.dauAvg} value={`${ret.dau}`} hint={ret.contributors_dau != null ? t.contrib(ret.contributors_dau) : undefined} accent={BRAND} />
+            <StatCard label={t.wauAvg} value={`${ret.wau}`} hint={ret.contributors_wau != null ? t.contrib(ret.contributors_wau) : undefined} />
+            <StatCard label={t.mauAvg} value={`${ret.mau}`} hint={ret.contributors_mau != null ? t.contrib(ret.contributors_mau) : undefined} />
+            <StatCard label={t.northStarAvg} value={ret.north_star != null ? `${ret.north_star}` : "—"} hint={t.weuHint} accent={BRAND} />
+            <StatCard label={t.dauMau} value={fmtPct(ret.stickiness_dau_mau)} hint={t.stickyDaily} />
+            <StatCard label={t.wauMau} value={fmtPct(ret.stickiness_wau_mau)} hint={t.stickyWeekly} />
+            <StatCard label={t.churnRisk} value={fmtInt(ret.churn_risk)} />
+            <StatCard label={t.resurrected} value={fmtInt(ret.resurrected)} />
+            <StatCard label={t.firstTimeActive} value={fmtInt(ret.first_time_active)} hint={t.thisWeek} />
           </StatGrid>
         </Panel>
       )}
 
       {/* Retención WoW */}
       {wow && wow.base_weeks.length > 0 && (
-        <Panel title="Retención semana a semana (WoW)" subtitle="% de activos de una semana que vuelven la siguiente">
+        <Panel title={t.wowTitle} subtitle={t.wowSub}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {wow.base_weeks.map((week, i) => (
               <div key={week} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -235,50 +232,51 @@ export default function CountryMetricsTab({
 
       {/* Comportamiento (DAU activity series + behavior totals) */}
       {ts && ts.days.length > 0 && (
-        <Panel title="Actividad diaria (DAU)" subtitle="Usuarios activos por día en el período">
+        <Panel title={t.dailyDauTitle} subtitle={t.dailyDauSub}>
           <LineChart values={ts.retention.dau} labels={ts.days} color="#10b981" />
         </Panel>
       )}
 
       {beh && (
-        <Panel title="Comportamiento" subtitle={`Usuarios activos en el período: ${fmtInt(beh.active_users)}`}>
+        <Panel title={t.behaviorTitle} subtitle={t.behaviorSub(fmtInt(beh.active_users))}>
           <StatGrid>
-            <StatCard label="Ratings" value={fmtInt(beh.ratings.total)} hint={`${beh.ratings.per_active_avg} por activo`} />
-            <StatCard label="Comentarios" value={fmtInt(beh.comments.total)} hint={`${beh.comments.per_active_avg} por activo`} />
-            <StatCard label="Watchlist" value={fmtInt(beh.watchlist.total)} hint={`${beh.watchlist.per_active_avg} por activo`} />
-            <StatCard label="Peeklists creadas" value={fmtInt(beh.peeklists.created)} hint={`${fmtInt(beh.peeklists.items_added)} ítems`} />
-            <StatCard label="Likes (títulos)" value={fmtInt(beh.likes.title_likes)} />
-            <StatCard label="Likes (comentarios)" value={fmtInt(beh.likes.comment_likes_given)} />
-            <StatCard label="Follows" value={fmtInt(beh.follows.created)} hint={`${fmtPct(beh.follows.mutual_pct)} mutuos`} />
-            <StatCard label="Rateadores retornando" value={fmtInt(beh.north_star_war_returning)} hint="Cuentas ≥7d que ratearon (7d)" />
+            <StatCard label={t.ratings} value={fmtInt(beh.ratings.total)} hint={t.perActive(beh.ratings.per_active_avg)} />
+            <StatCard label={t.comments} value={fmtInt(beh.comments.total)} hint={t.perActive(beh.comments.per_active_avg)} />
+            <StatCard label={t.watchlist} value={fmtInt(beh.watchlist.total)} hint={t.perActive(beh.watchlist.per_active_avg)} />
+            <StatCard label={t.peeklistsCreated} value={fmtInt(beh.peeklists.created)} hint={t.items(fmtInt(beh.peeklists.items_added))} />
+            <StatCard label={t.likesTitles} value={fmtInt(beh.likes.title_likes)} />
+            <StatCard label={t.likesComments} value={fmtInt(beh.likes.comment_likes_given)} />
+            <StatCard label={t.follows} value={fmtInt(beh.follows.created)} hint={t.mutual(fmtPct(beh.follows.mutual_pct))} />
+            <StatCard label={t.ratersReturning} value={fmtInt(beh.north_star_war_returning)} hint={t.ratersHint} />
           </StatGrid>
         </Panel>
       )}
 
       {/* Uso de la app: tiempo + secciones */}
       {app && (
-        <Panel title="Uso de la app" subtitle="Tiempo en app y secciones más navegadas (screen_views desde 29-may, duración capada a 10 min/pantalla)">
+        <Panel title={t.appTitle} subtitle={t.appSub}>
           <StatGrid>
-            <StatCard label="Tiempo / usuario" value={`${app.avg_min_per_user} min`} hint={`Mediana: ${app.median_min_per_user} min`} accent={BRAND} />
-            <StatCard label="Tiempo total" value={`${Math.round(app.total_minutes / 60)} h`} hint={`${fmtInt(app.total_minutes)} min`} />
-            <StatCard label="Por pantalla" value={`${app.avg_sec_per_screen}s`} />
-            <StatCard label="Usuarios con navegación" value={fmtInt(app.active_users)} />
+            <StatCard label={t.timePerUser} value={`${app.avg_min_per_user} ${t.minShort}`} hint={t.median(app.median_min_per_user)} accent={BRAND} />
+            <StatCard label={t.totalTime} value={`${Math.round(app.total_minutes / 60)} h`} hint={`${fmtInt(app.total_minutes)} ${t.minShort}`} />
+            <StatCard label={t.perScreen} value={`${app.avg_sec_per_screen}s`} />
+            <StatCard label={t.usersWithNav} value={fmtInt(app.active_users)} />
           </StatGrid>
           <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>{t.mostNavigated}</div>
             {(() => {
               const sections = (app.top_sections ?? []).filter((s) => !ONBOARDING_SCREENS.has(s.screen));
               const maxViews = sections.reduce((m, s) => Math.max(m, s.views), 0) || 1;
-              if (sections.length === 0) return <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Sin datos</div>;
+              if (sections.length === 0) return <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>{t.noData}</div>;
               return (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {sections.map((s) => (
                     <div key={s.screen} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 140, fontSize: 13, color: "rgba(255,255,255,0.75)" }}>{SECTION_LABELS[s.screen] ?? s.screen}</div>
+                      <div style={{ width: 140, fontSize: 13, color: "rgba(255,255,255,0.75)" }}>{sectionLabel(s.screen, t)}</div>
                       <div style={{ flex: 1, background: "rgba(255,255,255,0.06)", borderRadius: 6, height: 20 }}>
                         <div style={{ width: `${(s.views / maxViews) * 100}%`, background: BRAND, height: "100%", borderRadius: 6, minWidth: 2 }} />
                       </div>
                       <div style={{ width: 170, textAlign: "right", fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
-                        {fmtInt(s.views)} vistas · {fmtInt(s.users)} users · {s.avg_sec}s
+                        {fmtInt(s.views)} · {fmtInt(s.users)} · {s.avg_sec}s
                       </div>
                     </div>
                   ))}
