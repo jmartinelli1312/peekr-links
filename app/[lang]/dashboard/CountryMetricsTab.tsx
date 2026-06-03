@@ -70,6 +70,8 @@ const ONBOARDING_SCREENS = new Set([
   "/follow-onboarding-seen", "/onboarding", "/signup", "/guest-lock",
 ]);
 const SECTION_LABELS: Record<string, string> = {
+  "/feed": "Feed", "/explore": "Explorar", "/explore/search": "Buscador (Explore)",
+  "/activity": "Actividad", "/activity/ranking": "Ranking", "/inbox": "Inbox", "/profile": "Perfil propio",
   "/title/:type/:id": "Ficha de título", "/detail": "Detalle de título", "/actor/:id": "Actor",
   "/u/:username": "Perfil de usuario", "/profile/peeklists/:id": "Peeklist", "/watchlist": "Watchlist",
   "/follow-list": "Seguidores / Siguiendo", "/inbox/chat/:id": "Chat", "/inbox/new": "Nuevo chat",

@@ -612,6 +612,13 @@ const ONBOARDING_SCREENS = new Set([
 ]);
 
 const SECTION_LABELS: Record<string, string> = {
+  "/feed": "Feed",
+  "/explore": "Explorar",
+  "/explore/search": "Buscador (Explore)",
+  "/activity": "Actividad",
+  "/activity/ranking": "Ranking",
+  "/inbox": "Inbox",
+  "/profile": "Perfil propio",
   "/title/:type/:id": "Ficha de título",
   "/detail": "Detalle de título",
   "/actor/:id": "Actor",
