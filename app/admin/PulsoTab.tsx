@@ -52,6 +52,8 @@ type Retention = {
   contributors_dau?: number;  // legacy strict def: explicit action post-install
   contributors_wau?: number;
   contributors_mau?: number;
+  north_star?: number;        // period-average WEU (established users)
+  days_in_period?: number;
   churn_risk: number;
   resurrected: number;
   first_time_active: number;
@@ -309,6 +311,8 @@ export default function PulsoTab({ supabase }: Props) {
         }),
         supabase.rpc("admin_kpi_acquisition_global"),
         supabase.rpc("admin_kpi_retention", {
+          p_from: fromTs,
+          p_to_exclusive: toTsExclusive,
           p_only_onboarded: onlyOnboarded,
         }),
         supabase.rpc("admin_kpi_wow_retention", {
@@ -670,9 +674,12 @@ function AppEngagementSection({ data }: { data: AppEngagement | null }) {
   );
 }
 
-function NorthStarCard({ behavior }: { behavior: Behavior | null }) {
-  const value = behavior?.north_star_weu_returning ?? 0;
+function NorthStarCard({ behavior, retention }: { behavior: Behavior | null; retention: Retention | null }) {
+  // Prefer the period-average WEU from retention; fall back to behavior's
+  // as-of-now value if retention hasn't loaded.
+  const value = retention?.north_star ?? behavior?.north_star_weu_returning ?? 0;
   const ratersValue = behavior?.north_star_war_returning ?? 0;
+  const isAvg = retention?.north_star != null;
   const light = lightFor(value, { red: 100, yellow: 250 });
 
   return (
@@ -685,7 +692,7 @@ function NorthStarCard({ behavior }: { behavior: Behavior | null }) {
       }}
     >
       <div style={{ fontSize: 12, color: "#fff8", letterSpacing: 1 }}>
-        🌟 NORTH STAR — Weekly Engaged Returners
+        🌟 NORTH STAR — Weekly Engaged Returners{isAvg ? " (prom/día del período)" : ""}
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginTop: 6 }}>
         <div
@@ -864,7 +871,7 @@ function RetentionSection({
 
       {/* North Star (Weekly Engaged Returners) — la métrica que importa */}
       <div style={{ marginBottom: 14 }}>
-        <NorthStarCard behavior={behavior} />
+        <NorthStarCard behavior={behavior} retention={data} />
       </div>
 
       {/* Alertas activas — semáforos en rojo */}
@@ -883,32 +890,35 @@ function RetentionSection({
       )}
 
       <p style={{ color: "#fff8", fontSize: 12, marginTop: -4, marginBottom: 14 }}>
-        <strong style={{ color: "#fff" }}>Uso real</strong> = abrió y navegó
-        contenido (ficha, detalle, actor, perfil…) <em>o</em> hizo una acción
-        (rate / comment / watchlist / like / follow). Incluye el día de install.
-        Entre paréntesis, <strong style={{ color: "#fff" }}>contribuidores</strong>{" "}
-        (solo acciones explícitas post-install — la métrica anterior).{" "}
+        <strong style={{ color: "#fff" }}>Promedio diario del período</strong>{" "}
+        seleccionado ({data.days_in_period ?? "—"} día
+        {data.days_in_period === 1 ? "" : "s"}). DAU = promedio de activos por día;
+        WAU = promedio del rolling-7d por día; MAU = promedio del rolling-30d.{" "}
+        <strong style={{ color: "#fff" }}>Activo</strong> = navegó contenido o hizo
+        una acción (uso real). Entre paréntesis,{" "}
+        <strong style={{ color: "#fff" }}>contribuidores</strong> (solo acciones
+        explícitas post-install).{" "}
         <span style={{ color: "#fbbf24" }}>
-          Nota: la navegación se trackea desde 29-may, así que WAU/MAU y su ratio
-          aún se están llenando (stickiness puede verse alto temporalmente).
+          La navegación se trackea desde 29-may; en períodos largos el promedio
+          incluye días sin esa señal.
         </span>
       </p>
 
       <div style={cardsGrid}>
         <Kpi
-          label="DAU"
+          label="DAU prom/día"
           value={data.dau}
-          sub={`Uso real hoy${data.contributors_dau != null ? ` · contrib: ${data.contributors_dau}` : ""}`}
+          sub={`Activos/día${data.contributors_dau != null ? ` · contrib: ${data.contributors_dau}` : ""}`}
         />
         <Kpi
-          label="WAU"
+          label="WAU prom/día"
           value={data.wau}
-          sub={`Uso real 7d${data.contributors_wau != null ? ` · contrib: ${data.contributors_wau}` : ""}`}
+          sub={`Rolling 7d${data.contributors_wau != null ? ` · contrib: ${data.contributors_wau}` : ""}`}
         />
         <Kpi
-          label="MAU"
+          label="MAU prom/día"
           value={data.mau}
-          sub={`Uso real 30d${data.contributors_mau != null ? ` · contrib: ${data.contributors_mau}` : ""}`}
+          sub={`Rolling 30d${data.contributors_mau != null ? ` · contrib: ${data.contributors_mau}` : ""}`}
         />
         <Kpi
           label="Stickiness · WAU/MAU"

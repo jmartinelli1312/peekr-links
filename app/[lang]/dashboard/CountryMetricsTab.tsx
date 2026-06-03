@@ -36,6 +36,8 @@ type Retention = {
   contributors_dau?: number;
   contributors_wau?: number;
   contributors_mau?: number;
+  north_star?: number;
+  days_in_period?: number;
   churn_risk: number;
   resurrected: number;
   first_time_active: number;
@@ -110,7 +112,7 @@ export default function CountryMetricsTab({
       const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
       const [geoRes, retRes, wowRes, tsRes, behRes, appRes] = await Promise.all([
         supabase.rpc("creator_kpi_geo", { p_from: fromTs, p_to_exclusive: toTsExclusive }),
-        supabase.rpc("creator_kpi_retention", { p_only_onboarded: onlyOnboarded }),
+        supabase.rpc("creator_kpi_retention", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_only_onboarded: onlyOnboarded }),
         supabase.rpc("creator_kpi_wow_retention", { p_weeks: 8 }),
         supabase.rpc("creator_kpi_time_series", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_only_onboarded: onlyOnboarded }),
         supabase.rpc("creator_kpi_behavior", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_only_onboarded: onlyOnboarded }),
@@ -195,11 +197,12 @@ export default function CountryMetricsTab({
 
       {/* Retención DAU/WAU/MAU */}
       {ret && (
-        <Panel title="Retención" subtitle="Uso real: navegó contenido o hizo una acción (incl. día de install). 'contrib' = solo acciones explícitas post-install.">
+        <Panel title="Retención" subtitle={`Promedio diario del período (${ret.days_in_period ?? "—"} día${ret.days_in_period === 1 ? "" : "s"}). Uso real = navegó contenido o hizo una acción. 'contrib' = solo acciones explícitas post-install.`}>
           <StatGrid>
-            <StatCard label="DAU" value={fmtInt(ret.dau)} hint={ret.contributors_dau != null ? `contrib: ${fmtInt(ret.contributors_dau)}` : undefined} accent={BRAND} />
-            <StatCard label="WAU" value={fmtInt(ret.wau)} hint={ret.contributors_wau != null ? `contrib: ${fmtInt(ret.contributors_wau)}` : undefined} />
-            <StatCard label="MAU" value={fmtInt(ret.mau)} hint={ret.contributors_mau != null ? `contrib: ${fmtInt(ret.contributors_mau)}` : undefined} />
+            <StatCard label="DAU prom/día" value={`${ret.dau}`} hint={ret.contributors_dau != null ? `contrib: ${ret.contributors_dau}` : undefined} accent={BRAND} />
+            <StatCard label="WAU prom/día" value={`${ret.wau}`} hint={ret.contributors_wau != null ? `contrib: ${ret.contributors_wau}` : undefined} />
+            <StatCard label="MAU prom/día" value={`${ret.mau}`} hint={ret.contributors_mau != null ? `contrib: ${ret.contributors_mau}` : undefined} />
+            <StatCard label="North Star prom/día" value={ret.north_star != null ? `${ret.north_star}` : "—"} hint="WEU (cuentas ≥7d)" accent={BRAND} />
             <StatCard label="DAU / MAU" value={fmtPct(ret.stickiness_dau_mau)} hint="Stickiness diario" />
             <StatCard label="WAU / MAU" value={fmtPct(ret.stickiness_wau_mau)} hint="Stickiness semanal" />
             <StatCard label="En riesgo de churn" value={fmtInt(ret.churn_risk)} />
@@ -245,7 +248,7 @@ export default function CountryMetricsTab({
             <StatCard label="Likes (títulos)" value={fmtInt(beh.likes.title_likes)} />
             <StatCard label="Likes (comentarios)" value={fmtInt(beh.likes.comment_likes_given)} />
             <StatCard label="Follows" value={fmtInt(beh.follows.created)} hint={`${fmtPct(beh.follows.mutual_pct)} mutuos`} />
-            <StatCard label="WAR retornando" value={fmtInt(beh.north_star_war_returning)} hint="North star (7d)" accent={BRAND} />
+            <StatCard label="Rateadores retornando" value={fmtInt(beh.north_star_war_returning)} hint="Cuentas ≥7d que ratearon (7d)" />
           </StatGrid>
         </Panel>
       )}
