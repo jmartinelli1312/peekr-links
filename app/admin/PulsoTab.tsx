@@ -49,6 +49,9 @@ type Retention = {
   mau: number;
   stickiness_dau_mau: number;  // DAU / MAU — daily engagement intensity
   stickiness_wau_mau: number;  // WAU / MAU — weekly cadence (the one that matters for Letterboxd-style)
+  contributors_dau?: number;  // legacy strict def: explicit action post-install
+  contributors_wau?: number;
+  contributors_mau?: number;
   churn_risk: number;
   resurrected: number;
   first_time_active: number;
@@ -83,6 +86,12 @@ type Cohort = {
 
 type Behavior = {
   active_users: number;
+  /** Active users that signed up BEFORE the range — matches DAU. */
+  active_users_mature?: number;
+  /** Active users that signed up during the range (their first day). */
+  active_users_install_day?: number;
+  /** Signups in the range (whether they did anything else or not). */
+  signups_in_range?: number;
   ratings: { total: number; prev: number; per_active_avg: number };
   comments: { total: number; prev: number; per_active_avg: number };
   watchlist: { total: number; prev: number; per_active_avg: number };
@@ -775,27 +784,32 @@ function RetentionSection({
       )}
 
       <p style={{ color: "#fff8", fontSize: 12, marginTop: -4, marginBottom: 14 }}>
-        <strong style={{ color: "#fff" }}>Activo</strong> = hizo ≥1 acción
-        (rate / comment / watchlist / peeklist / like / follow) en un día{" "}
-        <strong style={{ color: "#fff" }}>posterior</strong> al día de signup.
-        Excluye actividad de install-day para medir retorno real.
+        <strong style={{ color: "#fff" }}>Uso real</strong> = abrió y navegó
+        contenido (ficha, detalle, actor, perfil…) <em>o</em> hizo una acción
+        (rate / comment / watchlist / like / follow). Incluye el día de install.
+        Entre paréntesis, <strong style={{ color: "#fff" }}>contribuidores</strong>{" "}
+        (solo acciones explícitas post-install — la métrica anterior).{" "}
+        <span style={{ color: "#fbbf24" }}>
+          Nota: la navegación se trackea desde 29-may, así que WAU/MAU y su ratio
+          aún se están llenando (stickiness puede verse alto temporalmente).
+        </span>
       </p>
 
       <div style={cardsGrid}>
         <Kpi
           label="DAU"
           value={data.dau}
-          sub="Activos hoy (sin install-day)"
+          sub={`Uso real hoy${data.contributors_dau != null ? ` · contrib: ${data.contributors_dau}` : ""}`}
         />
         <Kpi
           label="WAU"
           value={data.wau}
-          sub="Activos últimos 7d (post-install)"
+          sub={`Uso real 7d${data.contributors_wau != null ? ` · contrib: ${data.contributors_wau}` : ""}`}
         />
         <Kpi
           label="MAU"
           value={data.mau}
-          sub="Activos últimos 30d (post-install)"
+          sub={`Uso real 30d${data.contributors_mau != null ? ` · contrib: ${data.contributors_mau}` : ""}`}
         />
         <Kpi
           label="Stickiness · WAU/MAU"
@@ -1019,19 +1033,26 @@ type KnownCampaign = { from: string; to: string; label: string; kind: "paid" | "
 const KNOWN_CAMPAIGNS: Record<Cohort["bucket"], KnownCampaign[]> = {
   PA: [
     // Kevin posted his reel organically May 3. The same reel was then boosted
-    // as a paid Meta ad starting May 12 (still running). We model them as two
-    // distinct phases because the audience differs dramatically:
-    //   - Organic = Kevin's actual followers (engaged film audience)
-    //   - Paid = broader cold audience served by Meta's algo
+    // as a paid Meta ad starting May 12. Both Boost Post engagement campaigns
+    // were paused May 28 once we discovered they were optimizing for
+    // engagement (not installs) — that's why none of the spent $328 showed
+    // up as attributed installs in Meta. The new App Promotion campaigns
+    // launched May 29 (separated into Android + iOS ad sets within the
+    // same campaign for clean platform-level reporting).
     { from: "2026-05-03", to: "2026-05-11", label: "Kevin reel orgánico", kind: "organic" },
-    { from: "2026-05-12", to: "2099-01-01", label: "Kevin reel boosted (paid)", kind: "paid" },
+    { from: "2026-05-12", to: "2026-05-28", label: "Kevin reel boosted (Engagement obj.)", kind: "paid" },
     { from: "2026-05-13", to: "2026-05-16", label: "@elchotin.xyz carrusel", kind: "organic" },
+    { from: "2026-05-29", to: "2099-01-01", label: "Kevin reel — Android (App Installs)", kind: "paid" },
+    { from: "2026-05-29", to: "2099-01-01", label: "Kevin reel — iOS (App Installs)", kind: "paid" },
   ],
   AR: [
-    // Pelisaldetalle didn't post to his own profile — he handed the video to
-    // Jorge, who ran it as a paid Meta ad. So this is 100% paid traffic,
-    // same delivery model as Kevin's boosted reel (just a different creative).
-    { from: "2026-05-24", to: "2099-01-01", label: "pelisaldetalle reel (paid Meta)", kind: "paid" },
+    // The May 24 pelisaldetalle ad was also an Engagement-objective Boost
+    // Post — paused May 28 alongside Kevin's once we caught the mistake.
+    // App Promotion variants relaunched May 29 with proper conversion
+    // optimization + CAPI signal.
+    { from: "2026-05-24", to: "2026-05-28", label: "pelisaldetalle reel (Engagement obj.)", kind: "paid" },
+    { from: "2026-05-29", to: "2099-01-01", label: "pelisaldetalle reel — Android (App Installs)", kind: "paid" },
+    { from: "2026-05-29", to: "2099-01-01", label: "pelisaldetalle reel — iOS (App Installs)", kind: "paid" },
   ],
   Other: [],
 };
@@ -1243,11 +1264,28 @@ function BehaviorSection({
   const watchlistDelta = deltaPct(data.watchlist.total, data.watchlist.prev);
   const peeklistDelta = deltaPct(data.peeklists.created, data.peeklists.prev);
 
+  // Breakdown of active users between newly-signed-up-in-range vs returning.
+  // Older RPC responses don't include the breakdown — fall back to a
+  // single-line label in that case.
+  const mature = data.active_users_mature;
+  const installDay = data.active_users_install_day;
+  const hasBreakdown =
+    typeof mature === "number" && typeof installDay === "number";
+
   return (
     <section style={sectionCard}>
       <h3 style={sectionTitle}>🎬 Comportamiento</h3>
       <p style={{ color: "#fff8", fontSize: 12, marginTop: -4, marginBottom: 16 }}>
-        Promedios calculados sobre <strong>{formatNumber(data.active_users)}</strong> usuarios activos en el rango.
+        Promedios calculados sobre <strong>{formatNumber(data.active_users)}</strong> usuarios activos en el rango
+        {hasBreakdown && (
+          <>
+            {" "}
+            <span style={{ color: "#fff5" }}>
+              ({formatNumber(mature!)} retornantes + {formatNumber(installDay!)} nuevos en el rango)
+            </span>
+          </>
+        )}
+        .
       </p>
 
       <div style={cardsGrid}>

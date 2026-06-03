@@ -33,6 +33,9 @@ type Retention = {
   mau: number;
   stickiness_dau_mau: number;
   stickiness_wau_mau: number;
+  contributors_dau?: number;
+  contributors_wau?: number;
+  contributors_mau?: number;
   churn_risk: number;
   resurrected: number;
   first_time_active: number;
@@ -167,11 +170,11 @@ export default function CountryMetricsTab({
 
       {/* Retención DAU/WAU/MAU */}
       {ret && (
-        <Panel title="Retención" subtitle="Usuarios activos (acción posterior al día de install)">
+        <Panel title="Retención" subtitle="Uso real: navegó contenido o hizo una acción (incl. día de install). 'contrib' = solo acciones explícitas post-install.">
           <StatGrid>
-            <StatCard label="DAU" value={fmtInt(ret.dau)} accent={BRAND} />
-            <StatCard label="WAU" value={fmtInt(ret.wau)} />
-            <StatCard label="MAU" value={fmtInt(ret.mau)} />
+            <StatCard label="DAU" value={fmtInt(ret.dau)} hint={ret.contributors_dau != null ? `contrib: ${fmtInt(ret.contributors_dau)}` : undefined} accent={BRAND} />
+            <StatCard label="WAU" value={fmtInt(ret.wau)} hint={ret.contributors_wau != null ? `contrib: ${fmtInt(ret.contributors_wau)}` : undefined} />
+            <StatCard label="MAU" value={fmtInt(ret.mau)} hint={ret.contributors_mau != null ? `contrib: ${fmtInt(ret.contributors_mau)}` : undefined} />
             <StatCard label="DAU / MAU" value={fmtPct(ret.stickiness_dau_mau)} hint="Stickiness diario" />
             <StatCard label="WAU / MAU" value={fmtPct(ret.stickiness_wau_mau)} hint="Stickiness semanal" />
             <StatCard label="En riesgo de churn" value={fmtInt(ret.churn_risk)} />
