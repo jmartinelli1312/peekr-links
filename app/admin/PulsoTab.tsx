@@ -291,6 +291,7 @@ export default function PulsoTab({ supabase }: Props) {
   const [behavior, setBehavior] = useState<Behavior | null>(null);
   const [timeSeries, setTimeSeries] = useState<TimeSeries | null>(null);
   const [appEngagement, setAppEngagement] = useState<AppEngagement | null>(null);
+  const [abFeed, setAbFeed] = useState<ABFeed | null>(null);
   const [retentionTab, setRetentionTab] = useState<RetentionSeries>("dau");
   const [behaviorTab, setBehaviorTab] = useState<BehaviorSeries>("ratings");
   const [topMetric, setTopMetric] = useState<TopMetric>("ratings");
@@ -304,7 +305,7 @@ export default function PulsoTab({ supabase }: Props) {
     try {
       const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
 
-      const [acqRes, acqGlobalRes, retRes, wowRes, cohortRes, behRes, tsRes, appRes] = await Promise.all([
+      const [acqRes, acqGlobalRes, retRes, wowRes, cohortRes, behRes, tsRes, appRes, abRes] = await Promise.all([
         supabase.rpc("admin_kpi_acquisition", {
           p_from: fromTs,
           p_to_exclusive: toTsExclusive,
@@ -335,6 +336,10 @@ export default function PulsoTab({ supabase }: Props) {
           p_from: fromTs,
           p_to_exclusive: toTsExclusive,
         }),
+        supabase.rpc("admin_kpi_ab_feed", {
+          p_from: fromTs,
+          p_to_exclusive: toTsExclusive,
+        }),
       ]);
 
       if (acqRes.error) throw acqRes.error;
@@ -345,6 +350,7 @@ export default function PulsoTab({ supabase }: Props) {
       if (behRes.error) throw behRes.error;
       if (tsRes.error) throw tsRes.error;
       if (appRes.error) throw appRes.error;
+      if (abRes.error) throw abRes.error;
 
       setAcquisition(acqRes.data as Acquisition);
       setAcquisitionGlobal(acqGlobalRes.data as AcquisitionGlobal);
@@ -354,6 +360,7 @@ export default function PulsoTab({ supabase }: Props) {
       setBehavior(behRes.data as Behavior);
       setTimeSeries(tsRes.data as TimeSeries);
       setAppEngagement(appRes.data as AppEngagement);
+      setAbFeed(abRes.data as ABFeed);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -515,6 +522,9 @@ export default function PulsoTab({ supabase }: Props) {
       {/* ═════ 3.5 USO DE LA APP (tiempo + secciones) ═════ */}
       <AppEngagementSection data={appEngagement} />
 
+      {/* ═════ 3.6 A/B FEED vs IMMERSIVE ═════ */}
+      <ABFeedSection data={abFeed} />
+
       {/* ═════ 4. COHORTS ═════ */}
       <CohortRetentionSection cohorts={cohorts} />
 
@@ -635,6 +645,92 @@ const SECTION_LABELS: Record<string, string> = {
 
 function sectionLabel(screen: string): string {
   return SECTION_LABELS[screen] ?? screen;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// A/B FEED vs IMMERSIVE (actividad social por variante)
+// ═════════════════════════════════════════════════════════════════════════════
+type ABVariant = {
+  variant: string;
+  active_users: number;
+  social_users: number;
+  comments: number;
+  follows: number;
+  likes: number;
+  ratings: number;
+  social_per_active: number;
+  ratings_per_active: number;
+  pct_social: number;
+};
+type ABFeed = { variants: ABVariant[] };
+
+function ABFeedSection({ data }: { data: ABFeed | null }) {
+  if (!data) return null;
+  const feed = data.variants.find((v) => v.variant === "feed_default");
+  const imm = data.variants.find((v) => v.variant === "immersive_default");
+  if (!feed || !imm) return null;
+
+  // higherWins: true → mayor es mejor. Returns 'feed' | 'imm' | 'tie'.
+  const win = (a: number, b: number): "feed" | "imm" | "tie" => {
+    if (a === b) return "tie";
+    return a > b ? "feed" : "imm";
+  };
+  const rows: Array<{ label: string; f: number; i: number; fmt?: (n: number) => string; hint?: string }> = [
+    { label: "Usuarios activos", f: feed.active_users, i: imm.active_users },
+    { label: "Social / usuario activo", f: feed.social_per_active, i: imm.social_per_active, hint: "comentarios + follows + likes" },
+    { label: "% usuarios sociales", f: feed.pct_social, i: imm.pct_social, fmt: (n) => `${n}%` },
+    { label: "Comentarios", f: feed.comments, i: imm.comments },
+    { label: "Follows", f: feed.follows, i: imm.follows },
+    { label: "Likes", f: feed.likes, i: imm.likes },
+    { label: "Ratings / activo", f: feed.ratings_per_active, i: imm.ratings_per_active },
+  ];
+
+  const cell = (v: number, w: "feed" | "imm" | "tie", side: "feed" | "imm", fmt?: (n: number) => string) => (
+    <td style={{
+      padding: "8px 12px", textAlign: "right", fontWeight: w === side ? 800 : 500,
+      color: w === side ? "#10b981" : "rgba(255,255,255,0.8)", fontVariantNumeric: "tabular-nums",
+    }}>
+      {fmt ? fmt(v) : formatNumber(v)}{w === side ? " ✓" : ""}
+    </td>
+  );
+
+  return (
+    <section style={sectionCard}>
+      <h3 style={sectionTitle}>🧪 A/B — Feed clásico vs Immersive</h3>
+      <p style={{ color: "#fff8", fontSize: 12, marginTop: -4, marginBottom: 14 }}>
+        Actividad social por variante en el período seleccionado (50/50 al instalar).
+        Normalizado por usuario activo, acciones post-install.{" "}
+        <span style={{ color: "#fbbf24" }}>
+          Ojo: con pocos usuarios sociales por brazo aún no es estadísticamente
+          concluyente — mirá la tendencia, no un solo período.
+        </span>
+      </p>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
+            <th style={{ textAlign: "left", padding: "8px 12px" }}>Métrica</th>
+            <th style={{ textAlign: "right", padding: "8px 12px" }}>Feed clásico</th>
+            <th style={{ textAlign: "right", padding: "8px 12px" }}>Immersive</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const w = win(r.f, r.i);
+            return (
+              <tr key={r.label} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                <td style={{ padding: "8px 12px", color: "rgba(255,255,255,0.85)" }}>
+                  {r.label}
+                  {r.hint && <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}> · {r.hint}</span>}
+                </td>
+                {cell(r.f, w, "feed", r.fmt)}
+                {cell(r.i, w, "imm", r.fmt)}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
+  );
 }
 
 function AppEngagementSection({ data }: { data: AppEngagement | null }) {
