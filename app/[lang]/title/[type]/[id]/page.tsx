@@ -66,6 +66,12 @@ type TmdbBaseTitleResponse = {
   // cuando Peekr todavía no tiene ratings propios.
   vote_average?: number | null;
   vote_count?: number | null;
+  // Para Schema.org sameAs / entity linking (TMDB los devuelve por defecto:
+  // imdb_id en /movie/{id}; original_language + number_of_* en /tv/{id}).
+  imdb_id?: string | null;
+  original_language?: string | null;
+  number_of_seasons?: number | null;
+  number_of_episodes?: number | null;
   // TV-only: seasons array. TMDB returns this on /tv/{id} by default.
   // We pass it through to WatchedButton so it can render the season picker
   // without an extra client-side fetch.
@@ -908,6 +914,19 @@ export default async function TitlePage({ params }: PageProps) {
     datePublished: base.release_date || base.first_air_date || undefined,
     genre: (base.genres || []).map((g) => g.name),
     duration: type === "movie" && runtime ? `PT${runtime}M` : undefined,
+    inLanguage: base.original_language || undefined,
+    // sameAs links Peekr's page to the canonical entity on TMDB/IMDb so AI
+    // assistants and search engines can disambiguate "this is THAT title".
+    sameAs: [
+      `https://www.themoviedb.org/${type}/${numericId}`,
+      base.imdb_id ? `https://www.imdb.com/title/${base.imdb_id}/` : null,
+    ].filter(Boolean),
+    ...(type === "tv"
+      ? {
+          numberOfSeasons: base.number_of_seasons ?? undefined,
+          numberOfEpisodes: base.number_of_episodes ?? undefined,
+        }
+      : {}),
     // Solo incluimos AggregateRating cuando hay ratings reales de Peekr.
     // Sin ratings, omitir el schema (no inflar con datos de TMDB — Google
     // lo detecta y penaliza).
