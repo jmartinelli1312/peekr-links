@@ -116,45 +116,59 @@ export default function RateModal({
     setSaving(true);
 
     try {
-      const { data: userResp } = await supabase.auth.getUser();
-      const uid = userResp.user?.id;
+      // Ensure a valid session BEFORE writing. Previously a stale/expired
+      // access token made the FIRST write (the watched activity) fail
+      // silently with a 401, while supabase-js auto-refreshed in time for
+      // the SECOND write (the review). That produced reviews with no
+      // matching watched activity ("orphan reviews" invisible on profiles).
+      let { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        await supabase.auth.refreshSession();
+        ({ data: sessionData } = await supabase.auth.getSession());
+      }
+      const uid = sessionData.session?.user?.id;
       if (!uid) {
         setSaving(false);
         return;
       }
+      const userId: string = uid;
 
       const isRewatch = !isNewWatch;
       const nowIso = new Date().toISOString();
 
-      // Look for an existing row first — same key as Flutter:
-      // (user, tmdb) for movies, (user, tmdb, season) for TV.
-      let lookup = supabase
-        .from("user_title_activities")
-        .select("id")
-        .eq("user_id", uid)
-        .eq("tmdb_id", tmdbId)
-        .limit(1);
-      if (mediaType === "tv" && typeof seasonNumber === "number") {
-        lookup = lookup.eq("season_number", seasonNumber);
-      }
-      const { data: existing } = await lookup.maybeSingle();
-
-      if (existing?.id) {
-        await supabase
+      // Write the watched activity. Returns the supabase { error } so the
+      // caller can react instead of swallowing failures.
+      const writeActivity = async (): Promise<{ error: unknown }> => {
+        // Look for an existing row first — same key as Flutter:
+        // (user, tmdb) for movies, (user, tmdb, season) for TV.
+        let lookup = supabase
           .from("user_title_activities")
-          .update({
-            rating,
-            title,
-            media_type: mediaType,
-            poster_path: posterPath,
-            watched_at: nowIso,
-            is_rewatch: isRewatch,
-          })
-          .eq("id", existing.id);
-      } else {
-        await supabase.from("user_title_activities").upsert(
+          .select("id")
+          .eq("user_id", userId)
+          .eq("tmdb_id", tmdbId)
+          .limit(1);
+        if (mediaType === "tv" && typeof seasonNumber === "number") {
+          lookup = lookup.eq("season_number", seasonNumber);
+        }
+        const { data: existing } = await lookup.maybeSingle();
+
+        if (existing?.id) {
+          const { error } = await supabase
+            .from("user_title_activities")
+            .update({
+              rating,
+              title,
+              media_type: mediaType,
+              poster_path: posterPath,
+              watched_at: nowIso,
+              is_rewatch: isRewatch,
+            })
+            .eq("id", existing.id);
+          return { error };
+        }
+        const { error } = await supabase.from("user_title_activities").upsert(
           {
-            user_id: uid,
+            user_id: userId,
             tmdb_id: tmdbId,
             title,
             media_type: mediaType,
@@ -167,23 +181,39 @@ export default function RateModal({
           },
           { onConflict: "user_id,tmdb_id,season_number" }
         );
+        return { error };
+      };
+
+      // Write the watched activity FIRST and confirm it persisted. Retry
+      // once after a forced refresh in case the token expired mid-flight.
+      // We must NOT write the review unless the activity succeeded.
+      let { error: actErr } = await writeActivity();
+      if (actErr) {
+        await supabase.auth.refreshSession();
+        ({ error: actErr } = await writeActivity());
+      }
+      if (actErr) {
+        console.error("[RateModal] activity write failed — aborting", actErr);
+        throw actErr; // leaves modal open so the user can retry; no orphan
       }
 
       // Remove from watchlist if it was there (Flutter does the same).
       await supabase
         .from("watchlist")
         .delete()
-        .eq("user_id", uid)
+        .eq("user_id", userId)
         .eq("tmdb_id", tmdbId)
         .eq("media_type", mediaType);
 
+      // Only now write the review, since the watched activity is confirmed.
       const cleanComment = comment.trim();
       if (cleanComment.length > 0) {
-        await supabase.from("comments").insert({
+        const { error: cErr } = await supabase.from("comments").insert({
           tmdb_id: tmdbId,
-          user_id: uid,
+          user_id: userId,
           comment: cleanComment,
         });
+        if (cErr) console.error("[RateModal] comment write failed", cErr);
       }
 
       onSaved?.();
