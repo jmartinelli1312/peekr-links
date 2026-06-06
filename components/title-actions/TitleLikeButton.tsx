@@ -75,19 +75,21 @@ export default function TitleLikeButton({ tmdbId, mediaType, lang }: Props) {
 
     try {
       if (wasLiked) {
-        await supabase
+        const { error } = await supabase
           .from("title_likes")
           .delete()
           .eq("user_id", viewerId)
           .eq("tmdb_id", tmdbId)
           .eq("media_type", mediaType);
+        if (error) throw error;
       } else {
-        await supabase
+        const { error } = await supabase
           .from("title_likes")
           .upsert(
             { user_id: viewerId, tmdb_id: tmdbId, media_type: mediaType },
             { onConflict: "user_id,tmdb_id,media_type" }
           );
+        if (error) throw error;
       }
     } catch (e) {
       console.error("[TitleLikeButton] toggle error", e);

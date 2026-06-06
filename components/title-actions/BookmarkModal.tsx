@@ -167,14 +167,15 @@ export default function BookmarkModal({
     setSavedInWatchlist(!wasSaved);
     try {
       if (wasSaved) {
-        await supabase
+        const { error } = await supabase
           .from("watchlist")
           .delete()
           .eq("user_id", uid)
           .eq("tmdb_id", tmdbId)
           .eq("media_type", mediaType);
+        if (error) throw error;
       } else {
-        await supabase.from("watchlist").upsert(
+        const { error } = await supabase.from("watchlist").upsert(
           {
             user_id: uid,
             tmdb_id: tmdbId,
@@ -184,6 +185,7 @@ export default function BookmarkModal({
           },
           { onConflict: "user_id,tmdb_id,media_type" }
         );
+        if (error) throw error;
       }
     } catch (e) {
       console.error("[BookmarkModal] toggleWatchlist", e);
@@ -205,12 +207,13 @@ export default function BookmarkModal({
       setMemberSet(nextSet);
       setTop5Count(c => Math.max(0, c - 1));
       try {
-        await supabase
+        const { error } = await supabase
           .from("peeklist_items")
           .delete()
           .eq("peeklist_id", top5.id)
           .eq("tmdb_id", tmdbId)
           .eq("media_type", mediaType);
+        if (error) throw error;
       } catch (e) {
         console.error("[BookmarkModal] toggleTop5 remove", e);
         const revert = new Set(memberSet);
@@ -264,7 +267,7 @@ export default function BookmarkModal({
     next.add(p.id);
     setMemberSet(next);
     try {
-      await supabase.from("peeklist_items").insert({
+      const { error } = await supabase.from("peeklist_items").insert({
         peeklist_id: p.id,
         tmdb_id: tmdbId,
         media_type: mediaType,
@@ -273,6 +276,7 @@ export default function BookmarkModal({
         poster_path: posterPath,
         title,
       });
+      if (error) throw error;
     } catch (e) {
       console.error("[BookmarkModal] addToCustom", e);
       const revert = new Set(memberSet);
@@ -321,8 +325,12 @@ export default function BookmarkModal({
 
       const newList = data as PeeklistRow;
 
-      // Now add the title to the freshly created list.
-      await supabase.from("peeklist_items").insert({
+      // Now add the title to the freshly created list. supabase-js returns
+      // { error } rather than throwing, so check it explicitly — otherwise
+      // the list is created but the title silently never gets added. On
+      // failure, roll back the just-created (empty) list so we don't orphan
+      // it, then surface the error.
+      const { error: itemErr } = await supabase.from("peeklist_items").insert({
         peeklist_id: newList.id,
         tmdb_id: tmdbId,
         media_type: mediaType,
@@ -331,6 +339,10 @@ export default function BookmarkModal({
         poster_path: posterPath,
         title,
       });
+      if (itemErr) {
+        await supabase.from("peeklists").delete().eq("id", newList.id);
+        throw itemErr;
+      }
 
       setCustomLists(prev => [...prev, newList]);
       const next = new Set(memberSet);

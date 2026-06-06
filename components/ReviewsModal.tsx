@@ -488,15 +488,17 @@ export default function ReviewsModal({ tmdbId, mediaType, title, label, count }:
 
       try {
         if (prevLiked) {
-          await supabase
+          const { error } = await supabase
             .from("comment_likes")
             .delete()
             .eq("user_id", viewerId)
             .eq("comment_id", id);
+          if (error) throw error;
         } else {
-          await supabase
+          const { error } = await supabase
             .from("comment_likes")
             .insert({ user_id: viewerId, comment_id: id });
+          if (error) throw error;
         }
       } catch (e) {
         console.error("[ReviewsModal] toggleLike error", e);

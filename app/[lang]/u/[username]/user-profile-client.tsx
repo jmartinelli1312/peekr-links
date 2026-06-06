@@ -432,19 +432,28 @@ export default function UserProfileClient({
 
     setProcessing(true);
     try {
+      // supabase-js returns { error } and never throws — check it and only
+      // flip the UI state once the write is confirmed, otherwise the button
+      // would show "Following"/"Requested" even when the write silently
+      // failed (e.g. an expired token).
       if (isFollowing) {
-        await supabase.from("follows").delete().eq("user_id", meId).eq("follows_user_id", uid);
+        const { error } = await supabase.from("follows").delete().eq("user_id", meId).eq("follows_user_id", uid);
+        if (error) throw error;
         setIsFollowing(false);
       } else if (isPrivate) {
         if (!isRequested) {
-          await supabase.from("follow_requests").insert({ sender_id: meId, receiver_id: uid });
+          const { error } = await supabase.from("follow_requests").insert({ sender_id: meId, receiver_id: uid });
+          if (error) throw error;
           setIsRequested(true);
         }
       } else {
-        await supabase.from("follows").insert({ user_id: meId, follows_user_id: uid });
+        const { error } = await supabase.from("follows").insert({ user_id: meId, follows_user_id: uid });
+        if (error) throw error;
         setIsFollowing(true);
       }
       await refreshFollowStats();
+    } catch (e) {
+      console.error("[user-profile] toggle follow failed", e);
     } finally {
       setProcessing(false);
     }
