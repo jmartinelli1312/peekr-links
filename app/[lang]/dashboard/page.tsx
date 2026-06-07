@@ -37,7 +37,10 @@ export default function DashboardPage({ params }: { params: Promise<{ lang: stri
     ({ today: t.presetToday, yesterday: t.presetYesterday, "7d": t.preset7d, "30d": t.preset30d, "90d": t.preset90d }[p]);
 
   const [gate, setGate] = useState<Gate>("loading");
-  const [country, setCountry] = useState<string>("");
+  const [country, setCountry] = useState<string>("");          // the viewer's own/default country
+  const [selectedCountry, setSelectedCountry] = useState<string>(""); // active selection
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [countryOptions, setCountryOptions] = useState<{ country_code: string; users: number | null }[]>([]);
   const [tab, setTab] = useState<TabKey>("country");
 
   const [preset, setPreset] = useState<Preset>("30d");
@@ -71,8 +74,22 @@ export default function DashboardPage({ params }: { params: Promise<{ lang: stri
         router.replace(`/${lang}`);
         return;
       }
-      setCountry((data.country_code as string).toUpperCase());
+      const own = (data.country_code as string).toUpperCase();
+      setCountry(own);
+      setSelectedCountry(own);
       setGate("ok");
+
+      // Admins get a country selector to view any market; everyone else is
+      // locked to the country(ies) they actually own.
+      const [{ data: prof }, { data: opts }] = await Promise.all([
+        supabase.from("profiles").select("is_admin").eq("id", session.user.id).maybeSingle(),
+        supabase.rpc("creator_dashboard_country_options"),
+      ]);
+      if (!mounted) return;
+      setIsAdmin(!!(prof as { is_admin?: boolean } | null)?.is_admin);
+      setCountryOptions(
+        Array.isArray(opts) ? (opts as { country_code: string; users: number | null }[]) : []
+      );
     })();
     return () => {
       mounted = false;
@@ -102,9 +119,36 @@ export default function DashboardPage({ params }: { params: Promise<{ lang: stri
     <div>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Dashboard</h1>
-        <p style={{ margin: "6px 0 0", color: "rgba(255,255,255,0.6)", fontSize: 14 }}>
-          {t.metricsFor} <strong style={{ color: "rgba(255,255,255,0.9)" }}>{countryName(country)}</strong>
-        </p>
+        {isAdmin || countryOptions.length > 1 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+            <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 14 }}>{t.metricsFor}</span>
+            <select
+              value={selectedCountry}
+              onChange={(e) => setSelectedCountry(e.target.value)}
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.18)",
+                borderRadius: 8,
+                color: "#fff",
+                padding: "6px 10px",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {countryOptions.map((o) => (
+                <option key={o.country_code} value={o.country_code} style={{ color: "#000" }}>
+                  {countryName(o.country_code)}
+                  {o.users != null ? ` (${o.users.toLocaleString()})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <p style={{ margin: "6px 0 0", color: "rgba(255,255,255,0.6)", fontSize: 14 }}>
+            {t.metricsFor} <strong style={{ color: "rgba(255,255,255,0.9)" }}>{countryName(country)}</strong>
+          </p>
+        )}
       </div>
 
       {/* Tabs */}
@@ -160,9 +204,9 @@ export default function DashboardPage({ params }: { params: Promise<{ lang: stri
       </div>
 
       {tab === "country" ? (
-        <CountryMetricsTab supabase={supabase} range={range} onlyOnboarded={onlyOnboarded} lang={lang} />
+        <CountryMetricsTab supabase={supabase} range={range} onlyOnboarded={onlyOnboarded} lang={lang} country={selectedCountry} />
       ) : (
-        <TitlesTab supabase={supabase} range={range} lang={lang} />
+        <TitlesTab supabase={supabase} range={range} lang={lang} country={selectedCountry} />
       )}
     </div>
   );

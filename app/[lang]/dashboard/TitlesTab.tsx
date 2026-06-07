@@ -85,10 +85,12 @@ export default function TitlesTab({
   supabase,
   range,
   lang,
+  country,
 }: {
   supabase: SupabaseClient;
   range: Range;
   lang: Lang;
+  country: string;
 }) {
   const t = dashTexts(lang);
   const [titles, setTitles] = useState<TitlesResult | null>(null);
@@ -101,10 +103,11 @@ export default function TitlesTab({
     setErr(null);
     try {
       const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
-      const titlesRes = await supabase.rpc("creator_titles", {
+      const titlesRes = await supabase.rpc("cdash_titles", {
         p_from: fromTs,
         p_to_exclusive: toTsExclusive,
         p_limit: 10,
+        p_country: country,
       });
       if (titlesRes.error) throw titlesRes.error;
       setTitles(titlesRes.data as TitlesResult);
@@ -126,7 +129,7 @@ export default function TitlesTab({
     } finally {
       setLoading(false);
     }
-  }, [supabase, range]);
+  }, [supabase, range, country]);
 
   useEffect(() => {
     void fetchAll();

@@ -88,11 +88,13 @@ export default function CountryMetricsTab({
   range,
   onlyOnboarded,
   lang,
+  country,
 }: {
   supabase: SupabaseClient;
   range: Range;
   onlyOnboarded: boolean;
   lang: Lang;
+  country: string;
 }) {
   const t = dashTexts(lang);
   const [geo, setGeo] = useState<Geo | null>(null);
@@ -110,12 +112,12 @@ export default function CountryMetricsTab({
     try {
       const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
       const [geoRes, retRes, wowRes, tsRes, behRes, appRes] = await Promise.all([
-        supabase.rpc("creator_kpi_geo", { p_from: fromTs, p_to_exclusive: toTsExclusive }),
-        supabase.rpc("creator_kpi_retention", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_only_onboarded: onlyOnboarded }),
-        supabase.rpc("creator_kpi_wow_retention", { p_weeks: 8 }),
-        supabase.rpc("creator_kpi_time_series", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_only_onboarded: onlyOnboarded }),
-        supabase.rpc("creator_kpi_behavior", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_only_onboarded: onlyOnboarded }),
-        supabase.rpc("creator_kpi_app_engagement", { p_from: fromTs, p_to_exclusive: toTsExclusive }),
+        supabase.rpc("cdash_geo", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_country: country }),
+        supabase.rpc("cdash_retention", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_only_onboarded: onlyOnboarded, p_country: country }),
+        supabase.rpc("cdash_wow_retention", { p_weeks: 8, p_country: country }),
+        supabase.rpc("cdash_time_series", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_only_onboarded: onlyOnboarded, p_country: country }),
+        supabase.rpc("cdash_behavior", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_only_onboarded: onlyOnboarded, p_country: country }),
+        supabase.rpc("cdash_app_engagement", { p_from: fromTs, p_to_exclusive: toTsExclusive, p_country: country }),
       ]);
       if (geoRes.error) throw geoRes.error;
       if (retRes.error) throw retRes.error;
@@ -134,7 +136,7 @@ export default function CountryMetricsTab({
     } finally {
       setLoading(false);
     }
-  }, [supabase, range, onlyOnboarded]);
+  }, [supabase, range, onlyOnboarded, country]);
 
   useEffect(() => {
     void fetchAll();
