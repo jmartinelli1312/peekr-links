@@ -21,6 +21,7 @@ type HeaderTexts = {
   signIn: string;
   createAccount: string;
   settings: string;
+  imports: string;
   signOut: string;
   profile: string;
   dashboard: string;
@@ -58,6 +59,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
       signIn: "Sign in",
       createAccount: "Create account",
       settings: "Settings",
+      imports: "Imports",
       signOut: "Sign out",
       profile: "Profile",
       dashboard: "Dashboard",
@@ -70,6 +72,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
       signIn: "Iniciar sesión",
       createAccount: "Crear cuenta",
       settings: "Configuración",
+      imports: "Imports",
       signOut: "Cerrar sesión",
       profile: "Perfil",
       dashboard: "Dashboard",
@@ -82,6 +85,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
       signIn: "Entrar",
       createAccount: "Criar conta",
       settings: "Configurações",
+      imports: "Imports",
       signOut: "Sair",
       profile: "Perfil",
       dashboard: "Dashboard",
@@ -104,7 +108,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
     // segments without a lang prefix, not two-segment paths like /en/jmartinelli).
     const RESERVED = new Set([
       "about", "admin", "api", "activity", "actor", "buzz", "contact",
-      "download-app", "explore", "go", "lists", "login", "peeklist",
+      "download-app", "explore", "go", "imports", "lists", "login", "peeklist",
       "privacy", "signup", "sneak-peek", "support", "terms", "title", "u",
     ]);
     if (
@@ -616,6 +620,13 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
                   >
                     {t.settings}
                   </Link>
+                  <Link
+                    href={localizedHref("/imports")}
+                    className="peekr-user-item"
+                    onClick={closeAllMenus}
+                  >
+                    {t.imports}
+                  </Link>
                   <button
                     type="button"
                     className="peekr-user-item"
@@ -738,6 +749,13 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
                       onClick={closeAllMenus}
                     >
                       {t.settings}
+                    </Link>
+                    <Link
+                      href={localizedHref("/imports")}
+                      className="peekr-user-item"
+                      onClick={closeAllMenus}
+                    >
+                      {t.imports}
                     </Link>
                     <button
                       type="button"
