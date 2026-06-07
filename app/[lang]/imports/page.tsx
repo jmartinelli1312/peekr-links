@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import JSZip from "jszip";
 import { supabase } from "@/lib/supabase";
@@ -50,6 +50,12 @@ const I18N: Record<Lang, Record<string, string>> = {
     errorParse: "No pudimos leer el archivo. ¿Es el .zip de Letterboxd?",
     errorGeneric: "Algo salió mal. Probá de nuevo.",
     ratingNote: "Las calificaciones de 0–5 estrellas se convierten a la escala 0–10 de Peekr.",
+    gateChecking: "Cargando…",
+    gateTitle: "Imports es para creadores",
+    gateBody: "Por ahora, importar tu historial está disponible solo para cuentas de creador. Más adelante será parte de Peekr Premium.",
+    gateAnon: "Iniciá sesión con tu cuenta de creador para importar.",
+    gateLogin: "Iniciar sesión",
+    gateHome: "Volver al inicio",
   },
   en: {
     title: "Imports",
@@ -89,6 +95,12 @@ const I18N: Record<Lang, Record<string, string>> = {
     errorParse: "We couldn't read the file. Is it the Letterboxd .zip?",
     errorGeneric: "Something went wrong. Try again.",
     ratingNote: "0–5 star ratings are converted to Peekr's 0–10 scale.",
+    gateChecking: "Loading…",
+    gateTitle: "Imports is for creators",
+    gateBody: "For now, importing your history is available only for creator accounts. It will become part of Peekr Premium later.",
+    gateAnon: "Sign in with your creator account to import.",
+    gateLogin: "Sign in",
+    gateHome: "Back home",
   },
   pt: {
     title: "Imports",
@@ -128,6 +140,12 @@ const I18N: Record<Lang, Record<string, string>> = {
     errorParse: "Não conseguimos ler o arquivo. É o .zip do Letterboxd?",
     errorGeneric: "Algo deu errado. Tente de novo.",
     ratingNote: "Notas de 0–5 estrelas são convertidas para a escala 0–10 do Peekr.",
+    gateChecking: "Carregando…",
+    gateTitle: "Imports é para criadores",
+    gateBody: "Por enquanto, importar seu histórico está disponível apenas para contas de criador. Em breve fará parte do Peekr Premium.",
+    gateAnon: "Entre com sua conta de criador para importar.",
+    gateLogin: "Entrar",
+    gateHome: "Voltar ao início",
   },
 };
 
@@ -219,6 +237,23 @@ export default function ImportsPage({ params }: { params: Promise<{ lang: string
   const [includeLow, setIncludeLow] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<{ activities: number; reviews: number; watchlist: number; skipped: number } | null>(null);
+
+  // Access gate — Imports is creator-only (eventually a premium feature).
+  const [access, setAccess] = useState<"checking" | "ok" | "denied" | "anon">("checking");
+  useEffect(() => {
+    (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const uid = sessionData.session?.user?.id;
+      if (!uid) { setAccess("anon"); return; }
+      const { data } = await supabase
+        .from("profiles")
+        .select("account_type,creator_status")
+        .eq("id", uid)
+        .maybeSingle();
+      const ok = data?.account_type === "creator" && data?.creator_status === "approved";
+      setAccess(ok ? "ok" : "denied");
+    })().catch(() => setAccess("denied"));
+  }, []);
 
   const reviewsCount = useMemo(() => watched.filter((w) => w.review).length, [watched]);
 
@@ -451,6 +486,31 @@ export default function ImportsPage({ params }: { params: Promise<{ lang: string
   };
 
   // ─────────────────────────────────────────────────────────────────────────
+  // ── Creator-only gate ───────────────────────────────────────────────────
+  if (access !== "ok") {
+    return (
+      <main style={{ maxWidth: 560, margin: "0 auto", padding: "48px 20px 80px", textAlign: "center" }}>
+        <h1 style={{ fontSize: 30, fontWeight: 800, margin: "0 0 4px" }}>{t.title}</h1>
+        {access === "checking" ? (
+          <p style={{ color: "#666", marginTop: 24 }}>{t.gateChecking}</p>
+        ) : (
+          <div style={{ marginTop: 28, background: "#faf7f9", borderRadius: 16, padding: "28px 24px" }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>🎬</div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 10px" }}>{t.gateTitle}</h2>
+            <p style={{ color: "#555", margin: "0 0 18px", lineHeight: 1.6 }}>
+              {access === "anon" ? t.gateAnon : t.gateBody}
+            </p>
+            {access === "anon" ? (
+              <Link href={`/${lang}/login`} style={{ ...primaryBtn, textDecoration: "none" }}>{t.gateLogin}</Link>
+            ) : (
+              <Link href={`/${lang}`} style={{ ...ghostBtn, textDecoration: "none" }}>{t.gateHome}</Link>
+            )}
+          </div>
+        )}
+      </main>
+    );
+  }
+
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 20px 80px" }}>
       <h1 style={{ fontSize: 30, fontWeight: 800, margin: "0 0 4px" }}>{t.title}</h1>

@@ -43,6 +43,9 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isCreator, setIsCreator] = useState(false);
+  // Imports is creator-only (eventually a premium feature). Gated on the
+  // canonical creator definition: approved creator account.
+  const [canImport, setCanImport] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
   const desktopLangRef = useRef<HTMLDetailsElement>(null);
@@ -143,6 +146,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
         setIsLoggedIn(false);
         setProfile(null);
         setIsCreator(false);
+        setCanImport(false);
         setLoadingAuth(false);
         return;
       }
@@ -152,7 +156,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
       const [{ data }, { data: creatorRow }] = await Promise.all([
         supabase
           .from("profiles")
-          .select("username,avatar_url,display_name")
+          .select("username,avatar_url,display_name,account_type,creator_status")
           .eq("id", session.user.id)
           .maybeSingle(),
         supabase
@@ -165,10 +169,15 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
 
       setProfile((data as Profile | null) ?? null);
       setIsCreator(!!creatorRow);
+      setCanImport(
+        (data as { account_type?: string; creator_status?: string } | null)?.account_type === "creator" &&
+          (data as { creator_status?: string } | null)?.creator_status === "approved"
+      );
     } catch {
       setIsLoggedIn(false);
       setProfile(null);
       setIsCreator(false);
+      setCanImport(false);
     } finally {
       setLoadingAuth(false);
     }
@@ -620,13 +629,15 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
                   >
                     {t.settings}
                   </Link>
-                  <Link
-                    href={localizedHref("/imports")}
-                    className="peekr-user-item"
-                    onClick={closeAllMenus}
-                  >
-                    {t.imports}
-                  </Link>
+                  {canImport && (
+                    <Link
+                      href={localizedHref("/imports")}
+                      className="peekr-user-item"
+                      onClick={closeAllMenus}
+                    >
+                      {t.imports}
+                    </Link>
+                  )}
                   <button
                     type="button"
                     className="peekr-user-item"
@@ -750,13 +761,15 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
                     >
                       {t.settings}
                     </Link>
-                    <Link
-                      href={localizedHref("/imports")}
-                      className="peekr-user-item"
-                      onClick={closeAllMenus}
-                    >
-                      {t.imports}
-                    </Link>
+                    {canImport && (
+                      <Link
+                        href={localizedHref("/imports")}
+                        className="peekr-user-item"
+                        onClick={closeAllMenus}
+                      >
+                        {t.imports}
+                      </Link>
+                    )}
                     <button
                       type="button"
                       className="peekr-user-item"
