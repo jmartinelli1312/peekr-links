@@ -425,6 +425,7 @@ export default function ImportsPage({ params }: { params: Promise<{ lang: string
           release_year: m!.release_year ?? f.year,
           is_rewatch: f.rewatch,
           platform: "letterboxd",
+          eye_state: "complete", // imported = watched, so it counts as "visto"
         });
         if (f.review && !haveCom.has(tmdb)) {
           reviewRows.push({ tmdb_id: tmdb, user_id: uid, comment: f.review });

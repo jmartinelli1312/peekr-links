@@ -429,6 +429,7 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
           watched_at: r.watchedAt || new Date().toISOString(),
           release_year: r.match!.release_year,
           platform: "netflix",
+          eye_state: "complete", // imported = watched, so it counts as "visto"
         });
         if (r.peekrReview.trim()) reviews.push({ tmdb_id: tmdb, user_id: uid, comment: r.peekrReview.trim() });
       }
