@@ -295,8 +295,10 @@ export default async function UserProfilePage({
           .from("user_title_activities")
           .select("tmdb_id,title,poster_path,media_type,rating,watched_at")
           .eq("user_id", uid)
+          // "Visto" = watched (eye_state != none) or rated — matches the app.
+          .or("eye_state.neq.none,rating.not.is.null")
           .order("watched_at", { ascending: false })
-          .limit(120),
+          .limit(400),
 
         // title_likes: USING(true)
         supabase

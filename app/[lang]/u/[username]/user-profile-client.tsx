@@ -281,8 +281,9 @@ export default function UserProfileClient({
               .from("user_title_activities")
               .select("tmdb_id,title,poster_path,media_type,rating,watched_at")
               .eq("user_id", uid)
+              .or("eye_state.neq.none,rating.not.is.null")
               .order("watched_at", { ascending: false })
-              .limit(120),
+              .limit(400),
             supabase
               .from("title_likes")
               .select("tmdb_id, media_type")
