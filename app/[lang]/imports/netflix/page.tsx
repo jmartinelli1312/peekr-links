@@ -179,6 +179,7 @@ const I18N: Record<Lang, Record<string, string>> = {
     seasonAbbr: "T",
     mediaTv: "serie",
     mediaMovie: "película",
+    openTitle: "Abrir en Peekr",
     markAll: "Marcar todos",
     unmarkAll: "Desmarcar todos",
     importBtn: "Importar a mi perfil",
@@ -220,6 +221,7 @@ const I18N: Record<Lang, Record<string, string>> = {
     seasonAbbr: "S",
     mediaTv: "series",
     mediaMovie: "movie",
+    openTitle: "Open on Peekr",
     markAll: "Mark all",
     unmarkAll: "Unmark all",
     importBtn: "Import to my profile",
@@ -261,6 +263,7 @@ const I18N: Record<Lang, Record<string, string>> = {
     seasonAbbr: "T",
     mediaTv: "série",
     mediaMovie: "filme",
+    openTitle: "Abrir no Peekr",
     markAll: "Marcar todos",
     unmarkAll: "Desmarcar todos",
     importBtn: "Importar para meu perfil",
@@ -365,9 +368,9 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
         if (tmdb && seenTmdb.has(tmdb)) continue;
         if (tmdb) seenTmdb.add(tmdb);
         const th = thumbs.get(norm(ti.name));
-        // Default the Peekr rating to TMDB's score; the user can adjust/clear it.
-        const defaultRating =
-          m?.tmdb_rating != null ? String(m.tmdb_rating) : th === "up" ? "7" : "";
+        // Default the Peekr rating to TMDB's score; if TMDB has no rating, use
+        // 7.5 as a sensible default. The user can adjust/clear it either way.
+        const defaultRating = m?.tmdb_rating != null ? String(m.tmdb_rating) : "7.5";
         built.push({
           ...ti, match: m, thumb: th,
           peekrRating: defaultRating,
@@ -547,8 +550,16 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
                       onChange={(e) => setRow(r.key, { include: e.target.checked })}
                     />
                   </div>
-                  <div style={{ flex: 2, fontSize: 13, color: "#1a1a1a" }}>
-                    {r.netflixTitle}
+                  <div style={{ flex: 2, fontSize: 13 }}>
+                    <a
+                      href={`/${lang}/title/${r.match?.media_type}/${r.match?.tmdb_id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: "#1a1a1a", fontWeight: 600, textDecoration: "underline" }}
+                      title={t.openTitle}
+                    >
+                      {r.netflixTitle}
+                    </a>
                     {r.seasons.length > 0 && <span style={{ color: "#999" }}> · {t.seasonAbbr}{r.seasons.join(",")}</span>}
                   </div>
                   <div style={{ width: 40, textAlign: "center" }}>{r.thumb === "up" ? "👍" : r.thumb === "down" ? "👎" : ""}</div>
