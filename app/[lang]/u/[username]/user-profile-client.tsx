@@ -283,7 +283,7 @@ export default function UserProfileClient({
               .eq("user_id", uid)
               .or("eye_state.neq.none,rating.not.is.null")
               .order("watched_at", { ascending: false })
-              .limit(400),
+              .limit(1000),
             supabase
               .from("title_likes")
               .select("tmdb_id, media_type")

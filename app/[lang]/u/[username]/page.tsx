@@ -298,7 +298,9 @@ export default async function UserProfilePage({
           // "Visto" = watched (eye_state != none) or rated — matches the app.
           .or("eye_state.neq.none,rating.not.is.null")
           .order("watched_at", { ascending: false })
-          .limit(400),
+          // High enough to cover all activity rows (incl. per-season TV rows)
+          // so the deduped count matches the app, which fetches the full set.
+          .limit(1000),
 
         // title_likes: USING(true)
         supabase
