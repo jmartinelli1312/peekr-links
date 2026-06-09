@@ -78,20 +78,20 @@ const COPY: Record<Lang, Copy> = {
       {
         n: "03",
         title: "Instagram y TikTok en tu perfil",
-        body: "Mostrá tus redes con íconos de Instagram y TikTok directamente en tu perfil. Tus seguidores te encuentran en un toque.",
+        body: "Muestra tus redes con íconos de Instagram y TikTok directamente en tu perfil. Tus seguidores te encuentran en un toque.",
         how: "Perfil → Editar perfil → agrega tus usuarios de Instagram y TikTok.",
       },
       {
         n: "04",
         title: "SneakPeeks: carrusel y video",
-        body: "Publicá adelantos, reseñas y reacciones en formato carrusel o video. Es tu contenido destacado dentro de Peekr.",
+        body: "Publica adelantos, reseñas y reacciones en formato carrusel o video. Es tu contenido destacado dentro de Peekr.",
         important:
           "Referencia siempre el título. Al hacerlo: (1) se unifican los comentarios del SneakPeek con los del título, (2) se crea un link para que el usuario acceda al título, y (3) cuando alguien toca Guardar/Bookmark, el título se agrega directo a sus listas.",
         how: "Perfil → SneakPeeks → Crear → selecciona el título referenciado, sube tu carrusel o video y publica.",
       },
       {
         n: "05",
-        title: "Importá tu historial (Letterboxd y Netflix)",
+        title: "Importa tu historial (Letterboxd y Netflix)",
         body: "Trae todo tu historial de Letterboxd y Netflix a Peekr en minutos, con tus ratings y reseñas. Exclusivo para creators.",
         how: "Desde la web peekr.app → tu perfil → Imports. (Disponible solo en la web.)",
       },
