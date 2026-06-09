@@ -560,6 +560,7 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
                     >
                       {r.netflixTitle}
                     </a>
+                    {r.match?.release_year ? <span style={{ color: "#888" }}> ({r.match.release_year})</span> : null}
                     {r.seasons.length > 0 && <span style={{ color: "#999" }}> · {t.seasonAbbr}{r.seasons.join(",")}</span>}
                   </div>
                   <div style={{ width: 40, textAlign: "center" }}>{r.thumb === "up" ? "👍" : r.thumb === "down" ? "👎" : ""}</div>
