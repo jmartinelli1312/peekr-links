@@ -546,17 +546,15 @@ export default function ImportsPage({ params }: { params: Promise<{ lang: string
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }}
             />
 
-            {/* Netflix (placeholder) */}
-            <div style={{ ...cardStyle, opacity: 0.6 }}>
+            {/* Netflix */}
+            <Link href={`/${lang}/imports/netflix`} style={{ ...cardStyle, cursor: "pointer", borderColor: "#E50914", textDecoration: "none", color: "inherit" }}>
               <div style={iconBox("#E50914")}>N</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700 }}>{t.nfName}</div>
                 <div style={{ color: "#666", fontSize: 14 }}>{t.nfDesc}</div>
               </div>
-              <span style={{ fontSize: 12, color: "#999", border: "1px solid #ddd", borderRadius: 999, padding: "3px 10px" }}>
-                {t.soon}
-              </span>
-            </div>
+              <div style={{ color: "#E50914", fontWeight: 700 }}>+</div>
+            </Link>
           </div>
 
           {/* Letterboxd instructions */}
