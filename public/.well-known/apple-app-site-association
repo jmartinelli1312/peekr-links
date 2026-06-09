@@ -12,6 +12,7 @@
           { "/": "/terms*",        "exclude": true },
           { "/": "/support*",      "exclude": true },
           { "/": "/contact*",      "exclude": true },
+          { "/": "/creators-guide*", "exclude": true },
           { "/": "/download-app*", "exclude": true },
           { "/": "/api/*",         "exclude": true },
           { "/": "/_next/*",       "exclude": true },
