@@ -179,6 +179,8 @@ const I18N: Record<Lang, Record<string, string>> = {
     seasonAbbr: "T",
     mediaTv: "serie",
     mediaMovie: "película",
+    markAll: "Marcar todos",
+    unmarkAll: "Desmarcar todos",
     importBtn: "Importar a mi perfil",
     cancel: "Elegir otro archivo",
     done: "¡Listo!",
@@ -218,6 +220,8 @@ const I18N: Record<Lang, Record<string, string>> = {
     seasonAbbr: "S",
     mediaTv: "series",
     mediaMovie: "movie",
+    markAll: "Mark all",
+    unmarkAll: "Unmark all",
     importBtn: "Import to my profile",
     cancel: "Choose another file",
     done: "Done!",
@@ -257,6 +261,8 @@ const I18N: Record<Lang, Record<string, string>> = {
     seasonAbbr: "T",
     mediaTv: "série",
     mediaMovie: "filme",
+    markAll: "Marcar todos",
+    unmarkAll: "Desmarcar todos",
     importBtn: "Importar para meu perfil",
     cancel: "Escolher outro arquivo",
     done: "Pronto!",
@@ -389,6 +395,9 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
   const setRow = (key: string, patch: Partial<Row>) =>
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
+  const markAll = (val: boolean) =>
+    setRows((prev) => prev.map((r) => (r.match?.confidence === "high" ? { ...r, include: val } : r)));
+
   const doImport = useCallback(async () => {
     setError(null);
     const { data: s } = await supabase.auth.getSession();
@@ -508,8 +517,20 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
             </div>
           )}
 
+          <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
+            <button type="button" onClick={() => markAll(true)} style={linkBtn}>{t.markAll}</button>
+            <button type="button" onClick={() => markAll(false)} style={linkBtn}>{t.unmarkAll}</button>
+          </div>
+
           <div style={{ border: "1px solid #e3e3e3", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
             <div style={{ ...trStyle, background: "#f5f5f5", fontWeight: 700, fontSize: 12, color: "#555" }}>
+              <div style={{ width: 28, textAlign: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={buckets.high.length > 0 && buckets.high.every((r) => r.include)}
+                  onChange={(e) => markAll(e.target.checked)}
+                />
+              </div>
               <div style={{ flex: 2 }}>{t.colTitle}</div>
               <div style={{ width: 40, textAlign: "center" }}>{t.colThumb}</div>
               <div style={{ flex: 2 }}>{t.colMatch}</div>
@@ -518,7 +539,14 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
             </div>
             <div style={{ maxHeight: 460, overflowY: "auto", background: "#fff" }}>
               {buckets.high.map((r) => (
-                <div key={r.key} style={trStyle}>
+                <div key={r.key} style={{ ...trStyle, opacity: r.include ? 1 : 0.45 }}>
+                  <div style={{ width: 28, textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={r.include}
+                      onChange={(e) => setRow(r.key, { include: e.target.checked })}
+                    />
+                  </div>
                   <div style={{ flex: 2, fontSize: 13, color: "#1a1a1a" }}>
                     {r.netflixTitle}
                     {r.seasons.length > 0 && <span style={{ color: "#999" }}> · {t.seasonAbbr}{r.seasons.join(",")}</span>}
@@ -582,4 +610,7 @@ const primaryBtn: React.CSSProperties = {
 };
 const ghostBtn: React.CSSProperties = {
   background: "transparent", color: "#444", border: "1.5px solid #ddd", borderRadius: 999, padding: "11px 20px", fontWeight: 600, fontSize: 15, cursor: "pointer", textDecoration: "none",
+};
+const linkBtn: React.CSSProperties = {
+  background: "transparent", border: "none", color: BRAND, fontWeight: 700, fontSize: 13, cursor: "pointer", padding: 0,
 };
