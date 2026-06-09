@@ -10,6 +10,7 @@ const RESERVED_SEGMENTS = new Set([
   "es", "en", "pt",
   "about", "admin", "get", "go", "lang", "login", "privacy", "signup",
   "support", "terms", "test", "test-supabase", "lists", "buzz",
+  "creators-guide",
   "contact", "download-app", "explore", "title", "actor",
   "activity", "peeklist", "user", "u", "api", "sitemap.xml",
   "robots.txt", "apple-app-site-association", ".well-known", "sneak-peek",

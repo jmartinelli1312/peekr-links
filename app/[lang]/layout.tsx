@@ -53,6 +53,7 @@ export default async function LangLayout({
       privacy: "Privacy",
       terms: "Terms",
       contact: "Contact",
+      creators: "Creator FAQ",
       ownedBy: "Owned and operated by Emanation Films, Inc.",
     },
     es: {
@@ -60,6 +61,7 @@ export default async function LangLayout({
       privacy: "Privacidad",
       terms: "Términos",
       contact: "Contacto",
+      creators: "FAQ Creators",
       ownedBy: "Propiedad y operación de Emanation Films, Inc.",
     },
     pt: {
@@ -67,6 +69,7 @@ export default async function LangLayout({
       privacy: "Privacidade",
       terms: "Termos",
       contact: "Contato",
+      creators: "FAQ Creators",
       ownedBy: "De propriedade e operado por Emanation Films, Inc.",
     },
   }[lang];
@@ -154,6 +157,9 @@ export default async function LangLayout({
             </a>
             <a href={`/${lang}/contact`} className="peekr-footer-link">
               {t.contact}
+            </a>
+            <a href={`/creators-guide?lang=${lang}`} className="peekr-footer-link">
+              {t.creators}
             </a>
           </div>
 
