@@ -296,13 +296,15 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
   const [skippedExisting, setSkippedExisting] = useState(0);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<{ added: number; reviews: number } | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       const { data: s } = await supabase.auth.getSession();
       const uid = s.session?.user?.id;
       if (!uid) { setAccess("anon"); return; }
-      const { data } = await supabase.from("profiles").select("account_type,creator_status").eq("id", uid).maybeSingle();
+      const { data } = await supabase.from("profiles").select("account_type,creator_status,username").eq("id", uid).maybeSingle();
+      setUsername(data?.username ?? null);
       setAccess(data?.account_type === "creator" && data?.creator_status === "approved" ? "ok" : "denied");
     })().catch(() => setAccess("denied"));
   }, []);
@@ -601,7 +603,7 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
             {result.reviews > 0 && <> · <strong style={{ color: BRAND }}>{result.reviews}</strong> {t.doneReviews}</>}
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-            <Link href={`/${lang}`} style={{ ...primaryBtn, textDecoration: "none" }}>{t.backProfile}</Link>
+            <Link href={username ? `/${lang}/u/${username}` : `/${lang}`} style={{ ...primaryBtn, textDecoration: "none" }}>{t.backProfile}</Link>
             <button onClick={reset} style={ghostBtn}>{t.again}</button>
           </div>
         </div>
