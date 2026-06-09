@@ -57,9 +57,9 @@ type Copy = {
 const COPY: Record<Lang, Copy> = {
   es: {
     eyebrow: "Guía del Creator",
-    title: "Todo lo que desbloqueás como Creator de Peekr",
+    title: "Todo lo que desbloqueas como Creator de Peekr",
     intro:
-      "¡Felicitaciones! Ya sos un Creator verificado. Esta es tu guía de todos los beneficios que tenés y cómo usarlos.",
+      "¡Felicitaciones! Ya eres un Creator verificado. Esta es tu guía con todos los beneficios que tienes y cómo usarlos.",
     howLabel: "Cómo acceder",
     importantLabel: "Importante",
     perks: [
@@ -67,44 +67,44 @@ const COPY: Record<Lang, Copy> = {
         n: "01",
         title: "Insignia verificada",
         body: "Tu insignia de verificado aparece junto a tu @usuario en todo Peekr — perfil, comentarios, feed y listas. Le da credibilidad y autoridad a tu cuenta.",
-        how: "Se activa automáticamente al ser aprobado. No tenés que hacer nada.",
+        how: "Se activa automáticamente al ser aprobado. No tienes que hacer nada.",
       },
       {
         n: "02",
         title: "Bio con enlaces clicables",
-        body: "Tu biografía admite hyperlinks. Pegá URLs (tu web, YouTube, Linktree, etc.) y se vuelven clicables para llevar tráfico a donde quieras.",
-        how: "Perfil → Editar perfil → Biografía. Pegá tus links y guardá.",
+        body: "Tu biografía admite hyperlinks. Pega URLs (tu web, YouTube, Linktree, etc.) y se vuelven clicables para llevar tráfico a donde quieras.",
+        how: "Perfil → Editar perfil → Biografía. Pega tus links y guarda.",
       },
       {
         n: "03",
         title: "Instagram y TikTok en tu perfil",
         body: "Mostrá tus redes con íconos de Instagram y TikTok directamente en tu perfil. Tus seguidores te encuentran en un toque.",
-        how: "Perfil → Editar perfil → agregá tus usuarios de Instagram y TikTok.",
+        how: "Perfil → Editar perfil → agrega tus usuarios de Instagram y TikTok.",
       },
       {
         n: "04",
         title: "SneakPeeks: carrusel y video",
         body: "Publicá adelantos, reseñas y reacciones en formato carrusel o video. Es tu contenido destacado dentro de Peekr.",
         important:
-          "Referenciá siempre el título. Al hacerlo: (1) unificás los comentarios del SneakPeek con los del título, (2) se crea un link para que el usuario acceda al título, y (3) cuando alguien toca Guardar/Bookmark, el título se agrega directo a sus listas.",
-        how: "Perfil → SneakPeeks → Crear → seleccioná el título referenciado, subí tu carrusel o video y publicá.",
+          "Referencia siempre el título. Al hacerlo: (1) se unifican los comentarios del SneakPeek con los del título, (2) se crea un link para que el usuario acceda al título, y (3) cuando alguien toca Guardar/Bookmark, el título se agrega directo a sus listas.",
+        how: "Perfil → SneakPeeks → Crear → selecciona el título referenciado, sube tu carrusel o video y publica.",
       },
       {
         n: "05",
         title: "Importá tu historial (Letterboxd y Netflix)",
-        body: "Traé todo tu historial de Letterboxd y Netflix a Peekr en minutos, con tus ratings y reseñas. Exclusivo para creators.",
+        body: "Trae todo tu historial de Letterboxd y Netflix a Peekr en minutos, con tus ratings y reseñas. Exclusivo para creators.",
         how: "Desde la web peekr.app → tu perfil → Imports. (Disponible solo en la web.)",
       },
       {
         n: "06",
         title: "Listas ilimitadas",
-        body: "Creá todas las listas (peeklists) que quieras, sin límite. Armá colecciones temáticas, rankings y recomendaciones para tu audiencia.",
+        body: "Crea todas las listas (peeklists) que quieras, sin límite. Arma colecciones temáticas, rankings y recomendaciones para tu audiencia.",
         how: "Perfil → Listas → Crear nueva lista. Sin tope.",
       },
     ],
     ctaTitle: "¿Listo para empezar?",
     ctaBody:
-      "Subí al menos 5 SneakPeeks desde tu perfil para activar tu contenido en el feed.",
+      "Sube al menos 5 SneakPeeks desde tu perfil para activar tu contenido en el feed.",
     ctaBtn: "Abrir Peekr",
   },
   en: {
