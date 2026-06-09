@@ -143,6 +143,7 @@ type Match = {
   poster_path: string | null;
   release_year: number | null;
   tmdb_rating: number | null;
+  total_seasons: number | null;
   confidence: "high" | "medium" | "none";
 };
 type Row = ParsedTitle & {
@@ -414,23 +415,31 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
       const chosen = rows.filter((r) => r.include && r.match?.tmdb_id);
       const acts: any[] = [];
       const reviews: any[] = [];
+      const tvShows: { tmdb: number; title: string; poster_path: string | null; total: number; watched_at: string }[] = [];
       const seen = new Set<number>();
       for (const r of chosen) {
         const tmdb = r.match!.tmdb_id!;
         if (seen.has(tmdb)) continue;
         seen.add(tmdb);
         const ratingNum = r.peekrRating.trim() === "" ? null : Math.max(0, Math.min(10, Number(r.peekrRating)));
+        const watchedAt = r.watchedAt || new Date().toISOString();
         acts.push({
           user_id: uid, tmdb_id: tmdb,
           title: r.match!.matched_title || r.netflixTitle,
           media_type: r.match!.media_type || "movie",
           poster_path: r.match!.poster_path,
           rating: Number.isFinite(ratingNum as number) ? ratingNum : null,
-          watched_at: r.watchedAt || new Date().toISOString(),
+          watched_at: watchedAt,
           release_year: r.match!.release_year,
           platform: "netflix",
           eye_state: "complete", // imported = watched, so it counts as "visto"
         });
+        if (r.match!.media_type === "tv" && (r.match!.total_seasons ?? 0) > 0) {
+          tvShows.push({
+            tmdb, title: r.match!.matched_title || r.netflixTitle,
+            poster_path: r.match!.poster_path, total: r.match!.total_seasons!, watched_at: watchedAt,
+          });
+        }
         if (r.peekrReview.trim()) reviews.push({ tmdb_id: tmdb, user_id: uid, comment: r.peekrReview.trim() });
       }
 
@@ -447,6 +456,30 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
         if (error) throw error;
         done += c.length; setProgress(Math.round((done / total) * 100));
       }
+
+      // TV: mark every season watched + recalc each show's eye_state so the
+      // app shows the seasons checked and the series as "complete".
+      if (tvShows.length) {
+        await supabase.from("tv_metadata").upsert(
+          tvShows.map((s) => ({ tmdb_id: s.tmdb, total_seasons: s.total, last_checked_at: new Date().toISOString() })),
+          { onConflict: "tmdb_id" }
+        );
+        const seasonRows = tvShows.flatMap((s) =>
+          Array.from({ length: s.total }, (_, i) => ({
+            user_id: uid, tmdb_id: s.tmdb, media_type: "tv",
+            title: s.title, poster_path: s.poster_path,
+            season_number: i + 1, eye_state: "complete",
+            watched_at: s.watched_at, platform: "netflix",
+          }))
+        );
+        for (const c of chunk(seasonRows, 200)) {
+          await supabase.from("user_title_activities").upsert(c, { onConflict: "user_id,tmdb_id,season_number", ignoreDuplicates: true });
+        }
+        for (const s of tvShows) {
+          await supabase.rpc("recalc_eye_state", { p_user: uid, p_tmdb: s.tmdb });
+        }
+      }
+
       setResult({ added: acts.length, reviews: reviews.length });
       setStep("done");
     } catch (e) {

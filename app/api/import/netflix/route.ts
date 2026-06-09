@@ -30,8 +30,25 @@ type OutMatch = {
   poster_path: string | null;
   release_year: number | null;
   tmdb_rating: number | null; // TMDB vote_average (0-10), used as the default Peekr rating
+  total_seasons: number | null; // for TV: number of real seasons (season_number > 0)
   confidence: "high" | "medium" | "none";
 };
+
+// Number of real seasons for a TV show (excludes specials / season 0).
+async function tvTotalSeasons(id: number): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `${TMDB_BASE}/tv/${id}?api_key=${TMDB_KEY}&language=en-US`,
+      { next: { revalidate: 60 * 60 * 24 } }
+    );
+    const d = await res.json();
+    const real = (d?.seasons ?? []).filter((s: any) => (s?.season_number ?? 0) > 0);
+    const total = real.length || d?.number_of_seasons || 0;
+    return total > 0 ? total : null;
+  } catch {
+    return null;
+  }
+}
 
 function norm(s: string) {
   return (s || "")
@@ -88,9 +105,10 @@ function pack(
   key: string,
   r: any | null,
   kind: "tv" | "movie",
-  confidence: OutMatch["confidence"]
+  confidence: OutMatch["confidence"],
+  totalSeasons: number | null = null
 ): OutMatch {
-  if (!r) return { key, tmdb_id: null, media_type: null, matched_title: null, poster_path: null, release_year: null, tmdb_rating: null, confidence: "none" };
+  if (!r) return { key, tmdb_id: null, media_type: null, matched_title: null, poster_path: null, release_year: null, tmdb_rating: null, total_seasons: null, confidence: "none" };
   return {
     key,
     tmdb_id: r.id,
@@ -101,40 +119,49 @@ function pack(
     tmdb_rating: typeof r.vote_average === "number" && r.vote_average > 0
       ? Math.round(r.vote_average * 10) / 10
       : null,
+    total_seasons: totalSeasons,
     confidence,
   };
+}
+
+// Pick the matched row/kind/confidence first, then (for TV) enrich with the
+// real season count so the client can mark every season watched on import.
+async function finalize(key: string, r: any | null, kind: "tv" | "movie", confidence: OutMatch["confidence"]): Promise<OutMatch> {
+  if (!r) return pack(key, null, kind, "none");
+  const total = kind === "tv" ? await tvTotalSeasons(r.id) : null;
+  return pack(key, r, kind, confidence, total);
 }
 
 async function resolveOne(t: InTitle): Promise<OutMatch> {
   if (t.type === "movie") {
     const res = await tmdbSearch("movie", t.name);
     const ex = exactMatch(res, t.name, "movie");
-    if (ex) return pack(t.key, ex, "movie", "high");
+    if (ex) return finalize(t.key, ex, "movie", "high");
     const strong = strongTop(res, t.name, "movie");
-    if (strong) return pack(t.key, strong, "movie", "medium");
+    if (strong) return finalize(t.key, strong, "movie", "medium");
     return pack(t.key, null, "movie", "none");
   }
 
   if (t.type === "tv") {
     const res = await tmdbSearch("tv", t.name);
     const ex = exactMatch(res, t.name, "tv");
-    if (ex) return pack(t.key, ex, "tv", "high");
+    if (ex) return finalize(t.key, ex, "tv", "high");
     // misclassified movie watched multiple times -> try movie
     const mres = await tmdbSearch("movie", t.name);
     const mex = exactMatch(mres, t.name, "movie");
-    if (mex) return pack(t.key, mex, "movie", "high");
+    if (mex) return finalize(t.key, mex, "movie", "high");
     const strong = strongTop(res, t.name, "tv");
-    if (strong) return pack(t.key, strong, "tv", "medium");
+    if (strong) return finalize(t.key, strong, "tv", "medium");
     return pack(t.key, null, "tv", "none");
   }
 
   // ambiguous: "Show: Subtitle" — could be a movie (full title) or a show.
   const mres = await tmdbSearch("movie", t.fullName || t.name);
   const mex = exactMatch(mres, t.fullName || t.name, "movie");
-  if (mex) return pack(t.key, mex, "movie", "high");
+  if (mex) return finalize(t.key, mex, "movie", "high");
   const tres = await tmdbSearch("tv", t.name);
   const tex = exactMatch(tres, t.name, "tv");
-  if (tex) return pack(t.key, tex, "tv", "high");
+  if (tex) return finalize(t.key, tex, "tv", "high");
   return pack(t.key, null, "tv", "none");
 }
 
