@@ -512,7 +512,7 @@ export default function ImportsPage({ params }: { params: Promise<{ lang: string
   }
 
   return (
-    <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 20px 80px" }}>
+    <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 20px 80px", background: "#fff", color: "#1a1a1a", minHeight: "100vh" }}>
       <h1 style={{ fontSize: 30, fontWeight: 800, margin: "0 0 4px" }}>{t.title}</h1>
       <p style={{ color: "#666", margin: "0 0 28px" }}>{t.subtitle}</p>
 

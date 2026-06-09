@@ -142,6 +142,7 @@ type Match = {
   matched_title: string | null;
   poster_path: string | null;
   release_year: number | null;
+  tmdb_rating: number | null;
   confidence: "high" | "medium" | "none";
 };
 type Row = ParsedTitle & {
@@ -172,8 +173,12 @@ const I18N: Record<Lang, Record<string, string>> = {
     colTitle: "Título Netflix",
     colThumb: "👍/👎",
     colMatch: "Match TMDB",
-    colRating: "Tu nota (0-10)",
+    colRating: "Tu calificación (0-10)",
     colReview: "Tu reseña",
+    ratingHint: "Precargado con la nota de TMDB — subila, bajala o dejala.",
+    seasonAbbr: "T",
+    mediaTv: "serie",
+    mediaMovie: "película",
     importBtn: "Importar a mi perfil",
     cancel: "Elegir otro archivo",
     done: "¡Listo!",
@@ -209,6 +214,10 @@ const I18N: Record<Lang, Record<string, string>> = {
     colMatch: "TMDB match",
     colRating: "Your rating (0-10)",
     colReview: "Your review",
+    ratingHint: "Pre-filled with the TMDB score — raise it, lower it, or leave it.",
+    seasonAbbr: "S",
+    mediaTv: "series",
+    mediaMovie: "movie",
     importBtn: "Import to my profile",
     cancel: "Choose another file",
     done: "Done!",
@@ -244,6 +253,10 @@ const I18N: Record<Lang, Record<string, string>> = {
     colMatch: "Match TMDB",
     colRating: "Sua nota (0-10)",
     colReview: "Sua crítica",
+    ratingHint: "Pré-preenchido com a nota do TMDB — suba, baixe ou deixe.",
+    seasonAbbr: "T",
+    mediaTv: "série",
+    mediaMovie: "filme",
     importBtn: "Importar para meu perfil",
     cancel: "Escolher outro arquivo",
     done: "Pronto!",
@@ -346,9 +359,12 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
         if (tmdb && seenTmdb.has(tmdb)) continue;
         if (tmdb) seenTmdb.add(tmdb);
         const th = thumbs.get(norm(ti.name));
+        // Default the Peekr rating to TMDB's score; the user can adjust/clear it.
+        const defaultRating =
+          m?.tmdb_rating != null ? String(m.tmdb_rating) : th === "up" ? "7" : "";
         built.push({
           ...ti, match: m, thumb: th,
-          peekrRating: th === "up" ? "7" : "",
+          peekrRating: defaultRating,
           peekrReview: "",
           include: m?.confidence === "high",
         });
@@ -430,8 +446,8 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
   // ── Gate ──
   if (access !== "ok") {
     return (
-      <main style={{ maxWidth: 560, margin: "0 auto", padding: "48px 20px", textAlign: "center" }}>
-        <h1 style={{ fontSize: 28, fontWeight: 800 }}>{t.title}</h1>
+      <main style={{ maxWidth: 560, margin: "0 auto", padding: "48px 20px", textAlign: "center", background: "#fff", color: "#1a1a1a", minHeight: "100vh" }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: "#1a1a1a" }}>{t.title}</h1>
         {access === "checking" ? <p style={{ color: "#666", marginTop: 20 }}>…</p> : (
           <div style={{ marginTop: 24, background: "#faf7f9", borderRadius: 16, padding: 26 }}>
             <div style={{ fontSize: 38 }}>🎬</div>
@@ -447,9 +463,9 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
   }
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: "28px 18px 80px" }}>
+    <main style={{ maxWidth: 900, margin: "0 auto", padding: "28px 18px 80px", background: "#fff", color: "#1a1a1a", minHeight: "100vh" }}>
       <Link href={`/${lang}/imports`} style={{ color: "#888", fontSize: 14, textDecoration: "none" }}>{t.back}</Link>
-      <h1 style={{ fontSize: 28, fontWeight: 800, margin: "6px 0 18px" }}>{t.title}</h1>
+      <h1 style={{ fontSize: 28, fontWeight: 800, margin: "6px 0 18px", color: "#1a1a1a" }}>{t.title}</h1>
 
       {error && <div style={{ background: "#fde8f1", color: "#9b0050", padding: "12px 16px", borderRadius: 12, marginBottom: 18 }}>{error}</div>}
 
@@ -492,27 +508,27 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
             </div>
           )}
 
-          <div style={{ border: "1px solid #eee", borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ ...trStyle, background: "#faf7f9", fontWeight: 700, fontSize: 12, color: "#666" }}>
+          <div style={{ border: "1px solid #e3e3e3", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
+            <div style={{ ...trStyle, background: "#f5f5f5", fontWeight: 700, fontSize: 12, color: "#555" }}>
               <div style={{ flex: 2 }}>{t.colTitle}</div>
               <div style={{ width: 40, textAlign: "center" }}>{t.colThumb}</div>
               <div style={{ flex: 2 }}>{t.colMatch}</div>
-              <div style={{ width: 90 }}>{t.colRating}</div>
+              <div style={{ width: 100 }}>{t.colRating}</div>
               <div style={{ flex: 2 }}>{t.colReview}</div>
             </div>
-            <div style={{ maxHeight: 460, overflowY: "auto" }}>
+            <div style={{ maxHeight: 460, overflowY: "auto", background: "#fff" }}>
               {buckets.high.map((r) => (
                 <div key={r.key} style={trStyle}>
-                  <div style={{ flex: 2, fontSize: 13 }}>
+                  <div style={{ flex: 2, fontSize: 13, color: "#1a1a1a" }}>
                     {r.netflixTitle}
-                    {r.seasons.length > 0 && <span style={{ color: "#aaa" }}> · T{r.seasons.join(",")}</span>}
+                    {r.seasons.length > 0 && <span style={{ color: "#999" }}> · {t.seasonAbbr}{r.seasons.join(",")}</span>}
                   </div>
                   <div style={{ width: 40, textAlign: "center" }}>{r.thumb === "up" ? "👍" : r.thumb === "down" ? "👎" : ""}</div>
                   <div style={{ flex: 2, fontSize: 13, color: "#333" }}>
                     {r.match?.matched_title}
-                    <span style={{ color: "#aaa", fontSize: 11 }}> ({r.match?.media_type})</span>
+                    <span style={{ color: "#999", fontSize: 11 }}> ({r.match?.media_type === "tv" ? t.mediaTv : t.mediaMovie})</span>
                   </div>
-                  <div style={{ width: 90 }}>
+                  <div style={{ width: 100 }}>
                     <input type="number" min={0} max={10} step={0.5} value={r.peekrRating}
                            placeholder={t.noRating}
                            onChange={(e) => setRow(r.key, { peekrRating: e.target.value })}
@@ -527,6 +543,7 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
               ))}
             </div>
           </div>
+          <p style={{ color: "#888", fontSize: 12, marginTop: 8 }}>{t.ratingHint}</p>
 
           <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
             <button onClick={doImport} style={primaryBtn} disabled={buckets.high.length === 0}>{t.importBtn} ({buckets.high.filter(r => r.include).length})</button>
@@ -554,10 +571,11 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
 }
 
 const trStyle: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderBottom: "1px solid #f1f1f1",
+  display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderBottom: "1px solid #f1f1f1", background: "#fff",
 };
 const inputStyle: React.CSSProperties = {
   width: "100%", boxSizing: "border-box", border: "1px solid #ddd", borderRadius: 8, padding: "6px 8px", fontSize: 13,
+  background: "#fff", color: "#111",
 };
 const primaryBtn: React.CSSProperties = {
   background: BRAND, color: "#fff", border: "none", borderRadius: 999, padding: "11px 20px", fontWeight: 700, fontSize: 15, cursor: "pointer",

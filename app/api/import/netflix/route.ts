@@ -29,6 +29,7 @@ type OutMatch = {
   matched_title: string | null;
   poster_path: string | null;
   release_year: number | null;
+  tmdb_rating: number | null; // TMDB vote_average (0-10), used as the default Peekr rating
   confidence: "high" | "medium" | "none";
 };
 
@@ -89,7 +90,7 @@ function pack(
   kind: "tv" | "movie",
   confidence: OutMatch["confidence"]
 ): OutMatch {
-  if (!r) return { key, tmdb_id: null, media_type: null, matched_title: null, poster_path: null, release_year: null, confidence: "none" };
+  if (!r) return { key, tmdb_id: null, media_type: null, matched_title: null, poster_path: null, release_year: null, tmdb_rating: null, confidence: "none" };
   return {
     key,
     tmdb_id: r.id,
@@ -97,6 +98,9 @@ function pack(
     matched_title: titleOf(r, kind) || null,
     poster_path: r.poster_path || null,
     release_year: yearOf(r, kind),
+    tmdb_rating: typeof r.vote_average === "number" && r.vote_average > 0
+      ? Math.round(r.vote_average * 10) / 10
+      : null,
     confidence,
   };
 }
