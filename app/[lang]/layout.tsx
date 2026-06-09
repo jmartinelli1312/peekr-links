@@ -146,16 +146,16 @@ export default async function LangLayout({
           <div className="peekr-footer-owned">{t.ownedBy}</div>
 
           <div className="peekr-footer-links">
-            <a href={`/${lang}/about`} className="peekr-footer-link">
+            <a href={`/about?lang=${lang}`} className="peekr-footer-link">
               {t.about}
             </a>
-            <a href={`/${lang}/privacy`} className="peekr-footer-link">
+            <a href={`/privacy?lang=${lang}`} className="peekr-footer-link">
               {t.privacy}
             </a>
-            <a href={`/${lang}/terms`} className="peekr-footer-link">
+            <a href={`/terms?lang=${lang}`} className="peekr-footer-link">
               {t.terms}
             </a>
-            <a href={`/${lang}/contact`} className="peekr-footer-link">
+            <a href={`/contact?lang=${lang}`} className="peekr-footer-link">
               {t.contact}
             </a>
             <a href={`/creators-guide?lang=${lang}`} className="peekr-footer-link">

@@ -36,9 +36,14 @@ export async function generateMetadata() {
   };
 }
 
-export default async function PrivacyPage() {
+export default async function PrivacyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ lang?: string }>;
+}) {
+  const sp = await searchParams;
   const cookieStore = await cookies();
-  const lang = normalizeLang(cookieStore.get("lang")?.value);
+  const lang = normalizeLang(sp?.lang || cookieStore.get("lang")?.value);
 
   const t = {
     en: {
