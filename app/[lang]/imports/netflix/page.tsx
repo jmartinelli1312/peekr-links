@@ -458,13 +458,13 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
   // ── Gate ──
   if (access !== "ok") {
     return (
-      <main style={{ maxWidth: 560, margin: "0 auto", padding: "48px 20px", textAlign: "center", background: "#fff", color: "#1a1a1a", minHeight: "100vh" }}>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: "#1a1a1a" }}>{t.title}</h1>
-        {access === "checking" ? <p style={{ color: "#666", marginTop: 20 }}>…</p> : (
-          <div style={{ marginTop: 24, background: "#faf7f9", borderRadius: 16, padding: 26 }}>
+      <main style={{ maxWidth: 560, margin: "0 auto", padding: "48px 20px", textAlign: "center", color: "rgba(255,255,255,0.88)" }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}>{t.title}</h1>
+        {access === "checking" ? <p style={{ color: "rgba(255,255,255,0.6)", marginTop: 20 }}>…</p> : (
+          <div style={{ marginTop: 24, background: "rgba(255,255,255,0.06)", borderRadius: 16, padding: 26 }}>
             <div style={{ fontSize: 38 }}>🎬</div>
             <h2 style={{ fontSize: 20, fontWeight: 800 }}>{t.gateTitle}</h2>
-            <p style={{ color: "#555", lineHeight: 1.6 }}>{t.gateBody}</p>
+            <p style={{ color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>{t.gateBody}</p>
             {access === "anon"
               ? <Link href={`/${lang}/login`} style={primaryBtn}>{t.login}</Link>
               : <Link href={`/${lang}`} style={ghostBtn}>OK</Link>}
@@ -475,16 +475,16 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
   }
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: "28px 18px 80px", background: "#fff", color: "#1a1a1a", minHeight: "100vh" }}>
-      <Link href={`/${lang}/imports`} style={{ color: "#888", fontSize: 14, textDecoration: "none" }}>{t.back}</Link>
-      <h1 style={{ fontSize: 28, fontWeight: 800, margin: "6px 0 18px", color: "#1a1a1a" }}>{t.title}</h1>
+    <main style={{ maxWidth: 900, margin: "0 auto", padding: "28px 18px 80px", color: "rgba(255,255,255,0.88)" }}>
+      <Link href={`/${lang}/imports`} style={{ color: "#9a9a9a", fontSize: 14, textDecoration: "none" }}>{t.back}</Link>
+      <h1 style={{ fontSize: 28, fontWeight: 800, margin: "6px 0 18px", color: "#fff" }}>{t.title}</h1>
 
       {error && <div style={{ background: "#fde8f1", color: "#9b0050", padding: "12px 16px", borderRadius: 12, marginBottom: 18 }}>{error}</div>}
 
       {step === "idle" && (
         <>
-          <div style={{ background: "#faf7f9", borderRadius: 14, padding: "18px 20px", marginBottom: 18 }}>
-            <ol style={{ margin: 0, paddingLeft: 18, color: "#444", lineHeight: 1.8 }}>
+          <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: "18px 20px", marginBottom: 18 }}>
+            <ol style={{ margin: 0, paddingLeft: 18, color: "rgba(255,255,255,0.8)", lineHeight: 1.8 }}>
               <li>{t.step1}</li><li>{t.step2}</li><li>{t.step3}</li>
             </ol>
             <a href="https://www.netflix.com/viewingactivity" target="_blank" rel="noreferrer"
@@ -492,17 +492,17 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
               {t.openNetflix}
             </a>
           </div>
-          <label htmlFor="nf-file" style={{ display: "block", border: `1.5px dashed ${BRAND}`, borderRadius: 16, padding: "34px 18px", textAlign: "center", cursor: "pointer", color: "#666" }}>
+          <label htmlFor="nf-file" style={{ display: "block", border: `1.5px dashed ${BRAND}`, borderRadius: 16, padding: "34px 18px", textAlign: "center", cursor: "pointer", color: "rgba(255,255,255,0.75)" }}>
             {t.drop}
           </label>
           <input id="nf-file" type="file" accept=".csv,.zip" style={{ display: "none" }}
                  onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
-          <p style={{ color: "#999", fontSize: 13, marginTop: 12 }}>{t.onlyMovies}</p>
+          <p style={{ color: "#aaa", fontSize: 13, marginTop: 12 }}>{t.onlyMovies}</p>
         </>
       )}
 
       {(step === "parsing" || step === "resolving" || step === "importing") && (
-        <div style={{ textAlign: "center", padding: "60px 0", color: "#666" }}>
+        <div style={{ textAlign: "center", padding: "60px 0", color: "rgba(255,255,255,0.75)" }}>
           {step === "parsing" ? t.parsing : step === "resolving" ? `${t.resolving} ${progress}%` : `${t.importing} ${progress}%`}
         </div>
       )}
@@ -510,7 +510,7 @@ export default function NetflixImportPage({ params }: { params: Promise<{ lang: 
       {step === "preview" && (
         <div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14, fontSize: 14 }}>
-            <span><strong style={{ color: "#1a8a3c" }}>{buckets.high.length}</strong> {t.matched}</span>
+            <span><strong style={{ color: "#34d058" }}>{buckets.high.length}</strong> {t.matched}</span>
             {buckets.medium.length > 0 && <span>· {buckets.medium.length} {t.review}</span>}
             {buckets.none.length > 0 && <span>· {buckets.none.length} {t.notFound}</span>}
           </div>
@@ -620,7 +620,7 @@ const primaryBtn: React.CSSProperties = {
   background: BRAND, color: "#fff", border: "none", borderRadius: 999, padding: "11px 20px", fontWeight: 700, fontSize: 15, cursor: "pointer",
 };
 const ghostBtn: React.CSSProperties = {
-  background: "transparent", color: "#444", border: "1.5px solid #ddd", borderRadius: 999, padding: "11px 20px", fontWeight: 600, fontSize: 15, cursor: "pointer", textDecoration: "none",
+  background: "transparent", color: "rgba(255,255,255,0.85)", border: "1.5px solid rgba(255,255,255,0.25)", borderRadius: 999, padding: "11px 20px", fontWeight: 600, fontSize: 15, cursor: "pointer", textDecoration: "none",
 };
 const linkBtn: React.CSSProperties = {
   background: "transparent", border: "none", color: BRAND, fontWeight: 700, fontSize: 13, cursor: "pointer", padding: 0,

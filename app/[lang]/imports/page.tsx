@@ -512,9 +512,9 @@ export default function ImportsPage({ params }: { params: Promise<{ lang: string
   }
 
   return (
-    <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 20px 80px", background: "#fff", color: "#1a1a1a", minHeight: "100vh" }}>
-      <h1 style={{ fontSize: 30, fontWeight: 800, margin: "0 0 4px" }}>{t.title}</h1>
-      <p style={{ color: "#666", margin: "0 0 28px" }}>{t.subtitle}</p>
+    <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 20px 80px", color: "rgba(255,255,255,0.88)" }}>
+      <h1 style={{ fontSize: 30, fontWeight: 800, margin: "0 0 4px", color: "#fff" }}>{t.title}</h1>
+      <p style={{ color: "rgba(255,255,255,0.6)", margin: "0 0 28px" }}>{t.subtitle}</p>
 
       {error && (
         <div style={{ background: "#fde8f1", color: "#9b0050", padding: "12px 16px", borderRadius: 12, marginBottom: 20 }}>
@@ -533,8 +533,8 @@ export default function ImportsPage({ params }: { params: Promise<{ lang: string
             >
               <div style={iconBox("#202830")}>Lb</div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700 }}>{t.lbName}</div>
-                <div style={{ color: "#666", fontSize: 14 }}>{t.lbDesc}</div>
+                <div style={{ fontWeight: 700, color: "#fff" }}>{t.lbName}</div>
+                <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 14 }}>{t.lbDesc}</div>
               </div>
               <div style={{ color: BRAND, fontWeight: 700 }}>+</div>
             </label>
@@ -550,23 +550,23 @@ export default function ImportsPage({ params }: { params: Promise<{ lang: string
             <Link href={`/${lang}/imports/netflix`} style={{ ...cardStyle, cursor: "pointer", borderColor: "#E50914", textDecoration: "none", color: "inherit" }}>
               <div style={iconBox("#E50914")}>N</div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700 }}>{t.nfName}</div>
-                <div style={{ color: "#666", fontSize: 14 }}>{t.nfDesc}</div>
+                <div style={{ fontWeight: 700, color: "#fff" }}>{t.nfName}</div>
+                <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 14 }}>{t.nfDesc}</div>
               </div>
               <div style={{ color: "#E50914", fontWeight: 700 }}>+</div>
             </Link>
           </div>
 
           {/* Letterboxd instructions */}
-          <div style={{ marginTop: 28, background: "#faf7f9", borderRadius: 14, padding: "18px 20px" }}>
-            <div style={{ fontWeight: 700, marginBottom: 10 }}>{t.howTitle}</div>
-            <ol style={{ margin: 0, paddingLeft: 18, color: "#444", lineHeight: 1.7 }}>
+          <div style={{ marginTop: 28, background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: "18px 20px" }}>
+            <div style={{ fontWeight: 700, marginBottom: 10, color: "#fff" }}>{t.howTitle}</div>
+            <ol style={{ margin: 0, paddingLeft: 18, color: "rgba(255,255,255,0.8)", lineHeight: 1.7 }}>
               <li>{t.step1}</li>
               <li>{t.step2}</li>
               <li>{t.step3}</li>
             </ol>
-            <p style={{ color: "#888", fontSize: 13, marginTop: 12 }}>{t.onlyMovies}</p>
-            <p style={{ color: "#888", fontSize: 13, margin: 0 }}>{t.ratingNote}</p>
+            <p style={{ color: "#aaa", fontSize: 13, marginTop: 12 }}>{t.onlyMovies}</p>
+            <p style={{ color: "#aaa", fontSize: 13, margin: 0 }}>{t.ratingNote}</p>
           </div>
         </>
       )}
@@ -574,7 +574,7 @@ export default function ImportsPage({ params }: { params: Promise<{ lang: string
       {(step === "parsing" || step === "resolving" || step === "importing") && (
         <div style={{ textAlign: "center", padding: "60px 0" }}>
           <div className="lb-spin" style={spinner} />
-          <p style={{ color: "#666", marginTop: 18 }}>
+          <p style={{ color: "rgba(255,255,255,0.75)", marginTop: 18 }}>
             {step === "parsing" ? t.parsing : step === "resolving" ? t.resolving : `${t.importing} ${progress}%`}
           </p>
           <style>{`.lb-spin{animation:lbspin 0.8s linear infinite}@keyframes lbspin{to{transform:rotate(360deg)}}`}</style>
@@ -589,8 +589,8 @@ export default function ImportsPage({ params }: { params: Promise<{ lang: string
             <Stat n={counts.watchlist.length} label={t.foundWatchlist} />
           </div>
 
-          <div style={{ fontSize: 14, color: "#555", marginBottom: 14 }}>
-            <span style={{ color: "#1a8a3c", fontWeight: 700 }}>
+          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.7)", marginBottom: 14 }}>
+            <span style={{ color: "#34d058", fontWeight: 700 }}>
               {counts.watched.length + counts.watchlist.length} {t.matched}
             </span>
             {counts.lowCount > 0 && <> · {counts.lowCount} {t.needsReview}</>}
@@ -598,7 +598,7 @@ export default function ImportsPage({ params }: { params: Promise<{ lang: string
           </div>
 
           {counts.lowCount > 0 && (
-            <label style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 20, fontSize: 14, color: "#444" }}>
+            <label style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 20, fontSize: 14, color: "rgba(255,255,255,0.8)" }}>
               <input type="checkbox" checked={includeLow} onChange={(e) => setIncludeLow(e.target.checked)} />
               {t.includeLow}
             </label>
@@ -643,15 +643,15 @@ export default function ImportsPage({ params }: { params: Promise<{ lang: string
 // ─────────────────────────────────────────────────────────────────────────
 function Stat({ n, label }: { n: number; label: string }) {
   return (
-    <div style={{ background: "#faf7f9", borderRadius: 12, padding: "16px 12px", textAlign: "center" }}>
+    <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: "16px 12px", textAlign: "center" }}>
       <div style={{ fontSize: 26, fontWeight: 800, color: BRAND }}>{n}</div>
-      <div style={{ fontSize: 12, color: "#666" }}>{label}</div>
+      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{label}</div>
     </div>
   );
 }
 function Done({ n, label, muted }: { n: number; label: string; muted?: boolean }) {
   return (
-    <div style={{ color: muted ? "#999" : "#222" }}>
+    <div style={{ color: muted ? "#999" : "rgba(255,255,255,0.85)" }}>
       <strong style={{ color: muted ? "#999" : BRAND }}>{n}</strong> {label}
     </div>
   );
@@ -674,6 +674,6 @@ const primaryBtn: React.CSSProperties = {
   padding: "12px 22px", fontWeight: 700, fontSize: 15, cursor: "pointer",
 };
 const ghostBtn: React.CSSProperties = {
-  background: "transparent", color: "#444", border: "1.5px solid #ddd", borderRadius: 999,
+  background: "transparent", color: "rgba(255,255,255,0.85)", border: "1.5px solid rgba(255,255,255,0.25)", borderRadius: 999,
   padding: "12px 22px", fontWeight: 600, fontSize: 15, cursor: "pointer",
 };
