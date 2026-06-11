@@ -186,6 +186,10 @@ function ContractDoc({
                 Empresa / Marca: {fields.brandName || fields.partnerName}
               </Text>
               <Text style={s.sigMeta}>Usuario / Handle: {fields.username}</Text>
+              <Text style={s.sigMeta}>
+                Documento: {fields.docNumber || "____________"}
+                {fields.docCountry ? ` (${fields.docCountry})` : ""}
+              </Text>
               <Text style={s.sigMeta}>Fecha: {fmtDate(sign?.partnerSignedAt)}</Text>
             </View>
           </View>

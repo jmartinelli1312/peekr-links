@@ -15,6 +15,8 @@ export type ContractFields = {
   brandName: string; // company / brand acting through
   username: string; // social handle / account
   percentage: number; // e.g. 5
+  docNumber?: string; // partner's ID / passport number
+  docCountry?: string; // country that issued the document
 };
 
 const PCT_WORDS: Record<string, string> = {
@@ -43,7 +45,7 @@ const TEMPLATE: Block[] = [
   { t: "h1", x: "ACUERDO FOUNDING COUNTRY GROWTH PARTNER" },
   { t: "h1", x: "{{COUNTRY_UPPER}}" },
   { t: "p", x: "El presente Founding Country Growth Partner Agreement (el “Acuerdo”) se celebra con fecha {{effectiveDate}}, entre:" },
-  { t: "p", x: "EMANATION FILMS, INC., una sociedad constituida conforme a las leyes de la República de Panamá, DUNS Number 727265117, propietaria y operadora de la plataforma Peekr, representada por su Representante Legal, JORGE ENRIQUE MARTINELLI REMOND, con identificación panameña No. 8-713-1063 (en adelante, “Peekr” o la “Compañía”), y {{partnerName}}, actuando a través de o en nombre de {{brandName}}, incluyendo la marca, cuenta, presencia pública y/o ecosistema de redes sociales {{username}} (en adelante, el “Partner”). Peekr y el Partner podrán ser denominados individualmente como una “Parte” y conjuntamente como las “Partes”." },
+  { t: "p", x: "EMANATION FILMS, INC., una sociedad constituida conforme a las leyes de la República de Panamá, DUNS Number 727265117, propietaria y operadora de la plataforma Peekr, representada por su Representante Legal, JORGE ENRIQUE MARTINELLI REMOND, con identificación panameña No. 8-713-1063 (en adelante, “Peekr” o la “Compañía”), y {{partnerName}}{{docId}}, actuando a través de o en nombre de {{brandName}}, incluyendo la marca, cuenta, presencia pública y/o ecosistema de redes sociales {{username}} (en adelante, el “Partner”). Peekr y el Partner podrán ser denominados individualmente como una “Parte” y conjuntamente como las “Partes”." },
 
   { t: "h2", x: "1. OBJETO" },
   { t: "p", x: "El objeto de este Acuerdo es establecer una alianza estratégica de largo plazo mediante la cual el Partner actuará como Founding Country Growth Partner para {{country}} y contribuirá activamente al crecimiento, adopción, desarrollo del ecosistema de creadores y expansión de la comunidad de Peekr dentro de {{country}}." },
@@ -202,7 +204,13 @@ export function fillContract(f: ContractFields): Block[] {
   const y1 = fmtPct(Math.round((pct / 3) * 100) / 100);
   const y2 = fmtPct(Math.round(((pct * 2) / 3) * 100) / 100);
   const adj = COUNTRY_ADJ[f.country] ?? `de ${f.country}`;
+  const docNum = (f.docNumber ?? "").trim();
+  const docCty = (f.docCountry ?? "").trim();
+  const docId = docNum
+    ? `, identificado con documento No. ${docNum}${docCty ? ` emitido en ${docCty}` : ""}`
+    : "";
   const map: Record<string, string> = {
+    docId,
     country: f.country,
     COUNTRY_UPPER: f.country.toUpperCase(),
     countryAdj: adj,

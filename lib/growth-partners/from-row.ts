@@ -22,6 +22,8 @@ export function rowToFields(row: any): ContractFields {
     brandName: row.brand_name || row.partner_legal_name,
     username: row.username,
     percentage: Number(row.percentage),
+    docNumber: row.partner_doc_number ?? undefined,
+    docCountry: row.partner_doc_country ?? undefined,
   };
 }
 

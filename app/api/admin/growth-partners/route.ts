@@ -41,6 +41,12 @@ export async function POST(req: NextRequest) {
   const partnerEmail = body.partner_email
     ? String(body.partner_email).trim()
     : null;
+  const docNumber = body.partner_doc_number
+    ? String(body.partner_doc_number).trim()
+    : null;
+  const docCountry = body.partner_doc_country
+    ? String(body.partner_doc_country).trim()
+    : null;
 
   if (!country || !partnerName || !username || !Number.isFinite(percentage)) {
     return NextResponse.json(
@@ -61,6 +67,8 @@ export async function POST(req: NextRequest) {
       percentage,
       effective_date: effectiveDate,
       partner_email: partnerEmail,
+      partner_doc_number: docNumber,
+      partner_doc_country: docCountry,
       status: "draft",
       sign_token: token,
       created_by: userId,

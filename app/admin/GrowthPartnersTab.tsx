@@ -50,6 +50,8 @@ export default function GrowthPartnersTab() {
     percentage: "5",
     effective_date: "",
     partner_email: "",
+    partner_doc_number: "",
+    partner_doc_country: "Argentina",
   });
 
   const load = useCallback(async () => {
@@ -97,6 +99,8 @@ export default function GrowthPartnersTab() {
         percentage: "5",
         effective_date: "",
         partner_email: "",
+        partner_doc_number: "",
+        partner_doc_country: "Argentina",
       });
       await load();
     } finally {
@@ -163,6 +167,8 @@ export default function GrowthPartnersTab() {
             <Field label="Nombre legal del partner" value={form.partner_legal_name} onChange={(v) => setForm({ ...form, partner_legal_name: v })} />
             <Field label="Empresa / Marca" value={form.brand_name} onChange={(v) => setForm({ ...form, brand_name: v })} />
             <Field label="Usuario / Handle" value={form.username} onChange={(v) => setForm({ ...form, username: v })} />
+            <Field label="N° de documento" value={form.partner_doc_number} onChange={(v) => setForm({ ...form, partner_doc_number: v })} />
+            <Field label="País del documento" value={form.partner_doc_country} onChange={(v) => setForm({ ...form, partner_doc_country: v })} />
             <Field label="Email del partner" value={form.partner_email} onChange={(v) => setForm({ ...form, partner_email: v })} />
             <Field label="Fecha de vigencia" value={form.effective_date} onChange={(v) => setForm({ ...form, effective_date: v })} type="date" />
           </div>
