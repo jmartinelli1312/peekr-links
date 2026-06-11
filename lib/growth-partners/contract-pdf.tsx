@@ -30,7 +30,7 @@ const BRAND = "#FA0082";
 const s = StyleSheet.create({
   page: {
     paddingTop: 48,
-    paddingBottom: 56,
+    paddingBottom: 66,
     paddingHorizontal: 48,
     fontSize: 9.5,
     lineHeight: 1.5,
@@ -53,14 +53,19 @@ const s = StyleSheet.create({
   li: { marginBottom: 3, marginLeft: 12, textAlign: "justify" },
   footer: {
     position: "absolute",
-    bottom: 24,
+    bottom: 20,
     left: 48,
     right: 48,
     fontSize: 7.5,
     color: "#9a9a9a",
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-end",
   },
+  initialsRow: { flexDirection: "row", alignItems: "flex-end" },
+  initialBox: { flexDirection: "row", alignItems: "center", marginRight: 14 },
+  initialLabel: { fontSize: 6, color: "#b0b0b0", marginRight: 3, marginBottom: 2 },
+  initialImg: { height: 16, width: 44, objectFit: "contain" },
   sigSection: { marginTop: 22 },
   sigRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 10 },
   sigBlock: { width: "47%" },
@@ -106,10 +111,24 @@ function renderBlock(b: Block, i: number) {
   return <Text key={i} style={s.p}>{b.x}</Text>;
 }
 
-function Footer() {
+function Footer({ sign }: { sign?: SignData }) {
   return (
     <View style={s.footer} fixed>
-      <Text>Peekr · Founding Country Growth Partner Agreement</Text>
+      {/* Per-page initials: each party's signature, stamped small bottom-left. */}
+      <View style={s.initialsRow}>
+        {sign?.companySignature ? (
+          <View style={s.initialBox}>
+            <Text style={s.initialLabel}>Peekr</Text>
+            <Image src={sign.companySignature} style={s.initialImg} />
+          </View>
+        ) : null}
+        {sign?.partnerSignature ? (
+          <View style={s.initialBox}>
+            <Text style={s.initialLabel}>Partner</Text>
+            <Image src={sign.partnerSignature} style={s.initialImg} />
+          </View>
+        ) : null}
+      </View>
       <Text
         render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
       />
@@ -172,7 +191,7 @@ function ContractDoc({
           </View>
         </View>
 
-        <Footer />
+        <Footer sign={sign} />
       </Page>
 
       {bothSigned && (
@@ -231,7 +250,7 @@ function ContractDoc({
             <Text style={s.certVal}>{sign?.partnerUserAgent || "—"}</Text>
           </View>
 
-          <Footer />
+          <Footer sign={sign} />
         </Page>
       )}
     </Document>
