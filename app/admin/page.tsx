@@ -8,6 +8,7 @@ import PeekrbuzzDailyTab from "./PeekrbuzzDailyTab";
 import UserGeoTab from "./UserGeoTab";
 import AnalyticsTab from "./AnalyticsTab";
 import PulsoTab from "./PulsoTab";
+import GrowthPartnersTab from "./GrowthPartnersTab";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 // Catches runtime exceptions inside WeeklyEditorialTab and shows the actual
@@ -321,7 +322,7 @@ export default function AdminPage() {
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
-  const [activeTab, setActiveTab] = useState<"pulso" | "metrics" | "analytics" | "editorial">("pulso");
+  const [activeTab, setActiveTab] = useState<"pulso" | "metrics" | "analytics" | "editorial" | "growth">("pulso");
   const [pendingCounts, setPendingCounts] = useState({ articles: 0, carousels: 0, creators: 0, newsletters: 0 });
   const [pendingArticles, setPendingArticles] = useState<PendingArticle[]>([]);
   const [pendingCarousels, setPendingCarousels] = useState<PendingCarousel[]>([]);
@@ -1438,12 +1439,26 @@ export default function AdminPage() {
               >
                 📋 Editorial
               </button>
+              <button
+                className={`admin-tab${activeTab === "growth" ? " active" : ""}`}
+                onClick={() => setActiveTab("growth")}
+                style={{ fontWeight: 700, color: "#FA0082" }}
+              >
+                🤝 Growth Partners
+              </button>
             </div>
 
             {/* ===================== TAB: PULSO ===================== */}
             {activeTab === "pulso" && (
               <div style={{ marginTop: 20 }}>
                 <PulsoTab supabase={supabase} />
+              </div>
+            )}
+
+            {/* ===================== TAB: GROWTH PARTNERS ===================== */}
+            {activeTab === "growth" && (
+              <div style={{ marginTop: 20 }}>
+                <GrowthPartnersTab />
               </div>
             )}
 
