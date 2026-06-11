@@ -724,7 +724,7 @@ export default function PeekrbuzzDailyTab({ supabase }: { supabase: SupabaseClie
         {/* 3a — Weekend reco carousel (auto-generated Thursdays, manual trigger
             available). Renders FIRST so the high-impact weekly post sits at the
             top when an editor scrolls down. */}
-        <WeekendRecoSection supabase={supabase} key={`weekend-${carouselRefreshKey}`} />
+        <WeekendRecoSection supabase={supabase} date={targetDate} key={`weekend-${targetDate}-${carouselRefreshKey}`} />
 
         {/* 3b — Cinematic carousels per published daily article. */}
         <CarouselsGeneratedSection

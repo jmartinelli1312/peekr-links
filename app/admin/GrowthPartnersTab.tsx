@@ -14,6 +14,7 @@ type Contract = {
   percentage: number;
   effective_date: string | null;
   status: string;
+  language: string | null;
   company_signed_at: string | null;
   partner_signed_at: string | null;
   partner_email: string | null;
@@ -21,6 +22,20 @@ type Contract = {
   final_pdf_path: string | null;
   created_at: string;
 };
+
+const LANG_LABEL: Record<string, string> = { es: "Español", en: "Inglés", pt: "Portugués" };
+
+function fmtSignedDate(c: Contract): string {
+  const iso = c.partner_signed_at || c.company_signed_at;
+  if (!iso) return "—";
+  try {
+    return new Intl.DateTimeFormat("es-AR", {
+      day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+    }).format(new Date(iso));
+  } catch {
+    return "—";
+  }
+}
 
 const STATUS_LABEL: Record<string, { t: string; c: string }> = {
   draft: { t: "Borrador", c: "#9a9a9a" },
@@ -41,6 +56,7 @@ export default function GrowthPartnersTab() {
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [signing, setSigning] = useState<Contract | null>(null);
+  const [deleting, setDeleting] = useState<Contract | null>(null);
 
   const [form, setForm] = useState({
     country: "Argentina",
@@ -52,6 +68,7 @@ export default function GrowthPartnersTab() {
     partner_email: "",
     partner_doc_number: "",
     partner_doc_country: "Argentina",
+    language: "es",
   });
 
   const load = useCallback(async () => {
@@ -101,6 +118,7 @@ export default function GrowthPartnersTab() {
         partner_email: "",
         partner_doc_number: "",
         partner_doc_country: "Argentina",
+        language: "es",
       });
       await load();
     } finally {
@@ -140,6 +158,26 @@ export default function GrowthPartnersTab() {
     }
   };
 
+  const remove = async (id: string) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/growth-partners/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+        body: JSON.stringify({ confirm: "ELIMINAR" }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(j.error || "Error al eliminar");
+        return;
+      }
+      setDeleting(null);
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const copyLink = (token: string | null) => {
     if (!token) return;
     const url = `${window.location.origin}/sign/${token}`;
@@ -171,6 +209,16 @@ export default function GrowthPartnersTab() {
             <Field label="País del documento" value={form.partner_doc_country} onChange={(v) => setForm({ ...form, partner_doc_country: v })} />
             <Field label="Email del partner" value={form.partner_email} onChange={(v) => setForm({ ...form, partner_email: v })} />
             <Field label="Fecha de vigencia" value={form.effective_date} onChange={(v) => setForm({ ...form, effective_date: v })} type="date" />
+            <SelectField
+              label="Idioma del contrato"
+              value={form.language}
+              onChange={(v) => setForm({ ...form, language: v })}
+              options={[
+                { value: "es", label: "Español" },
+                { value: "en", label: "Inglés" },
+                { value: "pt", label: "Portugués" },
+              ]}
+            />
           </div>
           <div style={{ marginTop: 14 }}>
             <button onClick={create} disabled={busy} style={btnPrimary}>
@@ -206,6 +254,7 @@ export default function GrowthPartnersTab() {
                       <th style={th}>Usuario</th>
                       <th style={th}>%</th>
                       <th style={th}>Estado</th>
+                      <th style={th}>Firmado</th>
                       <th style={th}>Acciones</th>
                     </tr>
                   </thead>
@@ -214,11 +263,19 @@ export default function GrowthPartnersTab() {
                       const st = STATUS_LABEL[c.status] ?? { t: c.status, c: "#9a9a9a" };
                       return (
                         <tr key={c.id} style={{ borderTop: "1px solid #ffffff14" }}>
-                          <td style={td}>{c.partner_legal_name}</td>
+                          <td style={td}>
+                            {c.partner_legal_name}
+                            <div style={{ color: "#7a7a7a", fontSize: 11, marginTop: 2 }}>
+                              {LANG_LABEL[c.language ?? "es"] ?? "Español"}
+                            </div>
+                          </td>
                           <td style={td}>{c.username}</td>
                           <td style={td}>{Number(c.percentage).toFixed(2)}%</td>
                           <td style={td}>
                             <span style={{ color: st.c, fontWeight: 700 }}>{st.t}</span>
+                          </td>
+                          <td style={{ ...td, whiteSpace: "nowrap", color: "#bdbdbd", fontSize: 13 }}>
+                            {fmtSignedDate(c)}
                           </td>
                           <td style={{ ...td, whiteSpace: "nowrap" }}>
                             <button style={btnGhost} onClick={() => viewPdf(c.id)}>PDF</button>
@@ -232,6 +289,9 @@ export default function GrowthPartnersTab() {
                                 Copiar link partner
                               </button>
                             )}
+                            <button style={btnDanger} onClick={() => setDeleting(c)}>
+                              Eliminar
+                            </button>
                           </td>
                         </tr>
                       );
@@ -252,6 +312,114 @@ export default function GrowthPartnersTab() {
           onSign={(sig) => signCompany(signing.id, sig)}
         />
       )}
+
+      {deleting && (
+        <DeleteModal
+          contract={deleting}
+          busy={busy}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => remove(deleting.id)}
+        />
+      )}
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <label style={{ display: "block", fontSize: 12, color: "#9a9a9a" }}>
+      {label}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          display: "block",
+          width: "100%",
+          marginTop: 4,
+          padding: "8px 10px",
+          background: "#15151b",
+          border: "1px solid #ffffff22",
+          borderRadius: 8,
+          color: "#fff",
+          fontSize: 14,
+        }}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+// ── Delete confirmation modal (type ELIMINAR) ───────────────────────────────
+function DeleteModal({
+  contract,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  contract: Contract;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const [text, setText] = useState("");
+  const ok = text.trim().toUpperCase() === "ELIMINAR";
+  return (
+    <div style={overlay} onClick={onCancel}>
+      <div style={{ ...card, maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ marginTop: 0, color: "#ff6b6b" }}>Eliminar contrato</h3>
+        <p style={{ color: "#cfcfcf", fontSize: 14, lineHeight: 1.5 }}>
+          Vas a eliminar permanentemente el contrato de{" "}
+          <strong>{contract.partner_legal_name}</strong> ({contract.username}) ·{" "}
+          {contract.country} · {Number(contract.percentage).toFixed(2)}%.
+          <br />
+          Esta acción no se puede deshacer y borra también el PDF firmado.
+        </p>
+        <p style={{ color: "#9a9a9a", fontSize: 13, marginBottom: 6 }}>
+          Para confirmar, escribí <strong style={{ color: "#fff" }}>ELIMINAR</strong>:
+        </p>
+        <input
+          autoFocus
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="ELIMINAR"
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            background: "#15151b",
+            border: `1px solid ${ok ? "#ff6b6b" : "#ffffff22"}`,
+            borderRadius: 8,
+            color: "#fff",
+            fontSize: 15,
+            letterSpacing: 1,
+          }}
+        />
+        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+          <div style={{ flex: 1 }} />
+          <button style={btnGhost} onClick={onCancel}>Cancelar</button>
+          <button
+            style={{ ...btnDanger, opacity: ok && !busy ? 1 : 0.45, cursor: ok && !busy ? "pointer" : "not-allowed", marginRight: 0 }}
+            onClick={onConfirm}
+            disabled={!ok || busy}
+          >
+            {busy ? "Eliminando…" : "Eliminar definitivamente"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -410,6 +578,17 @@ const btnGhost: React.CSSProperties = {
   background: "transparent",
   color: "#eaeaea",
   border: "1px solid #ffffff22",
+  borderRadius: 999,
+  padding: "6px 12px",
+  fontWeight: 600,
+  fontSize: 13,
+  cursor: "pointer",
+  marginRight: 6,
+};
+const btnDanger: React.CSSProperties = {
+  background: "rgba(239,68,68,0.12)",
+  color: "#ff6b6b",
+  border: "1px solid rgba(239,68,68,0.4)",
   borderRadius: 999,
   padding: "6px 12px",
   fontWeight: 600,

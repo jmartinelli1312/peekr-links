@@ -44,8 +44,11 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function WeekendRecoSection({
   supabase,
+  date,
 }: {
   supabase: SupabaseClient;
+  /** ART calendar day ("YYYY-MM-DD") to file the carousels under. */
+  date: string;
 }) {
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,18 +70,24 @@ export default function WeekendRecoSection({
     }
   }, []);
 
-  // ── Load last 14 days of weekend_reco drafts ─────────────────────────────
+  // ── Load weekend_reco drafts for the selected ART calendar day ────────────
+  // Argentina is UTC-3 year-round, so the ART day [00:00, 24:00) maps to the
+  // UTC window [date T03:00Z, date+1 T03:00Z). Filtering generated_at by that
+  // window files each carousel under the day it was created — so they appear
+  // as history on their own date instead of piling up under "today".
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const since = new Date(Date.now() - 14 * 86400_000).toISOString();
+    const dayStartUtc = new Date(`${date}T03:00:00.000Z`);
+    const dayEndUtc = new Date(dayStartUtc.getTime() + 86400_000);
     const { data, error: fErr } = await supabase
       .from("peekrbuzz_ig_queue")
       .select(
         "id, draft_type, hook_text, caption, article_url, slide_urls, status, ig_media_id, threads_post_id, published_at, scheduled_for, error, generated_at, seed_title",
       )
       .eq("draft_type", "weekend_reco")
-      .gte("generated_at", since)
+      .gte("generated_at", dayStartUtc.toISOString())
+      .lt("generated_at", dayEndUtc.toISOString())
       .order("generated_at", { ascending: false });
 
     if (fErr) {
@@ -88,7 +97,7 @@ export default function WeekendRecoSection({
     }
     setDrafts((data ?? []) as DraftRow[]);
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, date]);
 
   useEffect(() => {
     void load();
@@ -276,7 +285,7 @@ export default function WeekendRecoSection({
           <h2>🎬 Recomendaciones del finde</h2>
           <p className="wr-sub">
             Carrusel automático de 6 slides cada jueves 12:00 ART, basado en los títulos más vistos en Peekr esta semana.
-            Va a IG y Threads cuando lo aprobás.
+            Va a IG y Threads cuando lo aprobás. Se muestra el del día seleccionado arriba — navegá la fecha para ver el historial.
           </p>
         </div>
         <button
@@ -296,9 +305,9 @@ export default function WeekendRecoSection({
         <div className="wr-empty">Cargando…</div>
       ) : drafts.length === 0 ? (
         <div className="wr-empty">
-          No hay carruseles del finde en los últimos 14 días.
+          No hay carruseles del finde para este día.
           <br />
-          El cron corre los jueves 15:00 UTC (12:00 ART) — o apretá <strong>Generar ahora</strong>.
+          Se generan los jueves 15:00 UTC (12:00 ART) — navegá la fecha al jueves correspondiente, o apretá <strong>Generar ahora</strong>.
         </div>
       ) : (
         drafts.map((d) => {

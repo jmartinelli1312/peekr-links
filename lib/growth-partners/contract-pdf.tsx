@@ -11,7 +11,53 @@ import {
   StyleSheet,
   renderToBuffer,
 } from "@react-pdf/renderer";
-import { fillContract, type ContractFields, type Block } from "./contract-template";
+import { fillContract, type ContractFields, type Block, type Lang } from "./contract-template";
+
+// Static PDF chrome (signature block, certificate) localized per language.
+const LABELS: Record<Lang, {
+  signatures: string; legalRep: string; panamaId: string; date: string;
+  partner: string; name: string; brand: string; handle: string; document: string;
+  certTitle: string; certSub: string; docName: string; doc: string; docId: string;
+  hash: string; signer: string; dateTime: string; ip: string; device: string;
+  dateLocale: string;
+}> = {
+  es: {
+    signatures: "FIRMAS", legalRep: "Representante Legal",
+    panamaId: "Identificación panameña: 8-713-1063", date: "Fecha",
+    partner: "PARTNER", name: "Nombre", brand: "Empresa / Marca",
+    handle: "Usuario / Handle", document: "Documento",
+    certTitle: "CERTIFICADO DE FINALIZACIÓN",
+    certSub: "Registro de firma electrónica · Peekr (Emanation Films, Inc.)",
+    docName: "Founding Country Growth Partner Agreement",
+    doc: "Documento", docId: "ID del documento", hash: "Hash (SHA-256)",
+    signer: "Firmante", dateTime: "Fecha y hora", ip: "IP", device: "Dispositivo",
+    dateLocale: "es-ES",
+  },
+  en: {
+    signatures: "SIGNATURES", legalRep: "Legal Representative",
+    panamaId: "Panamanian ID: 8-713-1063", date: "Date",
+    partner: "PARTNER", name: "Name", brand: "Company / Brand",
+    handle: "User / Handle", document: "Document",
+    certTitle: "CERTIFICATE OF COMPLETION",
+    certSub: "Electronic signature record · Peekr (Emanation Films, Inc.)",
+    docName: "Founding Country Growth Partner Agreement",
+    doc: "Document", docId: "Document ID", hash: "Hash (SHA-256)",
+    signer: "Signatory", dateTime: "Date and time", ip: "IP", device: "Device",
+    dateLocale: "en-US",
+  },
+  pt: {
+    signatures: "ASSINATURAS", legalRep: "Representante Legal",
+    panamaId: "Identificação panamenha: 8-713-1063", date: "Data",
+    partner: "PARTNER", name: "Nome", brand: "Empresa / Marca",
+    handle: "Usuário / Handle", document: "Documento",
+    certTitle: "CERTIFICADO DE CONCLUSÃO",
+    certSub: "Registro de assinatura eletrônica · Peekr (Emanation Films, Inc.)",
+    docName: "Founding Country Growth Partner Agreement",
+    doc: "Documento", docId: "ID do documento", hash: "Hash (SHA-256)",
+    signer: "Signatário", dateTime: "Data e hora", ip: "IP", device: "Dispositivo",
+    dateLocale: "pt-BR",
+  },
+};
 
 export type SignData = {
   companySignature?: string | null; // data URL
@@ -87,11 +133,11 @@ const s = StyleSheet.create({
   certParty: { fontFamily: "Helvetica-Bold", fontSize: 10, marginTop: 14, marginBottom: 4 },
 });
 
-function fmtDate(iso?: string | null): string {
+function fmtDate(iso?: string | null, loc: string = "es-ES"): string {
   if (!iso) return "_____________________";
   try {
     const d = new Date(iso);
-    return d.toLocaleString("es-ES", {
+    return d.toLocaleString(loc, {
       day: "2-digit",
       month: "long",
       year: "numeric",
@@ -145,6 +191,8 @@ function ContractDoc({
 }) {
   const blocks = fillContract(fields);
   const bothSigned = !!(sign?.companySignedAt && sign?.partnerSignedAt);
+  const lang: Lang = fields.language ?? "es";
+  const L = LABELS[lang];
 
   return (
     <Document
@@ -154,7 +202,7 @@ function ContractDoc({
         {blocks.map(renderBlock)}
 
         <View style={s.sigSection} wrap={false}>
-          <Text style={s.h2}>FIRMAS</Text>
+          <Text style={s.h2}>{L.signatures}</Text>
           <View style={s.sigRow}>
             {/* Company */}
             <View style={s.sigBlock}>
@@ -166,31 +214,31 @@ function ContractDoc({
               )}
               <View style={s.sigLine} />
               <Text style={s.sigName}>JORGE ENRIQUE MARTINELLI REMOND</Text>
-              <Text style={s.sigMeta}>Representante Legal</Text>
-              <Text style={s.sigMeta}>Identificación panameña: 8-713-1063</Text>
+              <Text style={s.sigMeta}>{L.legalRep}</Text>
+              <Text style={s.sigMeta}>{L.panamaId}</Text>
               <Text style={s.sigMeta}>DUNS Number: 727265117</Text>
-              <Text style={s.sigMeta}>Fecha: {fmtDate(sign?.companySignedAt)}</Text>
+              <Text style={s.sigMeta}>{L.date}: {fmtDate(sign?.companySignedAt, L.dateLocale)}</Text>
             </View>
 
             {/* Partner */}
             <View style={s.sigBlock}>
-              <Text style={s.sigLabel}>PARTNER</Text>
+              <Text style={s.sigLabel}>{L.partner}</Text>
               {sign?.partnerSignature ? (
                 <Image src={sign.partnerSignature} style={s.sigImg} />
               ) : (
                 <View style={s.sigLine} />
               )}
               <View style={s.sigLine} />
-              <Text style={s.sigName}>Nombre: {fields.partnerName}</Text>
+              <Text style={s.sigName}>{L.name}: {fields.partnerName}</Text>
               <Text style={s.sigMeta}>
-                Empresa / Marca: {fields.brandName || fields.partnerName}
+                {L.brand}: {fields.brandName || fields.partnerName}
               </Text>
-              <Text style={s.sigMeta}>Usuario / Handle: {fields.username}</Text>
+              <Text style={s.sigMeta}>{L.handle}: {fields.username}</Text>
               <Text style={s.sigMeta}>
-                Documento: {fields.docNumber || "____________"}
+                {L.document}: {fields.docNumber || "____________"}
                 {fields.docCountry ? ` (${fields.docCountry})` : ""}
               </Text>
-              <Text style={s.sigMeta}>Fecha: {fmtDate(sign?.partnerSignedAt)}</Text>
+              <Text style={s.sigMeta}>{L.date}: {fmtDate(sign?.partnerSignedAt, L.dateLocale)}</Text>
             </View>
           </View>
         </View>
@@ -200,57 +248,55 @@ function ContractDoc({
 
       {bothSigned && (
         <Page size="A4" style={s.page}>
-          <Text style={s.certTitle}>CERTIFICADO DE FINALIZACIÓN</Text>
-          <Text style={s.certSub}>
-            Registro de firma electrónica · Peekr (Emanation Films, Inc.)
-          </Text>
+          <Text style={s.certTitle}>{L.certTitle}</Text>
+          <Text style={s.certSub}>{L.certSub}</Text>
 
           <View style={s.certRow}>
-            <Text style={s.certKey}>Documento</Text>
+            <Text style={s.certKey}>{L.doc}</Text>
             <Text style={s.certVal}>
-              Founding Country Growth Partner Agreement — {fields.country}
+              {L.docName} — {fields.country}
             </Text>
           </View>
           <View style={s.certRow}>
-            <Text style={s.certKey}>ID del documento</Text>
+            <Text style={s.certKey}>{L.docId}</Text>
             <Text style={s.certVal}>{sign?.documentId || "—"}</Text>
           </View>
           <View style={s.certRow}>
-            <Text style={s.certKey}>Hash (SHA-256)</Text>
+            <Text style={s.certKey}>{L.hash}</Text>
             <Text style={s.certVal}>{sign?.documentHash || "—"}</Text>
           </View>
 
           <Text style={s.certParty}>EMANATION FILMS, INC.</Text>
           <View style={s.certRow}>
-            <Text style={s.certKey}>Firmante</Text>
+            <Text style={s.certKey}>{L.signer}</Text>
             <Text style={s.certVal}>Jorge Enrique Martinelli Remond</Text>
           </View>
           <View style={s.certRow}>
-            <Text style={s.certKey}>Fecha y hora</Text>
-            <Text style={s.certVal}>{fmtDate(sign?.companySignedAt)}</Text>
+            <Text style={s.certKey}>{L.dateTime}</Text>
+            <Text style={s.certVal}>{fmtDate(sign?.companySignedAt, L.dateLocale)}</Text>
           </View>
           <View style={s.certRow}>
-            <Text style={s.certKey}>IP</Text>
+            <Text style={s.certKey}>{L.ip}</Text>
             <Text style={s.certVal}>{sign?.companyIp || "—"}</Text>
           </View>
 
-          <Text style={s.certParty}>PARTNER</Text>
+          <Text style={s.certParty}>{L.partner}</Text>
           <View style={s.certRow}>
-            <Text style={s.certKey}>Firmante</Text>
+            <Text style={s.certKey}>{L.signer}</Text>
             <Text style={s.certVal}>
               {fields.partnerName} ({fields.username})
             </Text>
           </View>
           <View style={s.certRow}>
-            <Text style={s.certKey}>Fecha y hora</Text>
-            <Text style={s.certVal}>{fmtDate(sign?.partnerSignedAt)}</Text>
+            <Text style={s.certKey}>{L.dateTime}</Text>
+            <Text style={s.certVal}>{fmtDate(sign?.partnerSignedAt, L.dateLocale)}</Text>
           </View>
           <View style={s.certRow}>
-            <Text style={s.certKey}>IP</Text>
+            <Text style={s.certKey}>{L.ip}</Text>
             <Text style={s.certVal}>{sign?.partnerIp || "—"}</Text>
           </View>
           <View style={s.certRow}>
-            <Text style={s.certKey}>Dispositivo</Text>
+            <Text style={s.certKey}>{L.device}</Text>
             <Text style={s.certVal}>{sign?.partnerUserAgent || "—"}</Text>
           </View>
 
