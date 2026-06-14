@@ -7,16 +7,27 @@ import { NextRequest } from "next/server";
 // TMDB file paths look like "/abc123XYZ.jpg" (also .png / .svg for logos).
 const ALLOWED_PATH = /^\/[A-Za-z0-9._-]+\.(jpg|jpeg|png|svg|webp)$/;
 
+// Allowed TMDB size buckets. We default to w1280 instead of `original`:
+// `original` files are 2–8 MB each and stream through this function (counting
+// as Fast Origin + Fast Data Transfer on Vercel — a real cost driver once the
+// download galleries shipped). w1280 is still high quality for a download but
+// 5–10x smaller. Callers can opt back into full size with `?size=original`.
+const ALLOWED_SIZES = new Set([
+  "w300", "w500", "w780", "w1280", "original",
+]);
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const path = searchParams.get("path") || "";
   const name = searchParams.get("name") || "peekr-image";
+  const sizeParam = searchParams.get("size") || "w1280";
+  const size = ALLOWED_SIZES.has(sizeParam) ? sizeParam : "w1280";
 
   if (!ALLOWED_PATH.test(path)) {
     return new Response("Invalid image path", { status: 400 });
   }
 
-  const upstream = await fetch(`https://image.tmdb.org/t/p/original${path}`, {
+  const upstream = await fetch(`https://image.tmdb.org/t/p/${size}${path}`, {
     next: { revalidate: 604800 }, // 7d — TMDB images are immutable by path
   });
 

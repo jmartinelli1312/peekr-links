@@ -2,8 +2,12 @@ import { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
 import UserProfileClient from "./user-profile-client";
 
-// Server-rendered on every request — profile data should be fresh
-export const dynamic = "force-dynamic";
+// ISR: cache the rendered profile for 10 min instead of re-rendering on every
+// request. Public profiles don't need per-request freshness, and the previous
+// `force-dynamic` meant every bot/crawler hit ran a full SSR render + Supabase
+// queries with zero caching — a major driver of Function Invocations and Fast
+// Origin Transfer once AI crawlers were allowed (Jun 2026).
+export const revalidate = 600;
 
 const SITE = "https://www.peekr.app";
 

@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import PeekrbuzzDailyTab from "./PeekrbuzzDailyTab";
 import PulsoTab from "./PulsoTab";
 import GrowthPartnersTab from "./GrowthPartnersTab";
+import CreatorsSection from "./CreatorsSection";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 // Catches runtime exceptions inside WeeklyEditorialTab and shows the actual
@@ -1435,6 +1436,7 @@ export default function AdminPage() {
             {activeTab === "growth" && (
               <div style={{ marginTop: 20 }}>
                 <GrowthPartnersTab />
+                <CreatorsSection />
               </div>
             )}
 

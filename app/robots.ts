@@ -32,32 +32,62 @@ const DISALLOW = [
   "/*?tab=*",
 ];
 
-// AI assistants: allow them to read PUBLIC content so Peekr can be learned as
-// an entity and cited as a source (ChatGPT, Claude, Gemini, Perplexity, Meta).
-// Includes both training crawlers and on-demand user-fetch agents.
-const AI_BOTS = [
-  "GPTBot",            // OpenAI training
-  "OAI-SearchBot",     // ChatGPT search/citations
-  "ChatGPT-User",      // ChatGPT on-demand fetch (user asked to read a URL)
-  "ClaudeBot",         // Anthropic training
-  "anthropic-ai",      // Anthropic
-  "Claude-Web",        // Claude on-demand fetch
-  "CCBot",             // Common Crawl (feeds many models)
-  "Google-Extended",   // Gemini / Vertex grounding
-  "PerplexityBot",     // Perplexity index
-  "Perplexity-User",   // Perplexity on-demand fetch
-  "meta-externalagent",// Meta AI
-  "Applebot-Extended", // Apple Intelligence
+// AI bots split into two tiers based on COST vs VALUE (ver análisis de costos
+// de Vercel, jun 2026). Permitir TODOS los bots de IA los dejó crawlear el
+// sitemap completo (~4.5k URLs) en loop y ~3x'eó el costo de Vercel sin upside
+// de adquisición, porque el grueso de ese tráfico eran crawlers de training.
+//
+// TIER 1 — TRAINING crawlers (BLOQUEADOS): recorren TODO el sitemap repetido
+// para entrenar modelos base. El beneficio (que el modelo "sepa" de Peekr) es
+// indirecto y llega meses después en el próximo training. Costo alto y
+// constante hoy; no traen usuarios. → disallow total.
+const AI_TRAINING_BOTS = [
+  "GPTBot",             // OpenAI training
+  "ClaudeBot",          // Anthropic training
+  "anthropic-ai",       // Anthropic (UA de training legacy)
+  "CCBot",              // Common Crawl (alimenta muchos modelos)
+  "Google-Extended",    // Gemini / Vertex grounding (training)
+  "meta-externalagent", // Meta AI training
+  "Applebot-Extended",  // Apple Intelligence training
+];
+
+// TIER 2 — CITATION / on-demand fetch (PERMITIDOS): traen una URL puntual
+// cuando un usuario real te está por citar AHORA, o construyen el índice de
+// búsqueda que produce esas citas. Esto SÍ trae tráfico de alta intención y
+// cuesta poco (solo páginas relevantes). Throttled con crawlDelay y limitados
+// a contenido de alto valor (sin /u/ — los perfiles no aportan a citas).
+const AI_CITATION_BOTS = [
+  "OAI-SearchBot",   // índice de búsqueda de ChatGPT (citas)
+  "ChatGPT-User",    // fetch on-demand de ChatGPT (el usuario pidió leer la URL)
+  "Claude-Web",      // fetch on-demand de Claude
+  "PerplexityBot",   // índice de búsqueda de Perplexity (citas)
+  "Perplexity-User", // fetch on-demand de Perplexity
+];
+
+// Contenido de alto valor para citas (sin /*/u/ ni /api/og).
+const AI_CITATION_ALLOW = [
+  "/",
+  "/*/title/",
+  "/*/actor/",
+  "/*/lists/",
+  "/*/buzz/",
+  "/*/peeklist/",
 ];
 
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
-      // ── AI assistants — allow public content (was: blocked) ──────────────
+      // ── AI TRAINING crawlers — blocked (puro costo, sin tráfico) ──────────
       {
-        userAgent: AI_BOTS,
-        allow: ALLOW,
+        userAgent: AI_TRAINING_BOTS,
+        disallow: ["/"],
+      },
+      // ── AI CITATION / on-demand bots — allowed, throttled, alto valor ─────
+      {
+        userAgent: AI_CITATION_BOTS,
+        allow: AI_CITATION_ALLOW,
         disallow: DISALLOW,
+        crawlDelay: 10,
       },
       // ── Aggressive SEO scrapers / bad bots — block to reduce DB load ──────
       { userAgent: "AhrefsBot", disallow: ["/"] },

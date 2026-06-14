@@ -1,4 +1,4 @@
-export const revalidate = 21600; // 6h
+export const revalidate = 86400; // 24h — explore changes slowly; lower bot-driven revalidations
 
 import Link from "next/link";
 import { notFound } from "next/navigation";

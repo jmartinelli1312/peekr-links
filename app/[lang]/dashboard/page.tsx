@@ -62,19 +62,24 @@ export default function DashboardPage({ params }: { params: Promise<{ lang: stri
         router.replace("/login");
         return;
       }
+      // A creator/partner may own several country dashboards now. Fetch all of
+      // them; the country selector (fed by creator_dashboard_country_options)
+      // lets multi-country owners switch between their markets.
       const { data, error } = await supabase
         .from("creator_dashboards")
         .select("country_code")
         .eq("user_id", session.user.id)
-        .eq("enabled", true)
-        .maybeSingle();
+        .eq("enabled", true);
       if (!mounted) return;
-      if (error || !data) {
+      const owned = (data ?? [])
+        .map((r) => String(r.country_code).toUpperCase())
+        .sort();
+      if (error || owned.length === 0) {
         setGate("denied");
         router.replace(`/${lang}`);
         return;
       }
-      const own = (data.country_code as string).toUpperCase();
+      const own = owned[0];
       setCountry(own);
       setSelectedCountry(own);
       setGate("ok");

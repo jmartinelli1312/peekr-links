@@ -164,11 +164,11 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
           .select("user_id")
           .eq("user_id", session.user.id)
           .eq("enabled", true)
-          .maybeSingle(),
+          .limit(1),
       ]);
 
       setProfile((data as Profile | null) ?? null);
-      setIsCreator(!!creatorRow);
+      setIsCreator(Array.isArray(creatorRow) && creatorRow.length > 0);
       setCanImport(
         (data as { account_type?: string; creator_status?: string } | null)?.account_type === "creator" &&
           (data as { creator_status?: string } | null)?.creator_status === "approved"

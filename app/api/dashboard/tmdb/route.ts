@@ -48,8 +48,10 @@ export async function GET(req: NextRequest) {
     .select("country_code")
     .eq("user_id", user.id)
     .eq("enabled", true)
-    .maybeSingle();
-  if (!creator) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    .limit(1);
+  if (!creator || creator.length === 0) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) {
@@ -80,7 +82,7 @@ export async function GET(req: NextRequest) {
           .slice(0, 3),
       }));
 
-    return NextResponse.json({ people, country_code: creator.country_code });
+    return NextResponse.json({ people, country_code: creator[0].country_code });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "TMDB fetch failed" },

@@ -1,9 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 const BRAND = "#FA0082";
+
+// Countries that can be granted in a partner's stats dashboard.
+const DASH_COUNTRIES: { code: string; name: string }[] = [
+  { code: "AR", name: "Argentina" }, { code: "BR", name: "Brasil" },
+  { code: "MX", name: "México" }, { code: "CO", name: "Colombia" },
+  { code: "CL", name: "Chile" }, { code: "PE", name: "Perú" },
+  { code: "UY", name: "Uruguay" }, { code: "PY", name: "Paraguay" },
+  { code: "BO", name: "Bolivia" }, { code: "EC", name: "Ecuador" },
+  { code: "VE", name: "Venezuela" }, { code: "PA", name: "Panamá" },
+  { code: "CR", name: "Costa Rica" }, { code: "GT", name: "Guatemala" },
+  { code: "DO", name: "Rep. Dominicana" }, { code: "PR", name: "Puerto Rico" },
+  { code: "ES", name: "España" }, { code: "US", name: "Estados Unidos" },
+];
+
+type DashState = { loading: boolean; linked: boolean; handle: string; selected: string[] };
 
 type Contract = {
   id: string;
@@ -57,6 +72,11 @@ export default function GrowthPartnersTab() {
   const [busy, setBusy] = useState(false);
   const [signing, setSigning] = useState<Contract | null>(null);
   const [deleting, setDeleting] = useState<Contract | null>(null);
+
+  // Per-contract stats-dashboard country panel.
+  const [dashOpenId, setDashOpenId] = useState<string | null>(null);
+  const [dashByContract, setDashByContract] = useState<Record<string, DashState>>({});
+  const [dashSavingId, setDashSavingId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     country: "Argentina",
@@ -185,6 +205,71 @@ export default function GrowthPartnersTab() {
     alert("Link de firma copiado:\n" + url);
   };
 
+  const toggleDash = async (c: Contract) => {
+    if (dashOpenId === c.id) {
+      setDashOpenId(null);
+      return;
+    }
+    setDashOpenId(c.id);
+    if (!dashByContract[c.id]) {
+      setDashByContract((m) => ({ ...m, [c.id]: { loading: true, linked: false, handle: "", selected: [] } }));
+      try {
+        const res = await fetch(`/api/admin/growth-partners/${c.id}/dashboards`, {
+          headers: await authHeaders(),
+        });
+        const j = await res.json();
+        setDashByContract((m) => ({
+          ...m,
+          [c.id]: {
+            loading: false,
+            linked: !!j.linked,
+            handle: j.handle ?? "",
+            selected: Array.isArray(j.countries) ? j.countries : [],
+          },
+        }));
+      } catch {
+        setDashByContract((m) => ({ ...m, [c.id]: { loading: false, linked: false, handle: "", selected: [] } }));
+      }
+    }
+  };
+
+  const toggleDashCountry = (id: string, code: string) => {
+    setDashByContract((m) => {
+      const cur = m[id];
+      if (!cur) return m;
+      const has = cur.selected.includes(code);
+      return {
+        ...m,
+        [id]: {
+          ...cur,
+          selected: has ? cur.selected.filter((x) => x !== code) : [...cur.selected, code],
+        },
+      };
+    });
+  };
+
+  const saveDash = async (id: string) => {
+    const cur = dashByContract[id];
+    if (!cur) return;
+    setDashSavingId(id);
+    try {
+      const res = await fetch(`/api/admin/growth-partners/${id}/dashboards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+        body: JSON.stringify({ countries: cur.selected }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(j.error || "Error al guardar");
+        return;
+      }
+      setDashByContract((m) => ({ ...m, [id]: { ...cur, selected: j.countries ?? cur.selected } }));
+      alert("Países del dashboard actualizados.");
+    } finally {
+      setDashSavingId(null);
+    }
+  };
+
   // Group by country for the summary.
   const countries = Array.from(new Set(contracts.map((c) => c.country))).sort();
 
@@ -261,8 +346,11 @@ export default function GrowthPartnersTab() {
                   <tbody>
                     {rows.map((c) => {
                       const st = STATUS_LABEL[c.status] ?? { t: c.status, c: "#9a9a9a" };
+                      const dash = dashByContract[c.id];
+                      const open = dashOpenId === c.id;
                       return (
-                        <tr key={c.id} style={{ borderTop: "1px solid #ffffff14" }}>
+                        <Fragment key={c.id}>
+                        <tr style={{ borderTop: "1px solid #ffffff14" }}>
                           <td style={td}>
                             {c.partner_legal_name}
                             <div style={{ color: "#7a7a7a", fontSize: 11, marginTop: 2 }}>
@@ -289,11 +377,88 @@ export default function GrowthPartnersTab() {
                                 Copiar link partner
                               </button>
                             )}
+                            <button
+                              style={{ ...btnGhost, borderColor: open ? BRAND : "#ffffff22", color: open ? BRAND : "#eaeaea" }}
+                              onClick={() => toggleDash(c)}
+                            >
+                              {open ? "▲ Dashboard" : "📊 Dashboard países"}
+                            </button>
                             <button style={btnDanger} onClick={() => setDeleting(c)}>
                               Eliminar
                             </button>
                           </td>
                         </tr>
+                        {open && (
+                          <tr>
+                            <td colSpan={6} style={{ padding: "4px 10px 18px", background: "#0c0c11" }}>
+                              {!dash || dash.loading ? (
+                                <p style={{ color: "#888", margin: "8px 0" }}>Cargando…</p>
+                              ) : !dash.linked ? (
+                                <p style={{ color: "#ffb3b3", margin: "8px 0", fontSize: 13 }}>
+                                  No existe un perfil de Peekr con el usuario{" "}
+                                  <strong>@{dash.handle || c.username}</strong>. El partner necesita una
+                                  cuenta para poder asignarle estadísticas.
+                                </p>
+                              ) : (
+                                <div>
+                                  <div style={{ color: "#9a9a9a", fontSize: 12, margin: "8px 0 10px" }}>
+                                    Países cuyas estadísticas puede ver <strong style={{ color: "#eaeaea" }}>@{dash.handle}</strong> en su dashboard.
+                                    Destildá todo para no darle acceso a ninguno.
+                                  </div>
+                                  <div
+                                    style={{
+                                      display: "grid",
+                                      gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+                                      gap: 6,
+                                    }}
+                                  >
+                                    {DASH_COUNTRIES.map((co) => {
+                                      const checked = dash.selected.includes(co.code);
+                                      return (
+                                        <label
+                                          key={co.code}
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            padding: "6px 8px",
+                                            borderRadius: 8,
+                                            background: checked ? "rgba(250,0,130,0.12)" : "#15151b",
+                                            border: `1px solid ${checked ? BRAND : "#ffffff14"}`,
+                                            cursor: "pointer",
+                                            fontSize: 13,
+                                          }}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => toggleDashCountry(c.id, co.code)}
+                                          />
+                                          {co.name} <span style={{ color: "#7a7a7a" }}>({co.code})</span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 12 }}>
+                                    <button
+                                      style={btnPrimary}
+                                      onClick={() => saveDash(c.id)}
+                                      disabled={dashSavingId === c.id}
+                                    >
+                                      {dashSavingId === c.id ? "Guardando…" : "Guardar países"}
+                                    </button>
+                                    <span style={{ color: "#7a7a7a", fontSize: 12 }}>
+                                      {dash.selected.length === 0
+                                        ? "Sin acceso a ningún país"
+                                        : `${dash.selected.length} país${dash.selected.length === 1 ? "" : "es"} seleccionado${dash.selected.length === 1 ? "" : "s"}`}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                        </Fragment>
                       );
                     })}
                   </tbody>
