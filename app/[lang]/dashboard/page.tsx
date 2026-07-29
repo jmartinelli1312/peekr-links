@@ -141,6 +141,11 @@ export default function DashboardPage({ params }: { params: Promise<{ lang: stri
                 cursor: "pointer",
               }}
             >
+              {isAdmin && (
+                <option value="ALL" style={{ color: "#000" }}>
+                  🌎 {lang === "en" ? "All countries" : lang === "pt" ? "Todos os países" : "Todos los países"}
+                </option>
+              )}
               {countryOptions.map((o) => (
                 <option key={o.country_code} value={o.country_code} style={{ color: "#000" }}>
                   {countryName(o.country_code)}
@@ -211,7 +216,7 @@ export default function DashboardPage({ params }: { params: Promise<{ lang: stri
       {tab === "country" ? (
         <CountryMetricsTab supabase={supabase} range={range} onlyOnboarded={onlyOnboarded} lang={lang} country={selectedCountry} />
       ) : (
-        <TitlesTab supabase={supabase} range={range} lang={lang} country={selectedCountry} />
+        <TitlesTab supabase={supabase} range={range} lang={lang} country={selectedCountry} preset={preset} />
       )}
     </div>
   );

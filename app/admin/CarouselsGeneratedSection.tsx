@@ -33,6 +33,7 @@ interface CarouselRow {
   generated_by: string | null;
   created_at: string;
   updated_at: string;
+  sneakpeek_id: string | null;
 }
 
 interface ArticleLite {
@@ -69,7 +70,7 @@ export default function CarouselsGeneratedSection({
   const [igStatusById, setIgStatusById] = useState<Record<number, IgQueueStatus>>({});
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [busyAction, setBusyAction] = useState<null | "approve" | "regen" | "skip" | "download">(null);
+  const [busyAction, setBusyAction] = useState<null | "approve" | "regen" | "skip" | "download" | "sneakpeek">(null);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
@@ -106,7 +107,7 @@ export default function CarouselsGeneratedSection({
     const { data: rows, error: cErr } = await supabase
       .from("peekrbuzz_carousels")
       .select(
-        "id, article_id, version, status, category, category_emoji, title, thesis, cta, slides, caption, hashtags, mood, palette, ig_queue_id, generated_by, created_at, updated_at",
+        "id, article_id, version, status, category, category_emoji, title, thesis, cta, slides, caption, hashtags, mood, palette, ig_queue_id, generated_by, created_at, updated_at, sneakpeek_id",
       )
       .in("article_id", articleIds)
       .neq("status", "discarded")
@@ -194,6 +195,28 @@ export default function CarouselsGeneratedSection({
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error aprobando");
+    } finally {
+      setBusyId(null); setBusyAction(null);
+    }
+  }
+
+  async function publishSneakPeek(c: CarouselRow) {
+    if (c.sneakpeek_id) return;
+    if (!confirm("¿Publicar este carrusel en SneakPeeks bajo @peekr_oficial? (sin títulos referenciados)")) return;
+    setBusyId(c.id); setBusyAction("sneakpeek"); setError(""); setInfo("");
+    try {
+      const res = await authedFetch("/api/admin/peekrbuzz/carousels/publish-sneakpeek", "POST", { carousel_id: c.id });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; slides?: number; already?: boolean };
+      if (!res.ok) setError(data.error ?? `HTTP ${res.status}`);
+      else {
+        setInfo(data.already
+          ? "Ya estaba publicado en SneakPeeks"
+          : `Publicado en SneakPeeks (@peekr_oficial) — ${data.slides ?? 0} slides`);
+        await load();
+        onChanged?.();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error publicando en SneakPeeks");
     } finally {
       setBusyId(null); setBusyAction(null);
     }
@@ -389,6 +412,7 @@ export default function CarouselsGeneratedSection({
         .cg-btn:disabled { opacity: 0.45; cursor: not-allowed; }
         .cg-btn.approve  { background: #22c55e; border-color: #22c55e; color: #052e16; }
         .cg-btn.download { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.6); color: #c7d2fe; }
+        .cg-btn.sneakpeek { background: rgba(204,0,102,0.18); border-color: rgba(204,0,102,0.6); color: #ff80bf; }
         .cg-btn.regen    { background: transparent; border-color: rgba(245,158,11,0.55); color: #fcd34d; }
         .cg-btn.skip     { background: transparent; border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.55); }
 
@@ -501,6 +525,21 @@ export default function CarouselsGeneratedSection({
                     ? (canShareImages ? "Preparando…" : "Empaquetando…")
                     : (canShareImages ? "📥 Guardar en galería" : "⬇ Descargar todos (ZIP)")}
                 </button>
+
+                {Array.isArray(c.slides) && c.slides.length >= 2 && (
+                  <button
+                    className="cg-btn sneakpeek"
+                    onClick={() => publishSneakPeek(c)}
+                    disabled={isBusy || !!c.sneakpeek_id}
+                    title="Publica este carrusel en SneakPeeks (Flutter) bajo @peekr_oficial (sin títulos referenciados)"
+                  >
+                    {c.sneakpeek_id
+                      ? "✓ En SneakPeeks"
+                      : isBusy && busyAction === "sneakpeek"
+                        ? "Publicando…"
+                        : "📲 Publicar en SneakPeeks"}
+                  </button>
+                )}
 
                 {c.status === "draft" && (
                   <>

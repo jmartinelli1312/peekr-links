@@ -31,6 +31,8 @@ interface DraftRow {
   error: string | null;
   generated_at: string | null;
   seed_title: string | null;
+  reco_tmdb_ids: number[] | null;
+  sneakpeek_id: string | null;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -53,7 +55,7 @@ export default function WeekendRecoSection({
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [busyAction, setBusyAction] = useState<null | "approve" | "skip" | "download" | "generate">(null);
+  const [busyAction, setBusyAction] = useState<null | "approve" | "skip" | "download" | "generate" | "sneakpeek">(null);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
@@ -83,9 +85,11 @@ export default function WeekendRecoSection({
     const { data, error: fErr } = await supabase
       .from("peekrbuzz_ig_queue")
       .select(
-        "id, draft_type, hook_text, caption, article_url, slide_urls, status, ig_media_id, threads_post_id, published_at, scheduled_for, error, generated_at, seed_title",
+        "id, draft_type, hook_text, caption, article_url, slide_urls, status, ig_media_id, threads_post_id, published_at, scheduled_for, error, generated_at, seed_title, reco_tmdb_ids, sneakpeek_id",
       )
-      .eq("draft_type", "weekend_reco")
+      // stat_carousel drafts come from the creators dashboard ("Enviar al IG
+      // de Peekr") and share this same review/approve pipeline.
+      .in("draft_type", ["weekend_reco", "stat_carousel"])
       .gte("generated_at", dayStartUtc.toISOString())
       .lt("generated_at", dayEndUtc.toISOString())
       .order("generated_at", { ascending: false });
@@ -147,6 +151,27 @@ export default function WeekendRecoSection({
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error aprobando");
+    } finally {
+      setBusyId(null); setBusyAction(null);
+    }
+  }
+
+  async function publishSneakPeek(d: DraftRow) {
+    if (d.sneakpeek_id) return;
+    if (!confirm("¿Publicar este carrusel en SneakPeeks bajo @peekr_oficial, con sus títulos referenciados?")) return;
+    setBusyId(d.id); setBusyAction("sneakpeek"); setError(""); setInfo("");
+    try {
+      const res = await authedFetch("/api/admin/peekrbuzz/weekend-reco/publish-sneakpeek", "POST", { draft_id: d.id });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; titles_linked?: number; already?: boolean };
+      if (!res.ok) setError(data.error ?? `HTTP ${res.status}`);
+      else {
+        setInfo(data.already
+          ? "Ya estaba publicado en SneakPeeks"
+          : `Publicado en SneakPeeks (@peekr_oficial) con ${data.titles_linked ?? 0} títulos`);
+        await load();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error publicando en SneakPeeks");
     } finally {
       setBusyId(null); setBusyAction(null);
     }
@@ -271,6 +296,7 @@ export default function WeekendRecoSection({
         .wr-btn.approve  { background: #22c55e; border-color: #22c55e; color: #052e16; }
         .wr-btn.download { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.6); color: #c7d2fe; }
         .wr-btn.skip     { background: transparent; border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.55); }
+        .wr-btn.sneakpeek { background: rgba(204,0,102,0.18); border-color: rgba(204,0,102,0.6); color: #ff80bf; }
 
         .wr-status-line { font-size: 12px; padding: 8px 12px; border-radius: 8px; }
         .wr-status-line.info    { color: #67e8f9; background: rgba(6,182,212,0.1);  border: 1px solid rgba(6,182,212,0.3); }
@@ -381,6 +407,21 @@ export default function WeekendRecoSection({
                     title={canShareImages ? "Abre el menú compartir → tocá Guardar imágenes" : "Descarga cada slide al disco"}
                   >
                     {isBusy && busyAction === "download" ? "Preparando…" : (canShareImages ? "📥 Guardar en galería" : "⬇ Descargar slides")}
+                  </button>
+                )}
+
+                {slideUrls.length >= 2 && (
+                  <button
+                    className="wr-btn sneakpeek"
+                    onClick={() => publishSneakPeek(d)}
+                    disabled={isBusy || !!d.sneakpeek_id}
+                    title="Publica este carrusel en SneakPeeks (Flutter) bajo @peekr_oficial, con los títulos referenciados"
+                  >
+                    {d.sneakpeek_id
+                      ? "✓ En SneakPeeks"
+                      : isBusy && busyAction === "sneakpeek"
+                        ? "Publicando…"
+                        : "📲 Publicar en SneakPeeks"}
                   </button>
                 )}
 
