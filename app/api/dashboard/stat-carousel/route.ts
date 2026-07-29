@@ -97,6 +97,9 @@ export async function POST(req: NextRequest) {
     if (!byKey.has(cacheKey(r.tmdb_id, r.media_type))) byKey.set(cacheKey(r.tmdb_id, r.media_type), r);
   }
 
+  // Modest image sizes keep the satori/resvg render inside the edge worker's
+  // memory budget (w1280 backdrops triggered WORKER_RESOURCE_LIMIT). w780 is
+  // plenty under the dark overlays; posters show at 110px wide.
   const enriched = items.map((i, idx) => {
     const c = byKey.get(cacheKey(i.tmdb_id, i.media_type));
     const poster = c?.poster_es ?? c?.poster_path ?? null;
@@ -108,8 +111,8 @@ export async function POST(req: NextRequest) {
       media_type: i.media_type,
       title: c?.title_es ?? c?.title_en ?? `#${i.tmdb_id}`,
       poster_path: poster,
-      posterUrl: poster ? `${TMDB_IMG}/w342${poster}` : null,
-      backdropUrl: backdrop ? `${TMDB_IMG}/w1280${backdrop}` : null,
+      posterUrl: poster ? `${TMDB_IMG}/w185${poster}` : null,
+      backdropUrl: backdrop ? `${TMDB_IMG}/w780${backdrop}` : null,
       director: c?.director ?? null,
       year,
     };
@@ -145,17 +148,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Supabase env not configured" }, { status: 500 });
   }
 
+  // Edge workers occasionally die with WORKER_RESOURCE_LIMIT (546) when a
+  // saturated isolate picks up the request — a retry lands on a fresh worker
+  // and virtually always succeeds.
   async function renderSlide(slideIndex: number, type: string, data: unknown): Promise<string> {
-    const res = await fetch(`${supabaseUrl}/functions/v1/render_single_slide`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ draft_id: `stat-${rowId}`, slide_index: slideIndex, type, data }),
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (!res.ok) throw new Error(`render slide ${slideIndex}: ${res.status} ${await res.text()}`);
-    const j = (await res.json()) as { url?: string };
-    if (!j.url) throw new Error(`render slide ${slideIndex}: no url`);
-    return j.url;
+    let lastErr = "";
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const res = await fetch(`${supabaseUrl}/functions/v1/render_single_slide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ draft_id: `stat-${rowId}`, slide_index: slideIndex, type, data }),
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (res.ok) {
+        const j = (await res.json()) as { url?: string };
+        if (j.url) return j.url;
+        lastErr = "no url in response";
+      } else {
+        lastErr = `${res.status} ${await res.text().catch(() => "")}`;
+        // Only retry worker/transient failures; a 4xx won't get better.
+        if (res.status < 500) break;
+      }
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 800 * attempt));
+    }
+    throw new Error(`render slide ${slideIndex}: ${lastErr}`);
   }
 
   try {
