@@ -45,7 +45,14 @@ export async function POST(req: NextRequest) {
     data: { user },
     error: userError,
   } = await admin.auth.getUser(token);
-  if (userError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (userError || !user) {
+    // Surface WHY validation failed (expired token, bad signature, etc.) — an
+    // opaque 401 here cost us a debugging round-trip already.
+    return NextResponse.json(
+      { error: `Unauthorized: ${userError?.message ?? "no user for token"}` },
+      { status: 401 },
+    );
+  }
 
   const [{ data: prof }, { data: dash }] = await Promise.all([
     admin.from("profiles").select("is_admin").eq("id", user.id).maybeSingle(),

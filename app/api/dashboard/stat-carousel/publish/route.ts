@@ -30,7 +30,12 @@ export async function POST(req: NextRequest) {
     data: { user },
     error: userError,
   } = await admin.auth.getUser(token);
-  if (userError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (userError || !user) {
+    return NextResponse.json(
+      { error: `Unauthorized: ${userError?.message ?? "no user for token"}` },
+      { status: 401 },
+    );
+  }
 
   const { data: prof } = await admin
     .from("profiles")
