@@ -21,10 +21,10 @@ type Range = { from: string; to: string };
 type TitlesResult = {
   movies_most_viewed: TitleRow[];
   series_most_viewed: TitleRow[];
+  movies_most_watchlisted: TitleRow[];
+  series_most_watchlisted: TitleRow[];
   movies_top_rated_peekr: TitleRow[];
   series_top_rated_peekr: TitleRow[];
-  movies_top_rated_tmdb: TitleRow[];
-  series_top_rated_tmdb: TitleRow[];
 };
 
 type Person = {
@@ -190,7 +190,7 @@ function StatCarouselBar({
   );
 }
 
-function TitleGrid({ items, lang, metric, t }: { items: TitleRow[]; lang: Lang; metric: "views" | "peekr" | "tmdb"; t: DashTexts }) {
+function TitleGrid({ items, lang, metric, t }: { items: TitleRow[]; lang: Lang; metric: "views" | "peekr" | "saves"; t: DashTexts }) {
   if (!items || items.length === 0) {
     return <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>{t.noDataPeriod}</div>;
   }
@@ -203,7 +203,7 @@ function TitleGrid({ items, lang, metric, t }: { items: TitleRow[]; lang: Lang; 
             ? t.badgeViews(fmtInt(it.views_count ?? 0))
             : metric === "peekr"
             ? `★ ${it.peekr_avg ?? "—"} (${fmtInt(it.ratings_count ?? 0)})`
-            : `TMDB ${it.vote_average ?? "—"}`;
+            : t.badgeSaves(fmtInt(it.saves_count ?? 0));
         return (
           <div key={`${it.tmdb_id}-${i}`} style={{ minWidth: 0 }}>
             <div
@@ -314,6 +314,15 @@ export default function TitlesTab({
             <StatCarouselBar supabase={supabase} kind="series_most_viewed" metricLabel={t.seriesMostViewed} items={titles.series_most_viewed} country={country} preset={preset} range={range} lang={lang} />
           </Panel>
 
+          <Panel title={t.moviesMostWatchlisted} subtitle={t.mostWatchlistedSub}>
+            <TitleGrid items={titles.movies_most_watchlisted} lang={lang} metric="saves" t={t} />
+            <StatCarouselBar supabase={supabase} kind="movies_most_watchlisted" metricLabel={t.moviesMostWatchlisted} items={titles.movies_most_watchlisted} country={country} preset={preset} range={range} lang={lang} />
+          </Panel>
+          <Panel title={t.seriesMostWatchlisted} subtitle={t.mostWatchlistedSub}>
+            <TitleGrid items={titles.series_most_watchlisted} lang={lang} metric="saves" t={t} />
+            <StatCarouselBar supabase={supabase} kind="series_most_watchlisted" metricLabel={t.seriesMostWatchlisted} items={titles.series_most_watchlisted} country={country} preset={preset} range={range} lang={lang} />
+          </Panel>
+
           <Panel title={t.moviesTopPeekr} subtitle={t.topPeekrSub}>
             <TitleGrid items={titles.movies_top_rated_peekr} lang={lang} metric="peekr" t={t} />
             <StatCarouselBar supabase={supabase} kind="movies_top_rated_peekr" metricLabel={t.moviesTopPeekr} items={titles.movies_top_rated_peekr} country={country} preset={preset} range={range} lang={lang} />
@@ -321,15 +330,6 @@ export default function TitlesTab({
           <Panel title={t.seriesTopPeekr} subtitle={t.topPeekrSub}>
             <TitleGrid items={titles.series_top_rated_peekr} lang={lang} metric="peekr" t={t} />
             <StatCarouselBar supabase={supabase} kind="series_top_rated_peekr" metricLabel={t.seriesTopPeekr} items={titles.series_top_rated_peekr} country={country} preset={preset} range={range} lang={lang} />
-          </Panel>
-
-          <Panel title={t.moviesTopTmdb} subtitle={t.topTmdbSub}>
-            <TitleGrid items={titles.movies_top_rated_tmdb} lang={lang} metric="tmdb" t={t} />
-            <StatCarouselBar supabase={supabase} kind="movies_top_rated_tmdb" metricLabel={t.moviesTopTmdb} items={titles.movies_top_rated_tmdb} country={country} preset={preset} range={range} lang={lang} />
-          </Panel>
-          <Panel title={t.seriesTopTmdb} subtitle={t.topTmdbSub}>
-            <TitleGrid items={titles.series_top_rated_tmdb} lang={lang} metric="tmdb" t={t} />
-            <StatCarouselBar supabase={supabase} kind="series_top_rated_tmdb" metricLabel={t.seriesTopTmdb} items={titles.series_top_rated_tmdb} country={country} preset={preset} range={range} lang={lang} />
           </Panel>
         </>
       )}

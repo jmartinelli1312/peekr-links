@@ -103,6 +103,7 @@ export type TitleRow = {
   views_count?: number;
   peekr_avg?: number;
   ratings_count?: number;
+  saves_count?: number;
 };
 
 export function pickTitle(t: TitleRow, lang: Lang): string {

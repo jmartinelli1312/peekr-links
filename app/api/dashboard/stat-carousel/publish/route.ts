@@ -74,15 +74,25 @@ export async function POST(req: NextRequest) {
   };
   const items = Array.isArray(row.items) ? (row.items as Item[]) : [];
 
-  // ── Target: SneakPeek under the caller's account ───────────────────────────
+  // ── Target: SneakPeek under @peekr_oficial ─────────────────────────────────
+  // Stat carousels are Peekr-platform data, so they publish under the official
+  // account regardless of which dashboard owner generated them.
   if (target === "sneakpeek") {
     if (row.sneakpeek_id) {
       return NextResponse.json({ ok: true, already: true, sneakpeek_id: row.sneakpeek_id });
     }
+    const { data: official } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("username", "peekr_oficial")
+      .maybeSingle();
+    if (!official?.id) {
+      return NextResponse.json({ error: "@peekr_oficial account not found" }, { status: 500 });
+    }
     const { data: sp, error: spErr } = await admin
       .from("sneak_peeks")
       .insert({
-        creator_id: row.user_id,
+        creator_id: official.id,
         content_type: "carousel",
         image_urls: slideUrls,
         thumbnail_url: slideUrls[0],
