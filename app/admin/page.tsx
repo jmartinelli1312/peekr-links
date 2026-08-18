@@ -8,6 +8,8 @@ import PeekrbuzzDailyTab from "./PeekrbuzzDailyTab";
 import PulsoTab from "./PulsoTab";
 import GrowthPartnersTab from "./GrowthPartnersTab";
 import CreatorsSection from "./CreatorsSection";
+import SourceTab from "./SourceTab";
+import VideoStoriesTab from "./VideoStoriesTab";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 // Catches runtime exceptions inside WeeklyEditorialTab and shows the actual
@@ -321,7 +323,9 @@ export default function AdminPage() {
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
-  const [activeTab, setActiveTab] = useState<"pulso" | "editorial" | "growth">("pulso");
+  const [activeTab, setActiveTab] = useState<
+    "pulso" | "editorial" | "growth" | "source" | "video-stories"
+  >("pulso");
   const [pendingCounts, setPendingCounts] = useState({ articles: 0, carousels: 0, creators: 0, newsletters: 0 });
   const [pendingArticles, setPendingArticles] = useState<PendingArticle[]>([]);
   const [pendingCarousels, setPendingCarousels] = useState<PendingCarousel[]>([]);
@@ -1423,6 +1427,20 @@ export default function AdminPage() {
               >
                 🤝 Growth Partners
               </button>
+              <button
+                className={`admin-tab${activeTab === "source" ? " active" : ""}`}
+                onClick={() => setActiveTab("source")}
+                style={{ fontWeight: 700, color: "#FA0082" }}
+              >
+                🎯 Source
+              </button>
+              <button
+                className={`admin-tab${activeTab === "video-stories" ? " active" : ""}`}
+                onClick={() => setActiveTab("video-stories")}
+                style={{ fontWeight: 700, color: "#FA0082" }}
+              >
+                🎬 Video Stories
+              </button>
             </div>
 
             {/* ===================== TAB: PULSO ===================== */}
@@ -1431,6 +1449,16 @@ export default function AdminPage() {
                 <PulsoTab supabase={supabase} />
               </div>
             )}
+
+            {/* ===================== TAB: SOURCE ===================== */}
+            {activeTab === "source" && (
+              <div style={{ marginTop: 20 }}>
+                <SourceTab supabase={supabase} />
+              </div>
+            )}
+
+            {/* ===================== TAB: VIDEO STORIES ===================== */}
+            {activeTab === "video-stories" && <VideoStoriesTab />}
 
             {/* ===================== TAB: GROWTH PARTNERS ===================== */}
             {activeTab === "growth" && (

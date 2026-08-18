@@ -296,6 +296,7 @@ export default function PulsoTab({ supabase }: Props) {
   const [behaviorTab, setBehaviorTab] = useState<BehaviorSeries>("ratings");
   const [topMetric, setTopMetric] = useState<TopMetric>("ratings");
   const [topCreators, setTopCreators] = useState<Creator[]>([]);
+  const [newsletter, setNewsletter] = useState<NewsletterWeek[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -305,7 +306,7 @@ export default function PulsoTab({ supabase }: Props) {
     try {
       const { fromTs, toTsExclusive } = artRangeToUtcIso(range);
 
-      const [acqRes, acqGlobalRes, retRes, wowRes, cohortRes, behRes, tsRes, appRes, abRes] = await Promise.all([
+      const [acqRes, acqGlobalRes, retRes, wowRes, cohortRes, behRes, tsRes, appRes, abRes, nlRes] = await Promise.all([
         supabase.rpc("admin_kpi_acquisition", {
           p_from: fromTs,
           p_to_exclusive: toTsExclusive,
@@ -340,6 +341,7 @@ export default function PulsoTab({ supabase }: Props) {
           p_from: fromTs,
           p_to_exclusive: toTsExclusive,
         }),
+        supabase.rpc("admin_kpi_newsletter", { p_weeks: 8 }),
       ]);
 
       if (acqRes.error) throw acqRes.error;
@@ -351,6 +353,7 @@ export default function PulsoTab({ supabase }: Props) {
       if (tsRes.error) throw tsRes.error;
       if (appRes.error) throw appRes.error;
       if (abRes.error) throw abRes.error;
+      if (nlRes.error) throw nlRes.error;
 
       setAcquisition(acqRes.data as Acquisition);
       setAcquisitionGlobal(acqGlobalRes.data as AcquisitionGlobal);
@@ -361,6 +364,7 @@ export default function PulsoTab({ supabase }: Props) {
       setTimeSeries(tsRes.data as TimeSeries);
       setAppEngagement(appRes.data as AppEngagement);
       setAbFeed(abRes.data as ABFeed);
+      setNewsletter(nlRes.data as NewsletterWeek[]);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -521,6 +525,9 @@ export default function PulsoTab({ supabase }: Props) {
 
       {/* ═════ 3.5 USO DE LA APP (tiempo + secciones) ═════ */}
       <AppEngagementSection data={appEngagement} />
+
+      {/* ═════ 3.55 NEWSLETTER (enviados + aperturas por semana) ═════ */}
+      <NewsletterSection data={newsletter} />
 
       {/* ═════ 3.6 A/B FEED vs IMMERSIVE ═════ */}
       <ABFeedSection data={abFeed} />
@@ -773,6 +780,52 @@ function AppEngagementSection({ data }: { data: AppEngagement | null }) {
           ))
         )}
       </div>
+    </section>
+  );
+}
+
+type NewsletterWeek = { week: string; sent: number; opened: number; open_rate: number };
+
+function NewsletterSection({ data }: { data: NewsletterWeek[] | null }) {
+  if (!data) return null;
+  const rows = data;
+  const noOpens = rows.length > 0 && rows.every((r) => r.opened === 0);
+  const maxSent = rows.reduce((m, r) => Math.max(m, r.sent), 0) || 1;
+  const fmtWeek = (w: string) => {
+    try {
+      return new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "short", timeZone: "UTC" }).format(new Date(w + "T00:00:00Z"));
+    } catch { return w; }
+  };
+  return (
+    <section style={sectionCard}>
+      <h3 style={sectionTitle}>📧 Newsletter</h3>
+      <p style={{ color: "#fff8", fontSize: 12, marginTop: -4, marginBottom: 14 }}>
+        Emails enviados y abiertos por semana (<strong style={{ color: "#fff" }}>newsletter_sends</strong> ⨝ <strong style={{ color: "#fff" }}>email_events</strong>).
+        Barra rosa = enviados · verde = abiertos. El subject &quot;SneakPeeks&quot; personalizado arranca el próximo lunes.
+      </p>
+      {noOpens && (
+        <div style={{ background: "rgba(255,180,0,0.10)", border: "1px solid rgba(255,180,0,0.3)", color: "#ffd27a", borderRadius: 10, padding: "10px 14px", fontSize: 12, marginBottom: 14, lineHeight: 1.5 }}>
+          ⚠ Todavía no hay aperturas registradas. Para medirlas, registrá el webhook <strong>https://peekr.app/api/webhooks/resend</strong> en el dashboard de Resend (eventos <strong>email.opened</strong> y <strong>email.delivered</strong>) y activá open tracking.
+        </div>
+      )}
+      {rows.length === 0 ? (
+        <div style={{ fontSize: 13, color: "#fff6" }}>Sin envíos registrados</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {rows.map((r) => (
+            <div key={r.week} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 64, fontSize: 13, color: "#fffc" }}>{fmtWeek(r.week)}</div>
+              <div style={{ flex: 1, background: "rgba(255,255,255,0.06)", borderRadius: 6, height: 20, position: "relative" }}>
+                <div style={{ width: `${(r.sent / maxSent) * 100}%`, background: "#FA0082", height: "100%", borderRadius: 6, minWidth: 2 }} />
+                <div style={{ width: `${(r.opened / maxSent) * 100}%`, background: "#22c55e", height: "100%", borderRadius: 6, position: "absolute", top: 0, left: 0, minWidth: r.opened ? 2 : 0 }} />
+              </div>
+              <div style={{ width: 220, textAlign: "right", fontSize: 12, color: "#fff9" }}>
+                {formatNumber(r.sent)} env · {formatNumber(r.opened)} abiertos · <strong style={{ color: r.open_rate >= 20 ? "#22c55e" : "#fff" }}>{r.open_rate}%</strong>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

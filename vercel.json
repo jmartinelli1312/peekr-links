@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/select-daily-peekrbuzz",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/generate-video-story",
+      "schedule": "0 * * * *"
     }
   ]
 }

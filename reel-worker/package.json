@@ -1,0 +1,13 @@
+{
+  "name": "peekr-reel-worker",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Renders Peekr title reels (trailer + ElevenLabs voice + captions) — runs on Railway",
+  "scripts": {
+    "start": "node src/index.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.99.1"
+  }
+}

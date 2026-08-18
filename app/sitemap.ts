@@ -87,7 +87,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     buildTitlesSitemap(),
     buildActorsSitemap(),
   ]);
-  return [...staticAndEditorial, ...titles, ...actors];
+  // Actor pages excluidas del sitemap (jun 2026): ~80% del costo de crawl de
+  // Vercel sin valor SEO. Bloqueadas también en robots.ts (Disallow /*/actor/).
+  void actors;
+  return [...staticAndEditorial, ...titles];
 }
 
 async function buildStaticAndEditorialSitemap(): Promise<MetadataRoute.Sitemap> {

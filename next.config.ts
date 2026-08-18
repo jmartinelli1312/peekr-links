@@ -73,6 +73,16 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [
+      // Anti-clickjacking: forbid framing of every page. peekr-links has no
+      // pages meant to be embedded, so denying all framing is safe. Closes the
+      // "missing X-Frame-Options / CSP frame-ancestors" report.
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+        ],
+      },
       {
         source: "/apple-app-site-association",
         headers: [

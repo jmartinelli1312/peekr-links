@@ -366,7 +366,10 @@ export async function generateMetadata({ params }: PageProps) {
   // no inflar con técnicos de un episodio). Cuando Peekr tenga ratings sobre
   // sus títulos, podremos endurecer este gate a "aparece en algún título
   // con rating Peekr".
-  const indexable = castCount >= 5;
+  // Actor SEO retirado (jun 2026): el crawl de actores era ~80% del costo de
+  // Vercel sin valor de adquisición. Bloqueado en robots.ts + fuera del sitemap;
+  // noindex incondicional para deindexar las que Google ya tenga.
+  const indexable = false;
 
   const seoTitle = t.seoTitle(actor.name);
   const description =

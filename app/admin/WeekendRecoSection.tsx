@@ -89,7 +89,7 @@ export default function WeekendRecoSection({
       )
       // stat_carousel drafts come from the creators dashboard ("Enviar al IG
       // de Peekr") and share this same review/approve pipeline.
-      .in("draft_type", ["weekend_reco", "stat_carousel"])
+      .in("draft_type", ["weekend_reco", "stat_carousel", "reel"])
       .gte("generated_at", dayStartUtc.toISOString())
       .lt("generated_at", dayEndUtc.toISOString())
       .order("generated_at", { ascending: false });
@@ -381,8 +381,12 @@ export default function WeekendRecoSection({
                 <div className="wr-slides">
                   {slideUrls.map((url, i) => (
                     <div key={i} className="wr-slide">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`Slide ${i + 1}`} loading="lazy" />
+                      {url.toLowerCase().endsWith(".mp4") ? (
+                        <video src={url} controls playsInline preload="metadata" style={{ width: "100%", borderRadius: 8, background: "#000" }} />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={url} alt={`Slide ${i + 1}`} loading="lazy" />
+                      )}
                       <span className="wr-slide-num">{i + 1}/{slideUrls.length}</span>
                     </div>
                   ))}

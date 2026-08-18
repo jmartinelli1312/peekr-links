@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import CarouselSection from "./CarouselSection";
 import CarouselsGeneratedSection from "./CarouselsGeneratedSection";
 import WeekendRecoSection from "./WeekendRecoSection";
+import ReelsSection from "./ReelsSection";
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -725,6 +726,9 @@ export default function PeekrbuzzDailyTab({ supabase }: { supabase: SupabaseClie
             available). Renders FIRST so the high-impact weekly post sits at the
             top when an editor scrolls down. */}
         <WeekendRecoSection supabase={supabase} date={targetDate} key={`weekend-${targetDate}-${carouselRefreshKey}`} />
+
+        {/* 3a' — Title reels (trailer + voice + captions → IG Reels). */}
+        <ReelsSection supabase={supabase} />
 
         {/* 3b — Cinematic carousels per published daily article. */}
         <CarouselsGeneratedSection

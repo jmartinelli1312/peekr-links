@@ -64,9 +64,11 @@ export async function POST(req: NextRequest) {
     );
   }
   const slideUrls = (draft.slide_urls as string[] | null) ?? [];
-  if (slideUrls.length < 2) {
+  // Reels carry a single MP4; image carousels need 2-10 slides.
+  const minSlides = draft.draft_type === "reel" ? 1 : 2;
+  if (slideUrls.length < minSlides) {
     return NextResponse.json(
-      { error: `draft has ${slideUrls.length} slide_urls; need ≥ 2 to publish to IG` },
+      { error: `draft has ${slideUrls.length} slide_urls; need ≥ ${minSlides} to publish to IG` },
       { status: 400 },
     );
   }

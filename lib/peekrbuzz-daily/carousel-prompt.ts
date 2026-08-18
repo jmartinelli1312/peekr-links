@@ -130,9 +130,9 @@ Slide 10 — THESIS + CTA (fusionados)
   · "headline" = la tesis reflexiva (en español, frase corta y poderosa).
     Ejemplos de espíritu: "Hollywood solo te recuerda mientras dejes ganancia." / "La fama no protege a nadie." / "Un papel puede cambiarlo todo."
   · "body" = el CTA en español, premium, elegante, minimalista.
-    Ejemplos: "Si amás el cine, este es tu lugar. → @peekr.app" /
+    Ejemplos: "Si amás el cine, este es tu lugar. → @peekr.oficial" /
               "Descubrí qué ver con Peekr." /
-              "Seguinos en @peekr.app para más historias."
+              "Seguinos en @peekr.oficial para más historias."
   · kind = "thesis"
 
 🖼️ IMÁGENES POR SLIDE
@@ -162,7 +162,7 @@ Sugerí 4 hex codes coherentes con el mood del artículo:
 Una caption en español de 2-4 párrafos cortos:
   1. Hook emocional (2-3 líneas).
   2. Mini-desarrollo (la tesis sin spoilear el carrusel).
-  3. CTA con @peekr.app.
+  3. CTA con @peekr.oficial.
   4. Línea de hashtags (los mismos que devolvés en "hashtags").
 Total ≤ 1200 caracteres.
 

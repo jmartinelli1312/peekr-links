@@ -9,9 +9,6 @@ import { useEffect, useState } from "react";
 type Lang = "en" | "es" | "pt";
 type Platform = "ios" | "android" | "other";
 
-const APP_STORE_URL = "https://apps.apple.com/app/id6756285989";
-const PLAY_STORE_URL =
-  "https://play.google.com/store/apps/details?id=com.peekr.peekr";
 const DISMISSED_KEY = "peekr_app_banner_dismissed";
 
 function detectPlatform(): Platform {
@@ -43,6 +40,10 @@ const copy: Record<Lang, Record<Platform | "other", { message: string; cta: stri
 export default function AppDownloadBanner({ lang }: { lang: Lang }) {
   const [visible, setVisible] = useState(false);
   const [platform, setPlatform] = useState<Platform>("other");
+  // Query of the current page — carries acquisition params (e.g.
+  // ?s=creator:cineytvfans from a shared profile link). Forwarded to /get so
+  // the install is attributed to that source.
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     try {
@@ -53,6 +54,7 @@ export default function AppDownloadBanner({ lang }: { lang: Lang }) {
 
     const p = detectPlatform();
     setPlatform(p);
+    setSearch(window.location.search || "");
 
     // Only show on actual mobile devices — no banner on desktop
     if (p === "ios" || p === "android") {
@@ -62,12 +64,10 @@ export default function AppDownloadBanner({ lang }: { lang: Lang }) {
 
   if (!visible) return null;
 
-  const storeUrl =
-    platform === "ios"
-      ? APP_STORE_URL
-      : platform === "android"
-      ? PLAY_STORE_URL
-      : `https://www.peekr.app/${lang}/download-app`;
+  // Route through /get so platform detection + attribution (token logging,
+  // Android referrer, iOS clipboard) happen server-side. Forward the page's
+  // query string so ?s=<creator/referral/channel> survives to the install.
+  const href = `/get${search}`;
 
   const t = copy[lang][platform];
 
@@ -169,8 +169,7 @@ export default function AppDownloadBanner({ lang }: { lang: Lang }) {
         </div>
 
         <a
-          href={storeUrl}
-          target="_blank"
+          href={href}
           rel="noreferrer noopener"
           className="app-banner-cta"
           onClick={dismiss}

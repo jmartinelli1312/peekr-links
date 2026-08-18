@@ -165,7 +165,7 @@ export default async function LangLayout({
 
           <div className="peekr-footer-social">
             <a
-              href="https://instagram.com/peekr.app"
+              href="https://instagram.com/peekr.oficial"
               target="_blank"
               rel="noreferrer"
               className="peekr-footer-link"

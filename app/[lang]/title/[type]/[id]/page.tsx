@@ -9,6 +9,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
 import TitleTabs from "./title-tabs";
+import AppBounce from "./AppBounce";
 import ReviewsModal from "@/components/ReviewsModal";
 import WatchedButton from "@/components/title-actions/WatchedButton";
 import TitleLikeButton from "@/components/title-actions/TitleLikeButton";
@@ -1079,6 +1080,7 @@ export default async function TitlePage({ params }: PageProps) {
 
   return (
     <>
+      <AppBounce type={type} id={numericId} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

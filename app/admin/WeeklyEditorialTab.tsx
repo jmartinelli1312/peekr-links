@@ -1246,7 +1246,7 @@ export default function WeeklyEditorialTab({
             {
               icon: "📸",
               name: "Instagram",
-              handle: "@peekr.app",
+              handle: "@peekr.oficial",
               freq: "2 posts diarios + reco jueves",
               detail: "Actualidad 13:00 UTC · Historia 15:00 UTC · Reco carrusel los jueves 14:00 UTC",
               color: "#e1306c",
@@ -1254,7 +1254,7 @@ export default function WeeklyEditorialTab({
             {
               icon: "🧵",
               name: "Threads",
-              handle: "@peekr.app",
+              handle: "@peekr.oficial",
               freq: "2 posts diarios + reco jueves",
               detail: "Mismo contenido que IG — publicación simultánea",
               color: "#888",

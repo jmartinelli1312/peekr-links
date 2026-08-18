@@ -7,7 +7,6 @@ const ALLOW = [
   "/",
   "/api/og",
   "/*/title/",
-  "/*/actor/",
   "/*/lists/",
   "/*/buzz/",
   "/*/peeklist/",
@@ -17,6 +16,9 @@ const ALLOW = [
 // Private / auth / heavy paths — never crawl.
 const DISALLOW = [
   "/api/",
+  // Actor pages: ~80% del costo de crawl de Vercel (699K renders/día, 0% cache,
+  // working set casi todo único → ISR no ayuda). SEO long-tail de baja intención. (jun 2026)
+  "/*/actor/",
   "/admin",
   "/admin/",
   "/login",
@@ -68,7 +70,6 @@ const AI_CITATION_BOTS = [
 const AI_CITATION_ALLOW = [
   "/",
   "/*/title/",
-  "/*/actor/",
   "/*/lists/",
   "/*/buzz/",
   "/*/peeklist/",
@@ -97,8 +98,8 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: "PetalBot", disallow: ["/"] },
       { userAgent: "Bytespider", disallow: ["/"] },
       // ── Search engines — throttle on heavy paths ─────────────────────────
-      { userAgent: "Googlebot", allow: ["/"], crawlDelay: 2 },
-      { userAgent: "bingbot", allow: ["/"], crawlDelay: 2 },
+      { userAgent: "Googlebot", allow: ["/"], disallow: ["/*/actor/"], crawlDelay: 2 },
+      { userAgent: "bingbot", allow: ["/"], disallow: ["/*/actor/"], crawlDelay: 2 },
       // ── Everyone else ────────────────────────────────────────────────────
       {
         userAgent: "*",

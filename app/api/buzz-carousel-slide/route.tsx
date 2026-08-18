@@ -484,7 +484,7 @@ function ThesisSlide(p: SlideParams): ReactElement {
             letterSpacing: 2,
           }}
         >
-          @PEEKR.APP
+          @PEEKR.OFICIAL
         </div>
       </div>
     </div>

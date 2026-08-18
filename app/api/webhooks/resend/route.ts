@@ -110,5 +110,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Feedback loop: hard bounces and spam complaints mean we must stop mailing
+  // this address. Add it to the suppression list so the newsletter send skips
+  // it forever (protects sender reputation; a bounced address in a Resend batch
+  // also 422s the whole batch). Idempotent.
+  if ((eventType === "bounced" || eventType === "complained") && email) {
+    await supabase.from("email_suppressions").upsert(
+      {
+        email: email.trim().toLowerCase(),
+        reason: eventType,
+        source: "resend_webhook",
+      },
+      { onConflict: "email", ignoreDuplicates: true }
+    );
+  }
+
   return NextResponse.json({ ok: true });
 }

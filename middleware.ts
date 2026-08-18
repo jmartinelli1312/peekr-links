@@ -10,7 +10,7 @@ const RESERVED_SEGMENTS = new Set([
   "es", "en", "pt",
   "about", "admin", "get", "go", "lang", "login", "privacy", "signup",
   "support", "terms", "test", "test-supabase", "lists", "buzz",
-  "creators-guide",
+  "creators-guide", "quiz",
   "contact", "download-app", "explore", "title", "actor",
   "activity", "peeklist", "user", "u", "api", "sitemap.xml",
   "robots.txt", "apple-app-site-association", ".well-known", "sneak-peek",
@@ -132,7 +132,11 @@ export function middleware(request: NextRequest) {
   }
 
   // 3) Si el host o el path cambiaron, hacer UN ÚNICO redirect 308
-  const needsHostFix = host !== CANONICAL_HOST;
+  // Only enforce the canonical host in production. Otherwise `next dev` on
+  // localhost 308-redirects every request off to www.peekr.app, making local
+  // preview impossible.
+  const needsHostFix =
+    process.env.NODE_ENV === "production" && host !== CANONICAL_HOST;
   const needsPathFix = finalPath !== pathname;
 
   if (needsHostFix || needsPathFix) {

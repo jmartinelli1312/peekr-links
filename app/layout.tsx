@@ -67,8 +67,8 @@ const organizationSchema = {
     name: "Jorge Martinelli",
   },
   sameAs: [
-    "https://www.instagram.com/peekr.app",
-    "https://www.threads.net/@peekr.app",
+    "https://www.instagram.com/peekr.oficial",
+    "https://www.threads.net/@peekr.oficial",
     "https://x.com/peekr_oficial",
     "https://apps.apple.com/app/peekr-app/id6756285989",
     "https://play.google.com/store/apps/details?id=com.peekr.peekr",
